@@ -5,6 +5,6 @@
   "minAppVersion": "1.4.11",
   "description": "Security and feature updates for the remotely-save unofficial plugin allowing users to synchronize notes between local device and the cloud service. Not backwards compatible.",
   "author": "nightfall-yl",
-  "authorUrl": "https://github.com/nightfall-yl",
+  "authorUrl": "https://github.com/nightfall-yl/remotely-sync",
   "isDesktopOnly": false
 }
