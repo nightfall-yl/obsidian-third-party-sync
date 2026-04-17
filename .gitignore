@@ -1,0 +1,25 @@
+/build/
+
+# Intellij
+*.iml
+.idea
+
+# npm
+node_modules
+
+# build
+*.js.map
+
+# obsidian
+data.json
+
+# build
+test.sh
+
+.DS_Store
+**/.DS_Store
+
+dev/
+
+# WorkBuddy memory
+.workbuddy/memory/
