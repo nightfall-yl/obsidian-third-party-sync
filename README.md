@@ -129,6 +129,7 @@ cp main.js styles.css manifest.json /your/path/to/vault/.obsidian/plugins/remote
 ## 鸣谢
 
 - 感谢 @fyears 的原始 [Remotely Save](https://github.com/remotely-save/remotely-save) 插件
+- 感谢 @sboesen 的分支项目[Remotely Sync](https://github.com/sboesen/remotely-sync)插件
 
 
 ## 问题反馈
