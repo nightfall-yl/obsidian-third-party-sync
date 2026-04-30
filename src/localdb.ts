@@ -17,6 +17,7 @@ export const DEFAULT_TBL_FILE_HISTORY = "filefolderoperationhistory";
 export const DEFAULT_TBL_SYNC_MAPPING = "syncmetadatahistory";
 export const DEFAULT_SYNC_PLANS_HISTORY = "syncplanshistory";
 export const DEFAULT_TBL_VAULT_RANDOM_ID_MAPPING = "vaultrandomidmapping";
+export const DEFAULT_TBL_LOGGER_OUTPUT = "loggeroutput";
 export const DEFAULT_TBL_PREV_SYNC_RECORDS = "prevsyncrecords";
 
 export interface FileFolderHistoryRecord {
