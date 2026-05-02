@@ -75,6 +75,27 @@ const config = {
     new (require('webpack').ProvidePlugin)({
       Buffer: ['buffer', 'Buffer'],
     }),
+    {
+      apply: (compiler) => {
+        compiler.hooks.afterEmit.tap('CopyToDist', () => {
+          if (isProd) {
+            const distDir = path.join(__dirname, 'dist');
+            if (!fs.existsSync(distDir)) {
+              fs.mkdirSync(distDir, { recursive: true });
+            }
+            const filesToCopy = ['main.js', 'manifest.json', 'styles.css'];
+            filesToCopy.forEach(file => {
+              const src = path.join(__dirname, file);
+              const dest = path.join(distDir, file);
+              if (fs.existsSync(src)) {
+                fs.copyFileSync(src, dest);
+                console.log(`Copied ${file} to dist/`);
+              }
+            });
+          }
+        });
+      },
+    },
   ],
   mode: isProd ? 'production' : 'development',
   devtool: isProd ? false : 'inline-source-map',
