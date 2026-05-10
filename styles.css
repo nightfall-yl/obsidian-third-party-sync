@@ -9,12 +9,31 @@
 }
 
 .settings-auth-related {
-  border-top: 1px solid var(--background-modifier-border);
-  padding-top: 18px;
 }
 
 .s3-disclaimer {
   font-weight: bold;
+}
+.settings-long-desc {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  padding-left: 18px;
+  margin-bottom: 18px;
+}
+.settings-long-desc h2 {
+  font-size: var(--font-ui-medium);
+  font-weight: var(--bold-weight);
+  margin-bottom: 4px;
+}
+.settings-long-desc p {
+  margin: 6px 0;
+}
+.settings-long-desc ul {
+  margin: 4px 0 8px 16px;
+  padding: 0;
+}
+.settings-long-desc li {
+  margin: 2px 0;
 }
 .s3-hide {
   display: none;

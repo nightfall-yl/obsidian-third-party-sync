@@ -194,7 +194,7 @@
   "settings_onedrive_disclaimer1": "声明：此插件不是微软或 OneDrive 的官方产品。",
   "settings_onedrive_disclaimer2": "声明：您所输入的信息存储于本地。其它有害的或者出错的插件，是有可能读取到这些信息的。如果您发现了 OneDrive 有不符合预期的访问，请立刻从 https://microsoft.com/consent 删除记录于此插件的连接鉴权。",
   "settings_onedrive_folder": "我们会在您的 OneDrive 上创建此文件夹并在里面同步：/Apps/{{pluginID}}/{{remoteBaseDir}}。",
-  "settings_onedrive_nobiz": "现在只支持个人版 OneDrive。（暂时）并不支持企业版 OneDrive。",
+  "settings_onedrive_nobiz": "现在只支持个人版 OneDrive，暂不支持企业版 OneDrive。",
   "settings_onedrive_revoke": "撤回鉴权",
   "settings_onedrive_revoke_desc": "您现在使用了用户名 {{username}} 来连接。如果想取消连接，请点击此按钮。",
   "settings_onedrive_revoke_button": "撤回鉴权",
