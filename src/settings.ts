@@ -4,6 +4,7 @@ import {
   Notice,
   PluginSettingTab,
   Setting,
+  SettingGroup,
   Platform,
   requireApiVersion,
   setIcon,
@@ -452,18 +453,37 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
     //////////////////////////////////////////////////
 
     // we need to create the div in advance of any other service divs
-    const serviceChooserDiv = containerEl.createDiv();
-    serviceChooserDiv.createEl("h2", { text: t("settings_chooseservice") });
+    const sgChooser = new SettingGroup(containerEl);
+    sgChooser.setHeading(t("settings_chooseservice"));
+
+    //////////////////////////////////////////////////
+    // below for service detail (unified group)
+    //////////////////////////////////////////////////
+
+    const serviceHeadings: Record<string, string> = {
+      s3: t("settings_s3"),
+      onedrive: t("settings_onedrive"),
+      webdav: t("settings_webdav"),
+    };
+
+    // 声明部分 - 在卡片外，位于选择器和服务详情之间
+    const s3DescContainer = containerEl.createDiv({ cls: "s3-hide" });
+    const onedriveDescContainer = containerEl.createDiv({ cls: "onedrive-hide" });
+    const webdavDescContainer = containerEl.createDiv({ cls: "webdav-hide" });
+
+    const sgServiceDetail = new SettingGroup(containerEl);
+    sgServiceDetail.setHeading(serviceHeadings[this.plugin.settings.serviceType]);
+
+    // 收集各服务的 setting 元素用于切换显隐
+    const s3Settings: Setting[] = [];
+    const onedriveSettings: Setting[] = [];
+    const webdavSettings: Setting[] = [];
 
     //////////////////////////////////////////////////
     // below for s3
     //////////////////////////////////////////////////
 
-    const s3Div = containerEl.createEl("div", { cls: "s3-hide" });
-    s3Div.toggleClass("s3-hide", this.plugin.settings.serviceType !== "s3");
-    s3Div.createEl("h2", { text: t("settings_s3") });
-
-    const s3LongDescDiv = s3Div.createEl("div", { cls: "settings-long-desc" });
+    const s3LongDescDiv = s3DescContainer.createEl("div", { cls: "settings-long-desc" });
 
     for (const c of [
       t("settings_s3_disclaimer1"),
@@ -504,172 +524,184 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       });
     }
 
-    new Setting(s3Div)
-      .setName(t("settings_s3_endpoint"))
-      .setDesc(t("settings_s3_endpoint"))
-      .addText((text) =>
-        text
-          .setPlaceholder("")
-          .setValue(this.plugin.settings.s3.s3Endpoint)
-          .onChange(async (value) => {
-            this.plugin.settings.s3.s3Endpoint = value.trim();
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(s3Div)
-      .setName(t("settings_s3_region"))
-      .setDesc(t("settings_s3_region_desc"))
-      .addText((text) =>
-        text
-          .setPlaceholder("")
-          .setValue(`${this.plugin.settings.s3.s3Region}`)
-          .onChange(async (value) => {
-            this.plugin.settings.s3.s3Region = value.trim();
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(s3Div)
-      .setName(t("settings_s3_accesskeyid"))
-      .setDesc(t("settings_s3_accesskeyid_desc"))
-      .addText((text) => {
-        wrapTextWithPasswordHide(text);
-        text
-          .setPlaceholder("")
-          .setValue(`${this.plugin.settings.s3.s3AccessKeyID}`)
-          .onChange(async (value) => {
-            this.plugin.settings.s3.s3AccessKeyID = value.trim();
-            await this.plugin.saveSettings();
-          });
-      });
-
-    new Setting(s3Div)
-      .setName(t("settings_s3_secretaccesskey"))
-      .setDesc(t("settings_s3_secretaccesskey_desc"))
-      .addText((text) => {
-        wrapTextWithPasswordHide(text);
-        text
-          .setPlaceholder("")
-          .setValue(`${this.plugin.settings.s3.s3SecretAccessKey}`)
-          .onChange(async (value) => {
-            this.plugin.settings.s3.s3SecretAccessKey = value.trim();
-            await this.plugin.saveSettings();
-          });
-      });
-
-    new Setting(s3Div)
-      .setName(t("settings_s3_bucketname"))
-      .setDesc(t("settings_s3_bucketname"))
-      .addText((text) =>
-        text
-          .setPlaceholder("")
-          .setValue(`${this.plugin.settings.s3.s3BucketName}`)
-          .onChange(async (value) => {
-            this.plugin.settings.s3.s3BucketName = value.trim();
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(s3Div)
-      .setName(t("settings_s3_urlstyle"))
-      .setDesc(t("settings_s3_urlstyle_desc"))
-      .addDropdown((dropdown) => {
-        dropdown.addOption(
-          "virtualHostedStyle",
-          t("settings_s3_urlstyle_virtual")
-        );
-        dropdown.addOption("pathStyle", t("settings_s3_urlstyle_path"));
-        dropdown
-          .setValue(
-            this.plugin.settings.s3.forcePathStyle
-              ? "pathStyle"
-              : "virtualHostedStyle"
-          )
-          .onChange(async (val: string) => {
-            this.plugin.settings.s3.forcePathStyle = val === "pathStyle";
-            await this.plugin.saveSettings();
-          });
-      });
-
-    if (VALID_REQURL) {
-      new Setting(s3Div)
-        .setName(t("settings_s3_bypasscorslocally"))
-        .setDesc(t("settings_s3_bypasscorslocally_desc"))
-        .addDropdown((dropdown) => {
-          dropdown
-            .addOption("disable", t("disable"))
-            .addOption("enable", t("enable"));
-
-          dropdown
-            .setValue(
-              `${this.plugin.settings.s3.bypassCorsLocally ? "enable" : "disable"
-              }`
-            )
+    sgServiceDetail.addSetting((setting) => {
+      s3Settings.push(setting);
+      return setting.setName(t("settings_s3_endpoint"))
+        .setDesc(t("settings_s3_endpoint"))
+        .addText((text) =>
+          text
+            .setPlaceholder("")
+            .setValue(this.plugin.settings.s3.s3Endpoint)
             .onChange(async (value) => {
-              if (value === "enable") {
-                this.plugin.settings.s3.bypassCorsLocally = true;
-              } else {
-                this.plugin.settings.s3.bypassCorsLocally = false;
-              }
+              this.plugin.settings.s3.s3Endpoint = value.trim();
+              await this.plugin.saveSettings();
+            })
+        );
+    });
+
+    sgServiceDetail.addSetting((setting) => {
+      s3Settings.push(setting);
+      return setting.setName(t("settings_s3_region"))
+        .setDesc(t("settings_s3_region_desc"))
+        .addText((text) =>
+          text
+            .setPlaceholder("")
+            .setValue(`${this.plugin.settings.s3.s3Region}`)
+            .onChange(async (value) => {
+              this.plugin.settings.s3.s3Region = value.trim();
+              await this.plugin.saveSettings();
+            })
+        );
+    });
+
+    sgServiceDetail.addSetting((setting) => {
+      s3Settings.push(setting);
+      return setting.setName(t("settings_s3_accesskeyid"))
+        .setDesc(t("settings_s3_accesskeyid_desc"))
+        .addText((text) => {
+          wrapTextWithPasswordHide(text);
+          text
+            .setPlaceholder("")
+            .setValue(`${this.plugin.settings.s3.s3AccessKeyID}`)
+            .onChange(async (value) => {
+              this.plugin.settings.s3.s3AccessKeyID = value.trim();
               await this.plugin.saveSettings();
             });
         });
+    });
+
+    sgServiceDetail.addSetting((setting) => {
+      s3Settings.push(setting);
+      return setting.setName(t("settings_s3_secretaccesskey"))
+        .setDesc(t("settings_s3_secretaccesskey_desc"))
+        .addText((text) => {
+          wrapTextWithPasswordHide(text);
+          text
+            .setPlaceholder("")
+            .setValue(`${this.plugin.settings.s3.s3SecretAccessKey}`)
+            .onChange(async (value) => {
+              this.plugin.settings.s3.s3SecretAccessKey = value.trim();
+              await this.plugin.saveSettings();
+            });
+        });
+    });
+
+    sgServiceDetail.addSetting((setting) => {
+      s3Settings.push(setting);
+      return setting.setName(t("settings_s3_bucketname"))
+        .setDesc(t("settings_s3_bucketname"))
+        .addText((text) =>
+          text
+            .setPlaceholder("")
+            .setValue(`${this.plugin.settings.s3.s3BucketName}`)
+            .onChange(async (value) => {
+              this.plugin.settings.s3.s3BucketName = value.trim();
+              await this.plugin.saveSettings();
+            })
+        );
+    });
+
+    sgServiceDetail.addSetting((setting) => {
+      s3Settings.push(setting);
+      return setting.setName(t("settings_s3_urlstyle"))
+        .setDesc(t("settings_s3_urlstyle_desc"))
+        .addDropdown((dropdown) => {
+          dropdown.addOption(
+            "virtualHostedStyle",
+            t("settings_s3_urlstyle_virtual")
+          );
+          dropdown.addOption("pathStyle", t("settings_s3_urlstyle_path"));
+          dropdown
+            .setValue(
+              this.plugin.settings.s3.forcePathStyle
+                ? "pathStyle"
+                : "virtualHostedStyle"
+            )
+            .onChange(async (val: string) => {
+              this.plugin.settings.s3.forcePathStyle = val === "pathStyle";
+              await this.plugin.saveSettings();
+            });
+        });
+    });
+
+    if (VALID_REQURL) {
+      sgServiceDetail.addSetting((setting) => {
+        s3Settings.push(setting);
+        return setting.setName(t("settings_s3_bypasscorslocally"))
+          .setDesc(t("settings_s3_bypasscorslocally_desc"))
+          .addDropdown((dropdown) => {
+            dropdown
+              .addOption("disable", t("disable"))
+              .addOption("enable", t("enable"));
+
+            dropdown
+              .setValue(
+                `${this.plugin.settings.s3.bypassCorsLocally ? "enable" : "disable"
+                }`
+              )
+              .onChange(async (value) => {
+                if (value === "enable") {
+                  this.plugin.settings.s3.bypassCorsLocally = true;
+                } else {
+                  this.plugin.settings.s3.bypassCorsLocally = false;
+                }
+                await this.plugin.saveSettings();
+              });
+          });
+      });
     }
 
-    new Setting(s3Div)
-      .setName(t("settings_s3_parts"))
-      .setDesc(t("settings_s3_parts_desc"))
-      .addDropdown((dropdown) => {
-        dropdown.addOption("1", "1");
-        dropdown.addOption("2", "2");
-        dropdown.addOption("3", "3");
-        dropdown.addOption("5", "5");
-        dropdown.addOption("10", "10");
-        dropdown.addOption("15", "15");
-        dropdown.addOption("20", t("settings_s3_parts_default"));
+    sgServiceDetail.addSetting((setting) => {
+      s3Settings.push(setting);
+      return setting.setName(t("settings_s3_parts"))
+        .setDesc(t("settings_s3_parts_desc"))
+        .addDropdown((dropdown) => {
+          dropdown.addOption("1", "1");
+          dropdown.addOption("2", "2");
+          dropdown.addOption("3", "3");
+          dropdown.addOption("5", "5");
+          dropdown.addOption("10", "10");
+          dropdown.addOption("15", "15");
+          dropdown.addOption("20", t("settings_s3_parts_default"));
 
-        dropdown
-          .setValue(`${this.plugin.settings.s3.partsConcurrency}`)
-          .onChange(async (val) => {
-            const realVal = parseInt(val);
-            this.plugin.settings.s3.partsConcurrency = realVal;
-            await this.plugin.saveSettings();
-          });
-      });
-
-    new Setting(s3Div)
-      .setName(t("settings_checkonnectivity"))
-      .setDesc(t("settings_checkonnectivity_desc"))
-      .addButton(async (button) => {
-        button.setButtonText(t("settings_checkonnectivity_button"));
-        button.onClick(async () => {
-          new Notice(t("settings_checkonnectivity_checking"));
-          const client = new RemoteClient("s3", this.plugin.settings.s3);
-          const errors = { msg: "" };
-          const res = await client.checkConnectivity((err: any) => {
-            errors.msg = err;
-          });
-          if (res) {
-            new Notice(t("settings_s3_connect_succ"));
-          } else {
-            new Notice(t("settings_s3_connect_fail"));
-            new Notice(errors.msg);
-          }
+          dropdown
+            .setValue(`${this.plugin.settings.s3.partsConcurrency}`)
+            .onChange(async (val) => {
+              const realVal = parseInt(val);
+              this.plugin.settings.s3.partsConcurrency = realVal;
+              await this.plugin.saveSettings();
+            });
         });
-      });
+    });
+
+    sgServiceDetail.addSetting((setting) => {
+      s3Settings.push(setting);
+      return setting.setName(t("settings_checkonnectivity"))
+        .setDesc(t("settings_checkonnectivity_desc"))
+        .addButton(async (button) => {
+          button.setButtonText(t("settings_checkonnectivity_button"));
+          button.onClick(async () => {
+            new Notice(t("settings_checkonnectivity_checking"));
+            const client = new RemoteClient("s3", this.plugin.settings.s3);
+            const errors = { msg: "" };
+            const res = await client.checkConnectivity((err: any) => {
+              errors.msg = err;
+            });
+            if (res) {
+              new Notice(t("settings_s3_connect_succ"));
+            } else {
+              new Notice(t("settings_s3_connect_fail"));
+              new Notice(errors.msg);
+            }
+          });
+        });
+    });
 
     //////////////////////////////////////////////////
     // below for onedrive
     //////////////////////////////////////////////////
 
-    const onedriveDiv = containerEl.createEl("div", { cls: "onedrive-hide" });
-    onedriveDiv.toggleClass(
-      "onedrive-hide",
-      this.plugin.settings.serviceType !== "onedrive"
-    );
-    onedriveDiv.createEl("h2", { text: t("settings_onedrive") });
-    const onedriveLongDescDiv = onedriveDiv.createEl("div", {
+    const onedriveLongDescDiv = onedriveDescContainer.createEl("div", {
       cls: "settings-long-desc",
     });
     for (const c of [
@@ -695,7 +727,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       text: t("settings_onedrive_nobiz"),
     });
 
-    const onedriveSelectAuthDiv = onedriveDiv.createDiv();
+    const onedriveSelectAuthDiv = onedriveDescContainer.createDiv();
     const onedriveAuthDiv = onedriveSelectAuthDiv.createDiv({
       cls: "onedrive-auth-button-hide settings-auth-related",
     });
@@ -703,45 +735,49 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       cls: "onedrive-revoke-auth-button-hide settings-auth-related",
     });
 
-    const onedriveRevokeAuthSetting = new Setting(onedriveRevokeAuthDiv)
-      .setName(t("settings_onedrive_revoke"))
-      .setDesc(
-        t("settings_onedrive_revoke_desc", {
-          username: this.plugin.settings.onedrive.username,
-        })
-      )
-      .addButton(async (button) => {
-        button.setButtonText(t("settings_onedrive_revoke_button"));
-        button.onClick(async () => {
-          new OnedriveRevokeAuthModal(
-            this.app,
-            this.plugin,
-            onedriveAuthDiv,
-            onedriveRevokeAuthDiv
-          ).open();
+    const onedriveRevokeAuthSetting = sgServiceDetail.addSetting((setting) => {
+      onedriveSettings.push(setting);
+      return setting.setName(t("settings_onedrive_revoke"))
+        .setDesc(
+          t("settings_onedrive_revoke_desc", {
+            username: this.plugin.settings.onedrive.username,
+          })
+        )
+        .addButton(async (button) => {
+          button.setButtonText(t("settings_onedrive_revoke_button"));
+          button.onClick(async () => {
+            new OnedriveRevokeAuthModal(
+              this.app,
+              this.plugin,
+              onedriveAuthDiv,
+              onedriveRevokeAuthDiv
+            ).open();
+          });
         });
-      });
+    });
 
-    new Setting(onedriveAuthDiv)
-      .setName(t("settings_onedrive_auth"))
-      .setDesc(t("settings_onedrive_auth_desc"))
-      .addButton(async (button) => {
-        button.setButtonText(t("settings_onedrive_auth_button"));
-        button.onClick(async () => {
-          const modal = new OnedriveAuthModal(
-            this.app,
-            this.plugin,
-            onedriveAuthDiv,
-            onedriveRevokeAuthDiv,
-            onedriveRevokeAuthSetting
-          );
-          this.plugin.oauth2Info.helperModal = modal;
-          this.plugin.oauth2Info.authDiv = onedriveAuthDiv;
-          this.plugin.oauth2Info.revokeDiv = onedriveRevokeAuthDiv;
-          this.plugin.oauth2Info.revokeAuthSetting = onedriveRevokeAuthSetting;
-          modal.open();
+    sgServiceDetail.addSetting((setting) => {
+      onedriveSettings.push(setting);
+      return setting.setName(t("settings_onedrive_auth"))
+        .setDesc(t("settings_onedrive_auth_desc"))
+        .addButton(async (button) => {
+          button.setButtonText(t("settings_onedrive_auth_button"));
+          button.onClick(async () => {
+            const modal = new OnedriveAuthModal(
+              this.app,
+              this.plugin,
+              onedriveAuthDiv,
+              onedriveRevokeAuthDiv,
+              onedriveRevokeAuthSetting
+            );
+            this.plugin.oauth2Info.helperModal = modal;
+            this.plugin.oauth2Info.authDiv = onedriveAuthDiv;
+            this.plugin.oauth2Info.revokeDiv = onedriveRevokeAuthDiv;
+            this.plugin.oauth2Info.revokeAuthSetting = onedriveRevokeAuthSetting;
+            modal.open();
+          });
         });
-      });
+    });
 
     onedriveAuthDiv.toggleClass(
       "onedrive-auth-button-hide",
@@ -754,72 +790,68 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
 
     let newOnedriveRemoteBaseDir =
       this.plugin.settings.onedrive.remoteBaseDir || "";
-    new Setting(onedriveDiv)
-      .setName(t("settings_remotebasedir"))
-      .setDesc(t("settings_remotebasedir_desc"))
-      .addText((text) =>
-        text
-          .setPlaceholder(this.app.vault.getName())
-          .setValue(newOnedriveRemoteBaseDir)
-          .onChange((value) => {
-            newOnedriveRemoteBaseDir = value.trim();
-          })
-      )
-      .addButton((button) => {
-        button.setButtonText(t("confirm"));
-        button.onClick(() => {
-          new ChangeRemoteBaseDirModal(
-            this.app,
-            this.plugin,
-            newOnedriveRemoteBaseDir,
-            "onedrive"
-          ).open();
-        });
-      });
-
-    new Setting(onedriveDiv)
-      .setName(t("settings_checkonnectivity"))
-      .setDesc(t("settings_checkonnectivity_desc"))
-      .addButton(async (button) => {
-        button.setButtonText(t("settings_checkonnectivity_button"));
-        button.onClick(async () => {
-          new Notice(t("settings_checkonnectivity_checking"));
-          const self = this;
-          const client = new RemoteClient(
-            "onedrive",
-            undefined,
-            undefined,
-            this.plugin.settings.onedrive,
-            this.app.vault.getName(),
-            () => self.plugin.saveSettings()
-          );
-
-          const errors = { msg: "" };
-          const res = await client.checkConnectivity((err: any) => {
-            errors.msg = `${err}`;
+    sgServiceDetail.addSetting((setting) => {
+      onedriveSettings.push(setting);
+      return setting.setName(t("settings_remotebasedir"))
+        .setDesc(t("settings_remotebasedir_desc"))
+        .addText((text) =>
+          text
+            .setPlaceholder(this.app.vault.getName())
+            .setValue(newOnedriveRemoteBaseDir)
+            .onChange((value) => {
+              newOnedriveRemoteBaseDir = value.trim();
+            })
+        )
+        .addButton((button) => {
+          button.setButtonText(t("confirm"));
+          button.onClick(() => {
+            new ChangeRemoteBaseDirModal(
+              this.app,
+              this.plugin,
+              newOnedriveRemoteBaseDir,
+              "onedrive"
+            ).open();
           });
-          if (res) {
-            new Notice(t("settings_onedrive_connect_succ"));
-          } else {
-            new Notice(t("settings_onedrive_connect_fail"));
-            new Notice(errors.msg);
-          }
         });
-      });
+    });
+
+    sgServiceDetail.addSetting((setting) => {
+      onedriveSettings.push(setting);
+      return setting.setName(t("settings_checkonnectivity"))
+        .setDesc(t("settings_checkonnectivity_desc"))
+        .addButton(async (button) => {
+          button.setButtonText(t("settings_checkonnectivity_button"));
+          button.onClick(async () => {
+            new Notice(t("settings_checkonnectivity_checking"));
+            const self = this;
+            const client = new RemoteClient(
+              "onedrive",
+              undefined,
+              undefined,
+              this.plugin.settings.onedrive,
+              this.app.vault.getName(),
+              () => self.plugin.saveSettings()
+            );
+
+            const errors = { msg: "" };
+            const res = await client.checkConnectivity((err: any) => {
+              errors.msg = `${err}`;
+            });
+            if (res) {
+              new Notice(t("settings_onedrive_connect_succ"));
+            } else {
+              new Notice(t("settings_onedrive_connect_fail"));
+              new Notice(errors.msg);
+            }
+          });
+        });
+    });
 
     //////////////////////////////////////////////////
     // below for webdav
     //////////////////////////////////////////////////
 
-    const webdavDiv = containerEl.createEl("div", { cls: "webdav-hide" });
-    webdavDiv.toggleClass(
-      "webdav-hide",
-      this.plugin.settings.serviceType !== "webdav"
-    );
-
-    webdavDiv.createEl("h2", { text: t("settings_webdav") });
-
-    const webdavLongDescDiv = webdavDiv.createEl("div", {
+    const webdavLongDescDiv = webdavDescContainer.createEl("div", {
       cls: "settings-long-desc",
     });
 
@@ -845,199 +877,220 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       }),
     });
 
-    new Setting(webdavDiv)
-      .setName(t("settings_webdav_addr"))
-      .setDesc(t("settings_webdav_addr_desc"))
-      .addText((text) =>
-        text
-          .setPlaceholder("")
-          .setValue(this.plugin.settings.webdav.address)
-          .onChange(async (value) => {
-            this.plugin.settings.webdav.address = value.trim();
-            if (
-              this.plugin.settings.webdav.depth === "auto_1" ||
-              this.plugin.settings.webdav.depth === "auto_infinity"
-            ) {
-              this.plugin.settings.webdav.depth = "auto_unknown";
-            }
+    sgServiceDetail.addSetting((setting) => {
+      webdavSettings.push(setting);
+      return setting.setName(t("settings_webdav_addr"))
+        .setDesc(t("settings_webdav_addr_desc"))
+        .addText((text) =>
+          text
+            .setPlaceholder("")
+            .setValue(this.plugin.settings.webdav.address)
+            .onChange(async (value) => {
+              this.plugin.settings.webdav.address = value.trim();
+              if (
+                this.plugin.settings.webdav.depth === "auto_1" ||
+                this.plugin.settings.webdav.depth === "auto_infinity"
+              ) {
+                this.plugin.settings.webdav.depth = "auto_unknown";
+              }
 
-            // TODO: any more elegant way?
-            applyWebdavPresetRulesInplace(this.plugin.settings.webdav);
+              applyWebdavPresetRulesInplace(this.plugin.settings.webdav);
 
-            // normally saved
-            await this.plugin.saveSettings();
-          })
-      );
+              await this.plugin.saveSettings();
+            })
+        );
+    });
 
-    new Setting(webdavDiv)
-      .setName(t("settings_webdav_user"))
-      .setDesc(t("settings_webdav_user_desc"))
-      .addText((text) => {
-        wrapTextWithPasswordHide(text);
-        text
-          .setPlaceholder("")
-          .setValue(this.plugin.settings.webdav.username)
-          .onChange(async (value) => {
-            this.plugin.settings.webdav.username = value.trim();
-            if (
-              this.plugin.settings.webdav.depth === "auto_1" ||
-              this.plugin.settings.webdav.depth === "auto_infinity"
-            ) {
-              this.plugin.settings.webdav.depth = "auto_unknown";
-            }
-            await this.plugin.saveSettings();
-          });
-      });
+    sgServiceDetail.addSetting((setting) => {
+      webdavSettings.push(setting);
+      return setting.setName(t("settings_webdav_user"))
+        .setDesc(t("settings_webdav_user_desc"))
+        .addText((text) => {
+          wrapTextWithPasswordHide(text);
+          text
+            .setPlaceholder("")
+            .setValue(this.plugin.settings.webdav.username)
+            .onChange(async (value) => {
+              this.plugin.settings.webdav.username = value.trim();
+              if (
+                this.plugin.settings.webdav.depth === "auto_1" ||
+                this.plugin.settings.webdav.depth === "auto_infinity"
+              ) {
+                this.plugin.settings.webdav.depth = "auto_unknown";
+              }
+              await this.plugin.saveSettings();
+            });
+        });
+    });
 
-    new Setting(webdavDiv)
-      .setName(t("settings_webdav_password"))
-      .setDesc(t("settings_webdav_password_desc"))
-      .addText((text) => {
-        wrapTextWithPasswordHide(text);
-        text
-          .setPlaceholder("")
-          .setValue(this.plugin.settings.webdav.password)
-          .onChange(async (value) => {
-            this.plugin.settings.webdav.password = value.trim();
-            if (
-              this.plugin.settings.webdav.depth === "auto_1" ||
-              this.plugin.settings.webdav.depth === "auto_infinity"
-            ) {
-              this.plugin.settings.webdav.depth = "auto_unknown";
-            }
-            await this.plugin.saveSettings();
-          });
-      });
+    sgServiceDetail.addSetting((setting) => {
+      webdavSettings.push(setting);
+      return setting.setName(t("settings_webdav_password"))
+        .setDesc(t("settings_webdav_password_desc"))
+        .addText((text) => {
+          wrapTextWithPasswordHide(text);
+          text
+            .setPlaceholder("")
+            .setValue(this.plugin.settings.webdav.password)
+            .onChange(async (value) => {
+              this.plugin.settings.webdav.password = value.trim();
+              if (
+                this.plugin.settings.webdav.depth === "auto_1" ||
+                this.plugin.settings.webdav.depth === "auto_infinity"
+              ) {
+                this.plugin.settings.webdav.depth = "auto_unknown";
+              }
+              await this.plugin.saveSettings();
+            });
+        });
+    });
 
-    new Setting(webdavDiv)
-      .setName(t("settings_webdav_auth"))
-      .setDesc(t("settings_webdav_auth_desc"))
-      .addDropdown(async (dropdown) => {
-        dropdown.addOption("basic", "basic");
-        if (VALID_REQURL) {
-          dropdown.addOption("digest", "digest");
-        }
-
-        // new version config, copied to old version, we need to reset it
-        if (!VALID_REQURL && this.plugin.settings.webdav.authType !== "basic") {
-          this.plugin.settings.webdav.authType = "basic";
-          await this.plugin.saveSettings();
-        }
-
-        dropdown
-          .setValue(this.plugin.settings.webdav.authType)
-          .onChange(async (val: WebdavAuthType) => {
-            this.plugin.settings.webdav.authType = val;
-            await this.plugin.saveSettings();
-          });
-      });
-
-    new Setting(webdavDiv)
-      .setName(t("settings_webdav_depth"))
-      .setDesc(t("settings_webdav_depth_desc"))
-      .addDropdown((dropdown) => {
-        dropdown.addOption("auto", t("settings_webdav_depth_auto"));
-        dropdown.addOption("manual_1", t("settings_webdav_depth_1"));
-        dropdown.addOption("manual_infinity", t("settings_webdav_depth_inf"));
-
-        let initVal = "auto";
-        const autoOptions: Set<WebdavDepthType> = new Set([
-          "auto_unknown",
-          "auto_1",
-          "auto_infinity",
-        ]);
-        if (autoOptions.has(this.plugin.settings.webdav.depth)) {
-          initVal = "auto";
-        } else {
-          initVal = this.plugin.settings.webdav.depth || "auto";
-        }
-
-        type DepthOption = "auto" | "manual_1" | "manual_infinity";
-        dropdown.setValue(initVal).onChange(async (val: DepthOption) => {
-          if (val === "auto") {
-            this.plugin.settings.webdav.depth = "auto_unknown";
-            this.plugin.settings.webdav.manualRecursive = false;
-          } else if (val === "manual_1") {
-            this.plugin.settings.webdav.depth = "manual_1";
-            this.plugin.settings.webdav.manualRecursive = true;
-          } else if (val === "manual_infinity") {
-            this.plugin.settings.webdav.depth = "manual_infinity";
-            this.plugin.settings.webdav.manualRecursive = false;
+    sgServiceDetail.addSetting((setting) => {
+      webdavSettings.push(setting);
+      return setting.setName(t("settings_webdav_auth"))
+        .setDesc(t("settings_webdav_auth_desc"))
+        .addDropdown(async (dropdown) => {
+          dropdown.addOption("basic", "basic");
+          if (VALID_REQURL) {
+            dropdown.addOption("digest", "digest");
           }
 
-          // TODO: any more elegant way?
-          applyWebdavPresetRulesInplace(this.plugin.settings.webdav);
+          if (!VALID_REQURL && this.plugin.settings.webdav.authType !== "basic") {
+            this.plugin.settings.webdav.authType = "basic";
+            await this.plugin.saveSettings();
+          }
 
-          // normally save
-          await this.plugin.saveSettings();
+          dropdown
+            .setValue(this.plugin.settings.webdav.authType)
+            .onChange(async (val: WebdavAuthType) => {
+              this.plugin.settings.webdav.authType = val;
+              await this.plugin.saveSettings();
+            });
         });
-      });
+    });
+
+    sgServiceDetail.addSetting((setting) => {
+      webdavSettings.push(setting);
+      return setting.setName(t("settings_webdav_depth"))
+        .setDesc(t("settings_webdav_depth_desc"))
+        .addDropdown((dropdown) => {
+          dropdown.addOption("auto", t("settings_webdav_depth_auto"));
+          dropdown.addOption("manual_1", t("settings_webdav_depth_1"));
+          dropdown.addOption("manual_infinity", t("settings_webdav_depth_inf"));
+
+          let initVal = "auto";
+          const autoOptions: Set<WebdavDepthType> = new Set([
+            "auto_unknown",
+            "auto_1",
+            "auto_infinity",
+          ]);
+          if (autoOptions.has(this.plugin.settings.webdav.depth)) {
+            initVal = "auto";
+          } else {
+            initVal = this.plugin.settings.webdav.depth || "auto";
+          }
+
+          type DepthOption = "auto" | "manual_1" | "manual_infinity";
+          dropdown.setValue(initVal).onChange(async (val: DepthOption) => {
+            if (val === "auto") {
+              this.plugin.settings.webdav.depth = "auto_unknown";
+              this.plugin.settings.webdav.manualRecursive = false;
+            } else if (val === "manual_1") {
+              this.plugin.settings.webdav.depth = "manual_1";
+              this.plugin.settings.webdav.manualRecursive = true;
+            } else if (val === "manual_infinity") {
+              this.plugin.settings.webdav.depth = "manual_infinity";
+              this.plugin.settings.webdav.manualRecursive = false;
+            }
+
+            applyWebdavPresetRulesInplace(this.plugin.settings.webdav);
+
+            await this.plugin.saveSettings();
+          });
+        });
+    });
 
     let newWebdavRemoteBaseDir =
       this.plugin.settings.webdav.remoteBaseDir || "";
-    new Setting(webdavDiv)
-      .setName(t("settings_remotebasedir"))
-      .setDesc(t("settings_remotebasedir_desc"))
-      .addText((text) =>
-        text
-          .setPlaceholder(this.app.vault.getName())
-          .setValue(newWebdavRemoteBaseDir)
-          .onChange((value) => {
-            newWebdavRemoteBaseDir = value.trim();
-          })
-      )
-      .addButton((button) => {
-        button.setButtonText(t("confirm"));
-        button.onClick(() => {
-          new ChangeRemoteBaseDirModal(
-            this.app,
-            this.plugin,
-            newWebdavRemoteBaseDir,
-            "webdav"
-          ).open();
-        });
-      });
-
-    new Setting(webdavDiv)
-      .setName(t("settings_checkonnectivity"))
-      .setDesc(t("settings_checkonnectivity_desc"))
-      .addButton(async (button) => {
-        button.setButtonText(t("settings_checkonnectivity_button"));
-        button.onClick(async () => {
-          new Notice(t("settings_checkonnectivity_checking"));
-          const self = this;
-          const client = new RemoteClient(
-            "webdav",
-            undefined,
-            this.plugin.settings.webdav,
-            undefined,
-            this.app.vault.getName(),
-            () => self.plugin.saveSettings()
-          );
-          const errors = { msg: "" };
-          const res = await client.checkConnectivity((err: any) => {
-            errors.msg = `${err}`;
+    sgServiceDetail.addSetting((setting) => {
+      webdavSettings.push(setting);
+      return setting.setName(t("settings_remotebasedir"))
+        .setDesc(t("settings_remotebasedir_desc"))
+        .addText((text) =>
+          text
+            .setPlaceholder(this.app.vault.getName())
+            .setValue(newWebdavRemoteBaseDir)
+            .onChange((value) => {
+              newWebdavRemoteBaseDir = value.trim();
+            })
+        )
+        .addButton((button) => {
+          button.setButtonText(t("confirm"));
+          button.onClick(() => {
+            new ChangeRemoteBaseDirModal(
+              this.app,
+              this.plugin,
+              newWebdavRemoteBaseDir,
+              "webdav"
+            ).open();
           });
-          if (res) {
-            new Notice(t("settings_webdav_connect_succ"));
-          } else {
-            if (VALID_REQURL) {
-              new Notice(t("settings_webdav_connect_fail"));
-            } else {
-              new Notice(t("settings_webdav_connect_fail_withcors"));
-            }
-            new Notice(errors.msg);
-          }
         });
-      });
+    });
+
+    sgServiceDetail.addSetting((setting) => {
+      webdavSettings.push(setting);
+      return setting.setName(t("settings_checkonnectivity"))
+        .setDesc(t("settings_checkonnectivity_desc"))
+        .addButton(async (button) => {
+          button.setButtonText(t("settings_checkonnectivity_button"));
+          button.onClick(async () => {
+            new Notice(t("settings_checkonnectivity_checking"));
+            const self = this;
+            const client = new RemoteClient(
+              "webdav",
+              undefined,
+              this.plugin.settings.webdav,
+              undefined,
+              this.app.vault.getName(),
+              () => self.plugin.saveSettings()
+            );
+            const errors = { msg: "" };
+            const res = await client.checkConnectivity((err: any) => {
+              errors.msg = `${err}`;
+            });
+            if (res) {
+              new Notice(t("settings_webdav_connect_succ"));
+            } else {
+              if (VALID_REQURL) {
+                new Notice(t("settings_webdav_connect_fail"));
+              } else {
+                new Notice(t("settings_webdav_connect_fail_withcors"));
+              }
+              new Notice(errors.msg);
+            }
+          });
+        });
+    });
+
+    // 控制声明容器显隐
+    s3DescContainer.toggleClass("s3-hide", this.plugin.settings.serviceType !== "s3");
+    onedriveDescContainer.toggleClass("onedrive-hide", this.plugin.settings.serviceType !== "onedrive");
+    webdavDescContainer.toggleClass("webdav-hide", this.plugin.settings.serviceType !== "webdav");
+
+    // 控制 Setting 显隐
+    const isS3 = this.plugin.settings.serviceType === "s3";
+    const isOnedrive = this.plugin.settings.serviceType === "onedrive";
+    const isWebdav = this.plugin.settings.serviceType === "webdav";
+
+    s3Settings.forEach(s => s.settingEl.toggleClass("s3-hide", !isS3));
+    onedriveSettings.forEach(s => s.settingEl.toggleClass("onedrive-hide", !isOnedrive));
+    webdavSettings.forEach(s => s.settingEl.toggleClass("webdav-hide", !isWebdav));
 
     //////////////////////////////////////////////////
     // below for general chooser (part 2/2)
     //////////////////////////////////////////////////
 
-    // we need to create chooser
-    // after all service-div-s being created
-    new Setting(serviceChooserDiv)
+    sgChooser.addSetting((setting) => setting
       .setName(t("settings_chooseservice"))
       .setDesc(t("settings_chooseservice_desc"))
       .addDropdown(async (dropdown) => {
@@ -1048,31 +1101,21 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.serviceType)
           .onChange(async (val: SUPPORTED_SERVICES_TYPE) => {
             this.plugin.settings.serviceType = val;
-            s3Div.toggleClass(
-              "s3-hide",
-              this.plugin.settings.serviceType !== "s3"
-            );
-            onedriveDiv.toggleClass(
-              "onedrive-hide",
-              this.plugin.settings.serviceType !== "onedrive"
-            );
-            webdavDiv.toggleClass(
-              "webdav-hide",
-              this.plugin.settings.serviceType !== "webdav"
-            );
             await this.plugin.saveSettings();
+            this.display();
           });
-      });
+      })
+    );
 
     //////////////////////////////////////////////////
     // below for basic settings
     //////////////////////////////////////////////////
 
-    const basicDiv = containerEl.createEl("div");
-    basicDiv.createEl("h2", { text: t("settings_basic") });
+    const sgBasic = new SettingGroup(containerEl);
+    sgBasic.setHeading(t("settings_basic"));
 
     let newPassword = `${this.plugin.settings.password}`;
-    new Setting(basicDiv)
+    sgBasic.addSetting((setting) => setting
       .setName(t("settings_password"))
       .setDesc(t("settings_password_desc"))
       .addText((text) => {
@@ -1089,9 +1132,10 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
         button.onClick(async () => {
           new PasswordModal(this.app, this.plugin, newPassword).open();
         });
-      });
+      })
+    );
 
-    new Setting(basicDiv)
+    sgBasic.addSetting((setting) => setting
       .setName(t("settings_saverun"))
       .setDesc(t("settings_saverun_desc"))
       .addDropdown((dropdown) => {
@@ -1101,7 +1145,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
         dropdown.addOption(`${1000 * 10}`, t("settings_saverun_10sec"));
         dropdown.addOption(`${1000 * 30}`, t("settings_saverun_30sec"));
         dropdown.addOption(`${1000 * 60}`, t("settings_saverun_1min"));
-        let runScheduled = false
+        let runScheduled = false;
         dropdown
           .setValue(`${this.plugin.settings.syncOnSaveAfterMilliseconds}`)
           .onChange(async (val: string) => {
@@ -1116,9 +1160,12 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
               this.plugin.toggleSyncOnSave(true);
             }
           })
-    });
+      }));
 
-    new Setting(basicDiv)
+
+
+
+    sgBasic.addSetting((setting) => setting
     .setName(t("settings_remoterun"))
     .setDesc(t("settings_remoterun_desc"))
     .addDropdown((dropdown) => {
@@ -1127,7 +1174,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       dropdown.addOption(`${1000 * 5}`, t("settings_remoterun_5sec"));
       dropdown.addOption(`${1000 * 10}`, t("settings_remoterun_10sec"));
       dropdown.addOption(`${1000 * 60}`, t("settings_remoterun_1min"));
-      
+
       dropdown
         .setValue(`${this.plugin.settings.syncOnRemoteChangesAfterMilliseconds}`)
         .onChange(async (val: string) => {
@@ -1142,9 +1189,9 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
             this.plugin.toggleSyncOnRemote(true);
           }
         });
-    });
+    }));
 
-    new Setting(basicDiv)
+    sgBasic.addSetting((setting) => setting
       .setName(t("settings_autorun"))
       .setDesc(t("settings_autorun_desc"))
       .addDropdown((dropdown) => {
@@ -1182,9 +1229,10 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
               this.plugin.registerInterval(intervalID);
             }
           });
-      });
+      })
+    );
 
-    new Setting(basicDiv)
+    sgBasic.addSetting((setting) => setting
       .setName(t("settings_runoncestartup"))
       .setDesc(t("settings_runoncestartup_desc"))
       .addDropdown((dropdown) => {
@@ -1208,9 +1256,10 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
             this.plugin.settings.initRunAfterMilliseconds = realVal;
             await this.plugin.saveSettings();
           });
-      });
+      })
+    );
 
-    new Setting(basicDiv)
+    sgBasic.addSetting((setting) => setting
       .setName(t("settings_skiplargefiles"))
       .setDesc(t("settings_skiplargefiles_desc"))
       .addDropdown((dropdown) => {
@@ -1226,9 +1275,10 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
             this.plugin.settings.skipSizeLargerThan = parseInt(val);
             await this.plugin.saveSettings();
           });
-      });
+      })
+    );
 
-    new Setting(basicDiv)
+    sgBasic.addSetting((setting) => setting
       .setName(t("settings_enablestatusbar_info"))
       .setDesc(t("settings_enablestatusbar_info_desc"))
       .addToggle((toggle) => {
@@ -1244,16 +1294,17 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
               this.plugin.settings.enableStatusBarInfo !== true
             );
           });
-      });
+      })
+    );
 
-    const statusBarOptions = basicDiv.createDiv({ cls: "third-party-sync-hidden" });
+    const statusBarOptions = sgBasic.groupEl.createDiv({ cls: "third-party-sync-hidden" });
 
     statusBarOptions.toggleClass(
       "third-party-sync-hidden",
       this.plugin.settings.enableStatusBarInfo !== true
     );
 
-    new Setting(basicDiv)
+    sgBasic.addSetting((setting) => setting
       .setName(t("settings_sync_trash"))
       .setDesc(t("settings_sync_trash_desc"))
       .addToggle((toggle) => {
@@ -1263,9 +1314,10 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
             this.plugin.settings.syncTrash = val;
             await this.plugin.saveSettings();
           });
-      });
+      })
+    );
 
-    new Setting(basicDiv)
+    sgBasic.addSetting((setting) => setting
       .setName(t("settings_sync_bookmarks"))
       .setDesc(t("settings_sync_bookmarks_desc"))
       .addToggle((toggle) => {
@@ -1275,17 +1327,16 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
             this.plugin.settings.syncBookmarks = val;
             await this.plugin.saveSettings();
           });
-      });
+      })
+    );
 
     //////////////////////////////////////////////////
     // below for advanced settings
     //////////////////////////////////////////////////
-    const advDiv = containerEl.createEl("div");
-    advDiv.createEl("h2", {
-      text: t("settings_adv"),
-    });
+    const sgAdv = new SettingGroup(containerEl);
+    sgAdv.setHeading(t("settings_adv"));
 
-    new Setting(advDiv)
+    sgAdv.addSetting((setting) => setting
       .setName(t("settings_concurrency"))
       .setDesc(t("settings_concurrency_desc"))
       .addDropdown((dropdown) => {
@@ -1304,9 +1355,10 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
             this.plugin.settings.concurrency = realVal;
             await this.plugin.saveSettings();
           });
-      });
+      })
+    );
 
-    new Setting(advDiv)
+    sgAdv.addSetting((setting) => setting
       .setName(t("settings_syncunderscore"))
       .setDesc(t("settings_syncunderscore_desc"))
       .addDropdown((dropdown) => {
@@ -1320,9 +1372,10 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
             this.plugin.settings.syncUnderscoreItems = val === "enable";
             await this.plugin.saveSettings();
           });
-      });
+      })
+    );
 
-    new Setting(advDiv)
+    sgAdv.addSetting((setting) => setting
       .setName(t("settings_deletetowhere"))
       .setDesc(t("settings_deletetowhere_desc"))
       .addDropdown((dropdown) => {
@@ -1334,9 +1387,10 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
             this.plugin.settings.deleteToWhere = val as DeleteToWhereType;
             await this.plugin.saveSettings();
           });
-      });
+      })
+    );
 
-    new Setting(advDiv)
+    sgAdv.addSetting((setting) => setting
       .setName(t("settings_conflictaction"))
       .setDesc(t("settings_conflictaction_desc"))
       .addDropdown((dropdown) => {
@@ -1348,20 +1402,24 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
             this.plugin.settings.conflictAction = val;
             await this.plugin.saveSettings();
           });
-      });
+      })
+    );
 
-    const syncDirSetting = new Setting(advDiv)
-      .setName(t("setting_syncdirection"))
-      .setDesc(((desc: string) => {
-        const frag = document.createDocumentFragment();
-        const parts = desc.split("\n");
-        parts.forEach((part, i) => {
-          if (i > 0) frag.appendChild(document.createElement("br"));
-          frag.appendChild(document.createTextNode(part));
-        });
-        return frag;
-      })(t("setting_syncdirection_desc")))
-      .addDropdown((dropdown) => {
+    let syncDirSetting: Setting;
+    sgAdv.addSetting((setting) => {
+      syncDirSetting = setting;
+      return setting
+        .setName(t("setting_syncdirection"))
+        .setDesc(((desc: string) => {
+          const frag = document.createDocumentFragment();
+          const parts = desc.split("\n");
+          parts.forEach((part, i) => {
+            if (i > 0) frag.appendChild(document.createElement("br"));
+            frag.appendChild(document.createTextNode(part));
+          });
+          return frag;
+        })(t("setting_syncdirection_desc")))
+        .addDropdown((dropdown) => {
         dropdown.addOption(
           "bidirectional",
           t("setting_syncdirection_bidirectional_desc")
@@ -1390,7 +1448,8 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           });
       });
-    
+    });
+
     // Move dropdown to be after the description
     const settingEl = syncDirSetting.settingEl;
     const infoEl = syncDirSetting.infoEl;
@@ -1399,7 +1458,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       settingEl.appendChild(controlEl);
     }
 
-    new Setting(advDiv)
+    sgAdv.addSetting((setting) => setting
       .setName(t("settings_protectmodifypercentage"))
       .setDesc(t("settings_protectmodifypercentage_desc"))
       .addDropdown((dropdown) => {
@@ -1420,9 +1479,10 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
             this.plugin.settings.protectModifyPercentage = parseInt(val);
             await this.plugin.saveSettings();
           });
-      });
+      })
+    );
 
-    new Setting(advDiv)
+    sgAdv.addSetting((setting) => setting
       .setName(t("settings_configdir"))
       .setDesc(
         t("settings_configdir_desc", {
@@ -1453,20 +1513,19 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
               await this.plugin.saveSettings();
             }
           });
-      });
+      })
+    );
 
     //////////////////////////////////////////////////
     // below for import and export functions
     //////////////////////////////////////////////////
 
     // import and export
-    const importExportDiv = containerEl.createEl("div");
-    importExportDiv.createEl("h2", {
-      text: t("settings_importexport"),
-    });
+    const sgImportExport = new SettingGroup(containerEl);
+    sgImportExport.setHeading(t("settings_importexport"));
     let importUriInput = "";
 
-    new Setting(importExportDiv)
+    sgImportExport.addSetting((setting) => setting
       .setName(t("settings_export"))
       .setDesc(t("settings_export_desc"))
       .addButton(async (button) => {
@@ -1500,9 +1559,10 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
           await navigator.clipboard.writeText(uri);
           new Notice(t("modal_export_button_notice"));
         });
-      });
+      })
+    );
 
-    new Setting(importExportDiv)
+    sgImportExport.addSetting((setting) => setting
       .setName(t("settings_import"))
       .setDesc(t("settings_import_desc"))
       .addText((text) => {
@@ -1591,39 +1651,42 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
           );
           this.display();
         });
-      });
+      })
+    );
 
     //////////////////////////////////////////////////
     // below for debug
     //////////////////////////////////////////////////
 
-    const debugDiv = containerEl.createEl("div");
-    debugDiv.createEl("h2", { text: t("settings_debug") });
+    const sgDebug = new SettingGroup(containerEl);
+    sgDebug.setHeading(t("settings_debug"));
 
     // Debug mode toggle (always visible)
-    const debugToggle = new Setting(debugDiv)
-      .setName(t("settings_debug_enabled"))
-      .setDesc(t("settings_debug_enabled_desc"))
-      .addDropdown(async (dropdown) => {
-        dropdown.addOption("disable", t("disable"));
-        dropdown.addOption("enable", t("enable"));
-        dropdown
-          .setValue(this.plugin.settings.debugEnabled ? "enable" : "disable")
-          .onChange(async (val: string) => {
-            const debugEnabled = val === "enable";
-            this.plugin.settings.debugEnabled = debugEnabled;
-            if (debugEnabled) {
-              log.setLevel("debug");
-            } else {
-              log.setLevel("info");
-            }
-            this.update();
-            await this.plugin.saveSettings();
-          });
-      });
+    sgDebug.addSetting((setting) =>
+      setting
+        .setName(t("settings_debug_enabled"))
+        .setDesc(t("settings_debug_enabled_desc"))
+        .addDropdown(async (dropdown) => {
+          dropdown.addOption("disable", t("disable"));
+          dropdown.addOption("enable", t("enable"));
+          dropdown
+            .setValue(this.plugin.settings.debugEnabled ? "enable" : "disable")
+            .onChange(async (val: string) => {
+              const debugEnabled = val === "enable";
+              this.plugin.settings.debugEnabled = debugEnabled;
+              if (debugEnabled) {
+                log.setLevel("debug");
+              } else {
+                log.setLevel("info");
+              }
+              this.update();
+              await this.plugin.saveSettings();
+            });
+        })
+    );
 
     // Container for debug options (hidden when debug is disabled)
-    const debugOptionsDiv = debugDiv.createEl("div", {
+    const debugOptionsDiv = sgDebug.groupEl.createEl("div", {
       cls: "remotely-sync-debug-options"
     });
 

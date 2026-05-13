@@ -1,0 +1,10 @@
+{
+	"id": "{{PLUGIN_ID}}",
+	"name": "{{PLUGIN_NAME}}",
+	"version": "1.0.0",
+	"minAppVersion": "0.15.0",
+	"description": "Description of your plugin.",
+	"author": "Your Name",
+	"authorUrl": "https://github.com/your-name",
+	"isDesktopOnly": false
+}

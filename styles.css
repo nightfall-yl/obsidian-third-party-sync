@@ -1,3 +1,8 @@
+/* SettingGroup heading description spacing */
+.setting-group > .setting-item-heading .setting-item-description {
+  margin-top: 4px;
+}
+
 /* set the styles */
 
 .password-second-confirm {
@@ -36,14 +41,14 @@
   margin: 2px 0;
 }
 .s3-hide {
-  display: none;
+  display: none !important;
 }
 
 .onedrive-disclaimer {
   font-weight: bold;
 }
 .onedrive-hide {
-  display: none;
+  display: none !important;
 }
 
 .onedrive-auth-button-hide {
@@ -58,7 +63,7 @@
   font-weight: bold;
 }
 .webdav-hide {
-  display: none;
+  display: none !important;
 }
 
 
