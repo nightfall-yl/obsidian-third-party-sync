@@ -373,5 +373,9 @@
   "settings_reset_sync_metadata_desc": "删除远端的同步元数据文件并重新上传空的元数据。通常用于解决同步状态异常问题。",
   "settings_reset_sync_metadata_notice_start": "正在删除远端元数据，请稍候……",
   "settings_reset_sync_metadata_notice_end": "远端元数据已重置完成。",
-  "settings_reset_sync_metadata_notice_error": "当前正在删除远端元数据，请稍候再试。"
+  "settings_reset_sync_metadata_notice_error": "当前正在删除远端元数据，请稍候再试。",
+  "syncalgov2_title": "Obsidian 第三方同步插件",
+  "syncalgov2_texts": "欢迎使用 Third-party Sync！本插件是 <a href='https://github.com/remotely-save/remotely-save'>Remotely Save</a> 的分支项目，更适合中国大陆用户使用，专注于安全性更新和功能增强。\n⚠️ 请注意：\n· 这不是 Obsidian 官方提供的 <a href='https://obsidian.md/sync'>同步服务</a> 。\n· 使用本插件前，请务必备份您的 Vault。\n· 升级到此版本后，建议至少执行一次完整同步，以确保所有数据正确更新。\n\n如果您同意使用本插件，请点击「我同意」按钮。\n如果您不同意，请点击「我不同意」按钮，插件将不会启用（Unload）。",
+  "syncalgov2_button_agree": "我同意",
+  "syncalgov2_button_disagree": "我不同意"
 }

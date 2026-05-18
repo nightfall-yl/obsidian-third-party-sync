@@ -224,20 +224,14 @@ class ChangeRemoteBaseDirModal extends Modal {
 
 export class OnedriveAuthModal extends Modal {
   readonly plugin: ThirdPartySyncPlugin;
-  readonly authDiv: HTMLDivElement;
-  readonly revokeAuthDiv: HTMLDivElement;
   readonly revokeAuthSetting: Setting;
   constructor(
     app: App,
     plugin: ThirdPartySyncPlugin,
-    authDiv: HTMLDivElement,
-    revokeAuthDiv: HTMLDivElement,
     revokeAuthSetting: Setting
   ) {
     super(app);
     this.plugin = plugin;
-    this.authDiv = authDiv;
-    this.revokeAuthDiv = revokeAuthDiv;
     this.revokeAuthSetting = revokeAuthSetting;
   }
 
@@ -289,18 +283,18 @@ export class OnedriveAuthModal extends Modal {
 
 export class OnedriveRevokeAuthModal extends Modal {
   readonly plugin: ThirdPartySyncPlugin;
-  readonly authDiv: HTMLDivElement;
-  readonly revokeAuthDiv: HTMLDivElement;
+  readonly authSetting: Setting;
+  readonly revokeAuthSetting: Setting;
   constructor(
     app: App,
     plugin: ThirdPartySyncPlugin,
-    authDiv: HTMLDivElement,
-    revokeAuthDiv: HTMLDivElement
+    authSetting: Setting,
+    revokeAuthSetting: Setting
   ) {
     super(app);
     this.plugin = plugin;
-    this.authDiv = authDiv;
-    this.revokeAuthDiv = revokeAuthDiv;
+    this.authSetting = authSetting;
+    this.revokeAuthSetting = revokeAuthSetting;
   }
 
   async onOpen() {
@@ -333,14 +327,9 @@ export class OnedriveRevokeAuthModal extends Modal {
               JSON.stringify(DEFAULT_ONEDRIVE_CONFIG)
             );
             await this.plugin.saveSettings();
-            this.authDiv.toggleClass(
-              "onedrive-auth-button-hide",
-              this.plugin.settings.onedrive.username !== ""
-            );
-            this.revokeAuthDiv.toggleClass(
-              "onedrive-revoke-auth-button-hide",
-              this.plugin.settings.onedrive.username === ""
-            );
+            const isAuthed = this.plugin.settings.onedrive.username !== "";
+            this.authSetting.settingEl.toggleClass("tp-sync-auth-hidden", isAuthed);
+            this.revokeAuthSetting.settingEl.toggleClass("tp-sync-revoke-hidden", !isAuthed);
             new Notice(t("modal_onedriverevokeauth_clean_notice"));
             this.close();
           } catch (err) {
@@ -466,13 +455,21 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       webdav: t("settings_webdav"),
     };
 
-    // 声明部分 - 在卡片外，位于选择器和服务详情之间
-    const s3DescContainer = containerEl.createDiv({ cls: "s3-hide" });
-    const onedriveDescContainer = containerEl.createDiv({ cls: "onedrive-hide" });
-    const webdavDescContainer = containerEl.createDiv({ cls: "webdav-hide" });
-
     const sgServiceDetail = new SettingGroup(containerEl);
-    sgServiceDetail.setHeading(serviceHeadings[this.plugin.settings.serviceType]);
+    sgServiceDetail.addClass("service-detail-group");
+
+    const serviceHeadingFrag = document.createDocumentFragment();
+    const serviceHeadingName = serviceHeadingFrag.createEl("div", { text: serviceHeadings[this.plugin.settings.serviceType], cls: "setting-item-name" });
+
+    const s3DescEl = serviceHeadingFrag.createDiv({ cls: "settings-long-desc s3-hide" });
+    const onedriveDescEl = serviceHeadingFrag.createDiv({ cls: "settings-long-desc onedrive-hide" });
+    const webdavDescEl = serviceHeadingFrag.createDiv({ cls: "settings-long-desc webdav-hide" });
+
+    s3DescEl.toggleClass("s3-hide", this.plugin.settings.serviceType !== "s3");
+    onedriveDescEl.toggleClass("onedrive-hide", this.plugin.settings.serviceType !== "onedrive");
+    webdavDescEl.toggleClass("webdav-hide", this.plugin.settings.serviceType !== "webdav");
+
+    sgServiceDetail.setHeading(serviceHeadingFrag);
 
     // 收集各服务的 setting 元素用于切换显隐
     const s3Settings: Setting[] = [];
@@ -483,29 +480,27 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
     // below for s3
     //////////////////////////////////////////////////
 
-    const s3LongDescDiv = s3DescContainer.createEl("div", { cls: "settings-long-desc" });
-
     for (const c of [
       t("settings_s3_disclaimer1"),
       t("settings_s3_disclaimer2"),
     ]) {
-      s3LongDescDiv.createEl("p", {
+      s3DescEl.createEl("p", {
         text: c,
         cls: "s3-disclaimer",
       });
     }
 
     if (!VALID_REQURL) {
-      s3LongDescDiv.createEl("p", {
+      s3DescEl.createEl("p", {
         text: t("settings_s3_cors"),
       });
     }
 
-    s3LongDescDiv.createEl("p", {
+    s3DescEl.createEl("p", {
       text: t("settings_s3_prod"),
     });
 
-    const s3LinksUl = s3LongDescDiv.createEl("ul");
+    const s3LinksUl = s3DescEl.createEl("ul");
 
     s3LinksUl.createEl("li").createEl("a", {
       href: "https://docs.aws.amazon.com/general/latest/gr/s3.html",
@@ -701,20 +696,17 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
     // below for onedrive
     //////////////////////////////////////////////////
 
-    const onedriveLongDescDiv = onedriveDescContainer.createEl("div", {
-      cls: "settings-long-desc",
-    });
     for (const c of [
       t("settings_onedrive_disclaimer1"),
       t("settings_onedrive_disclaimer2"),
     ]) {
-      onedriveLongDescDiv.createEl("p", {
+      onedriveDescEl.createEl("p", {
         text: c,
         cls: "onedrive-disclaimer",
       });
     }
 
-    onedriveLongDescDiv.createEl("p", {
+    onedriveDescEl.createEl("p", {
       text: t("settings_onedrive_folder", {
         pluginID: this.plugin.manifest.id,
         remoteBaseDir:
@@ -723,20 +715,20 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       }),
     });
 
-    onedriveLongDescDiv.createEl("p", {
+    onedriveDescEl.createEl("p", {
       text: t("settings_onedrive_nobiz"),
     });
 
-    const onedriveSelectAuthDiv = onedriveDescContainer.createDiv();
-    const onedriveAuthDiv = onedriveSelectAuthDiv.createDiv({
-      cls: "onedrive-auth-button-hide settings-auth-related",
-    });
-    const onedriveRevokeAuthDiv = onedriveSelectAuthDiv.createDiv({
-      cls: "onedrive-revoke-auth-button-hide settings-auth-related",
-    });
+    const isOneDriveAuthenticated = this.plugin.settings.onedrive.username !== "";
 
-    const onedriveRevokeAuthSetting = sgServiceDetail.addSetting((setting) => {
+    let onedriveRevokeAuthSetting: Setting;
+    let onedriveAuthSetting: Setting;
+    sgServiceDetail.addSetting((setting) => {
       onedriveSettings.push(setting);
+      onedriveRevokeAuthSetting = setting;
+      if (!isOneDriveAuthenticated) setting.settingEl.addClass("tp-sync-revoke-hidden");
+      setting.settingEl.style.borderTop = "none";
+      setting.settingEl.style.boxShadow = "none";
       return setting.setName(t("settings_onedrive_revoke"))
         .setDesc(
           t("settings_onedrive_revoke_desc", {
@@ -749,8 +741,8 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
             new OnedriveRevokeAuthModal(
               this.app,
               this.plugin,
-              onedriveAuthDiv,
-              onedriveRevokeAuthDiv
+              onedriveAuthSetting,
+              onedriveRevokeAuthSetting
             ).open();
           });
         });
@@ -758,6 +750,10 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
 
     sgServiceDetail.addSetting((setting) => {
       onedriveSettings.push(setting);
+      onedriveAuthSetting = setting;
+      if (isOneDriveAuthenticated) setting.settingEl.addClass("tp-sync-auth-hidden");
+      setting.settingEl.style.borderTop = "none";
+      setting.settingEl.style.boxShadow = "none";
       return setting.setName(t("settings_onedrive_auth"))
         .setDesc(t("settings_onedrive_auth_desc"))
         .addButton(async (button) => {
@@ -766,27 +762,15 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
             const modal = new OnedriveAuthModal(
               this.app,
               this.plugin,
-              onedriveAuthDiv,
-              onedriveRevokeAuthDiv,
               onedriveRevokeAuthSetting
             );
             this.plugin.oauth2Info.helperModal = modal;
-            this.plugin.oauth2Info.authDiv = onedriveAuthDiv;
-            this.plugin.oauth2Info.revokeDiv = onedriveRevokeAuthDiv;
+            this.plugin.oauth2Info.authSetting = onedriveAuthSetting;
             this.plugin.oauth2Info.revokeAuthSetting = onedriveRevokeAuthSetting;
             modal.open();
           });
         });
     });
-
-    onedriveAuthDiv.toggleClass(
-      "onedrive-auth-button-hide",
-      this.plugin.settings.onedrive.username !== ""
-    );
-    onedriveRevokeAuthDiv.toggleClass(
-      "onedrive-revoke-auth-button-hide",
-      this.plugin.settings.onedrive.username === ""
-    );
 
     let newOnedriveRemoteBaseDir =
       this.plugin.settings.onedrive.remoteBaseDir || "";
@@ -851,26 +835,22 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
     // below for webdav
     //////////////////////////////////////////////////
 
-    const webdavLongDescDiv = webdavDescContainer.createEl("div", {
-      cls: "settings-long-desc",
-    });
-
-    webdavLongDescDiv.createEl("p", {
+    webdavDescEl.createEl("p", {
       text: t("settings_webdav_disclaimer1"),
       cls: "webdav-disclaimer",
     });
 
     if (!VALID_REQURL) {
-      webdavLongDescDiv.createEl("p", {
+      webdavDescEl.createEl("p", {
         text: t("settings_webdav_cors_os"),
       });
 
-      webdavLongDescDiv.createEl("p", {
+      webdavDescEl.createEl("p", {
         text: t("settings_webdav_cors"),
       });
     }
 
-    webdavLongDescDiv.createEl("p", {
+    webdavDescEl.createEl("p", {
       text: t("settings_webdav_folder", {
         remoteBaseDir:
           this.plugin.settings.webdav.remoteBaseDir || this.app.vault.getName(),
@@ -1071,11 +1051,6 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
           });
         });
     });
-
-    // 控制声明容器显隐
-    s3DescContainer.toggleClass("s3-hide", this.plugin.settings.serviceType !== "s3");
-    onedriveDescContainer.toggleClass("onedrive-hide", this.plugin.settings.serviceType !== "onedrive");
-    webdavDescContainer.toggleClass("webdav-hide", this.plugin.settings.serviceType !== "webdav");
 
     // 控制 Setting 显隐
     const isS3 = this.plugin.settings.serviceType === "s3";

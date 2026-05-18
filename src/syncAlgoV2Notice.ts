@@ -23,9 +23,7 @@ export class SyncAlgoV2Modal extends Modal {
     this.i18n.t("syncalgov2_texts")
       .split("\n")
       .forEach((val) => {
-        contentEl.createEl("p", {
-          text: val,
-        });
+        contentEl.createEl("p").innerHTML = val;
       });
 
     new Setting(contentEl)

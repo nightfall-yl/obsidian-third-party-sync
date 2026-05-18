@@ -324,5 +324,9 @@
   "settings_s3_urlstyle_path": "Path-Style",
   "settings_concurrency_default": "5 (default)",
   "settings_s3_parts_default": "20 (default)",
-  "menu_check_file_stat": "Check file stats"
+  "menu_check_file_stat": "Check file stats",
+  "syncalgov2_title": "Third-party Sync Plugin for Obsidian",
+  "syncalgov2_texts": "Welcome to use Third-party Sync! This is an unofficial fork of <a href='https://github.com/remotely-save/remotely-save'>Remotely Save</a> , focusing on security updates and feature enhancements.\n⚠️ Please note:\n· This is NOT the official Obsidian Sync provided by <a href='https://obsidian.md/sync'>Sync Service</a> .\n· Please backup your Vault before using this plugin.\n· After upgrading to this version, it is recommended to perform a full sync at least once to ensure all data is properly updated.\n\nIf you agree to use this plugin, please click the \"Agree\" button.\nIf you do not agree, please click the \"Do Not Agree\" button, and the plugin will not be enabled (Unload).",
+  "syncalgov2_button_agree": "Agree",
+  "syncalgov2_button_disagree": "Do Not Agree"
 }

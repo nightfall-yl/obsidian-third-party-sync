@@ -3,19 +3,45 @@
   margin-top: 4px;
 }
 
+/* Service detail heading: align with native SettingGroup headings */
+.setting-group > .setting-item-heading {
+  padding: 12px 16px 0 !important;
+}
+.setting-group > .setting-item-heading > .setting-item-name {
+  font-size: var(--font-ui-medium) !important;
+  font-weight: var(--bold-weight) !important;
+}
+
+/* Fix extra line: remove all separator lines in service detail group */
+.service-detail-group > .setting-item-heading {
+  border-bottom: none !important;
+  box-shadow: none !important;
+}
+.service-detail-group > .setting-item-heading::after {
+  display: none !important;
+}
+.service-detail-group > .setting-item {
+  border-top: none !important;
+  border-top-width: 0 !important;
+  box-shadow: none !important;
+}
+.service-detail-group > .setting-item::before,
+.service-detail-group > .setting-item::after {
+  display: none !important;
+}
+.setting-item.tp-sync-revoke-hidden,
+.setting-item.tp-sync-auth-hidden {
+  display: none !important;
+}
+
 /* set the styles */
 
 .password-second-confirm {
   font-weight: bold;
 }
-
 .password-disclaimer {
   font-weight: bold;
 }
-
-.settings-auth-related {
-}
-
 .s3-disclaimer {
   font-weight: bold;
 }
@@ -23,7 +49,6 @@
   font-size: var(--font-ui-smaller);
   color: var(--text-muted);
   padding-left: 18px;
-  margin-bottom: 18px;
 }
 .settings-long-desc h2 {
   font-size: var(--font-ui-medium);
@@ -51,14 +76,6 @@
   display: none !important;
 }
 
-.onedrive-auth-button-hide {
-  display: none;
-}
-
-.onedrive-revoke-auth-button-hide {
-  display: none;
-}
-
 .webdav-disclaimer {
   font-weight: bold;
 }
@@ -75,4 +92,93 @@
 
 .third-party-sync-show-status-bar {
   display: flex !important;
+}
+
+/* OneDrive OAuth Modal Styles */
+.oauth-step-2 {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+.oauth-step-2 h3 {
+  margin-bottom: 12px;
+  color: var(--text-normal);
+}
+.oauth-help-text,
+.oauth-example-url {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  margin: 8px 0;
+  word-break: break-all;
+}
+.oauth-example-url {
+  background-color: var(--background-secondary);
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-family: monospace;
+}
+.oauth-input-container {
+  margin: 16px 0;
+}
+.oauth-input-container label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: var(--font-ui-small);
+  color: var(--text-muted);
+}
+.oauth-code-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+  font-size: var(--font-ui-medium);
+  font-family: monospace;
+  box-sizing: border-box;
+}
+.oauth-code-input:focus {
+  outline: none;
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px var(--interactive-accent-hover);
+}
+.oauth-submit-row {
+  text-align: right;
+}
+.oauth-submit-btn {
+  padding: 8px 24px !important;
+}
+.oauth-button-row {
+  margin-top: 10px;
+}
+/* Success/Error states */
+.oauth-success-icon {
+  text-align: center;
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+.oauth-error-icon {
+  text-align: center;
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+.oauth-success-username {
+  color: var(--text-success);
+  font-weight: bold;
+  text-align: center;
+}
+.oauth-error-message {
+  color: var(--text-error);
+  word-break: break-word;
+  max-height: 150px;
+  overflow-y: auto;
+  background: var(--background-secondary);
+  padding: 10px;
+  border-radius: 4px;
+  margin: 12px 0;
+}
+.oauth-status-loading {
+  text-align: center;
+  padding: 40px 20px;
+  font-size: var(--font-ui-large);
 }

@@ -93,8 +93,7 @@ const DEFAULT_SETTINGS: ThirdPartySyncPluginSettings = {
 interface OAuth2Info {
   verifier?: string;
   helperModal?: Modal;
-  authDiv?: HTMLElement;
-  revokeDiv?: HTMLElement;
+  authSetting?: Setting;
   revokeAuthSetting?: Setting;
 }
 
@@ -649,18 +648,11 @@ export default class ThirdPartySyncPlugin extends Plugin {
     }
   }
 
-  async promptAgreement(): Promise<boolean> {
-    return new Promise((resolve) => {
-      new SyncAlgoV2Modal(this.app, this.i18n, (result) => resolve(result)).open();
-    });
-  }
-
   async onload() {
     this.oauth2Info = {
       verifier: "",
       helperModal: undefined,
-      authDiv: undefined,
-      revokeDiv: undefined,
+      authSetting: undefined,
       revokeAuthSetting: undefined,
     }; // init
 
@@ -677,19 +669,6 @@ export default class ThirdPartySyncPlugin extends Plugin {
     const t = (x: TransItemType, vars?: any) => {
       return this.i18n.t(x, vars);
     };
-
-    // Check if they have agreed to uploading metadata
-    if (!this.settings.agreeToUploadExtraMetadata) {
-      const agreed = await this.promptAgreement();
-
-      if (agreed) {
-        this.settings.agreeToUploadExtraMetadata = true;
-        await this.saveSettings();
-      } else {
-        this.unload();
-        return;
-      }
-    }
 
     if (this.settings.debugEnabled) {
       log.setLevel("debug");
@@ -831,18 +810,18 @@ export default class ThirdPartySyncPlugin extends Plugin {
             this.app.vault.getName(),
             () => self.saveSettings()
           );
-          this.settings.onedrive.username = await client.getUser();
+          this.settings.onedrive.username = await client.getUserDisplayName();
           await this.saveSettings();
 
           this.oauth2Info.verifier = ""; // reset it
           this.oauth2Info.helperModal?.close(); // close it
           this.oauth2Info.helperModal = undefined;
 
-          this.oauth2Info.authDiv?.toggleClass(
-            "onedrive-auth-button-hide",
-            this.settings.onedrive.username !== ""
-          );
-          this.oauth2Info.authDiv = undefined;
+          const isAuthed = this.settings.onedrive.username !== "";
+          if (this.oauth2Info.authSetting) {
+            this.oauth2Info.authSetting.settingEl.toggleClass("tp-sync-auth-hidden", isAuthed);
+          }
+          this.oauth2Info.authSetting = undefined;
 
           this.oauth2Info.revokeAuthSetting?.setDesc(
             t("protocol_onedrive_connect_succ_revoke", {
@@ -850,11 +829,9 @@ export default class ThirdPartySyncPlugin extends Plugin {
             })
           );
           this.oauth2Info.revokeAuthSetting = undefined;
-          this.oauth2Info.revokeDiv?.toggleClass(
-            "onedrive-revoke-auth-button-hide",
-            this.settings.onedrive.username === ""
-          );
-          this.oauth2Info.revokeDiv = undefined;
+          if (this.oauth2Info.revokeAuthSetting) {
+            this.oauth2Info.revokeAuthSetting.settingEl.toggleClass("tp-sync-revoke-hidden", !isAuthed);
+          }
         } else {
           new Notice(t("protocol_onedrive_connect_fail"));
           throw Error(
@@ -954,6 +931,28 @@ export default class ThirdPartySyncPlugin extends Plugin {
     //   log.info("click", evt);
     // });
 
+    // Check if user has agreed to the sync algorithm (same as remotely-save)
+    // If not agreed → show agreement modal without enabling features
+    // If agreed → enable all sync features
+    if (!this.settings.agreeToUploadExtraMetadata) {
+      new SyncAlgoV2Modal(this.app, this.i18n, (result) => {
+        if (result) {
+          this.settings.agreeToUploadExtraMetadata = true;
+          this.saveSettings();
+          // User agreed → now enable all features
+          this.enableFeaturesAfterAgreement();
+        } else {
+          // User disagreed → unload plugin completely
+          this.unload();
+        }
+      }).open();
+    } else {
+      // Already agreed before → enable all features directly
+      this.enableFeaturesAfterAgreement();
+    }
+  }
+
+  private enableFeaturesAfterAgreement() {
     this.enableAutoSyncIfSet();
     this.enableInitSyncIfSet();
 
@@ -980,10 +979,23 @@ export default class ThirdPartySyncPlugin extends Plugin {
   }
 
   async loadSettings() {
+    let rawData = null;
+    try {
+      rawData = await this.loadData();
+    } catch (e) {
+      console.warn("Failed to load settings, using defaults:", e);
+      rawData = null;
+    }
+
+    if (!rawData || typeof rawData !== 'object') {
+      console.log("No existing settings found, using default configuration");
+      rawData = {};
+    }
+
     this.settings = Object.assign(
       {},
       cloneDeep(DEFAULT_SETTINGS),
-      messyConfigToNormal(await this.loadData())
+      messyConfigToNormal(rawData)
     );
     if (this.settings.onedrive.clientID === "") {
       this.settings.onedrive.clientID = DEFAULT_SETTINGS.onedrive.clientID;

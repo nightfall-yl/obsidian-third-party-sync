@@ -29,7 +29,7 @@ const REDIRECT_URI = `obsidian://${COMMAND_CALLBACK_ONEDRIVE}`;
 
 export const DEFAULT_ONEDRIVE_CONFIG: OnedriveConfig = {
   accessToken: "",
-  clientID: "dac010b9-192f-4237-bf53-167d36149942",
+  clientID: "3729fc1c-0af2-4bec-9376-d7ac4f0ff806",
   authority: "https://login.microsoftonline.com/common/",
   refreshToken: "",
   accessTokenExpiresInSeconds: 0,
