@@ -10,7 +10,7 @@ const getKeyFromPassword = async (
   password: string,
   rounds: number = DEFAULT_ITER
 ) => {
-  const crypto = (typeof window !== 'undefined' && window.crypto) || (typeof globalThis !== 'undefined' && globalThis.crypto);
+  const crypto = (typeof window !== 'undefined' && window.crypto);
   if (!crypto || !crypto.subtle || !crypto.subtle.importKey || !crypto.subtle.deriveBits) {
     throw new Error('Crypto subtle API not available');
   }
@@ -42,7 +42,7 @@ export const encryptArrayBuffer = async (
   password: string,
   rounds: number = DEFAULT_ITER
 ) => {
-  const crypto = (typeof window !== 'undefined' && window.crypto) || (typeof globalThis !== 'undefined' && globalThis.crypto);
+  const crypto = (typeof window !== 'undefined' && window.crypto);
   if (!crypto || !crypto.getRandomValues || !crypto.subtle || !crypto.subtle.importKey || !crypto.subtle.encrypt) {
     throw new Error('Crypto API not available');
   }
@@ -65,7 +65,7 @@ export const encryptArrayBuffer = async (
     { name: "AES-GCM", iv },
     keyCrypt,
     arrBuf
-  )) as ArrayBuffer;
+  ));
 
   const res = new Uint8Array([...salt, ...iv, ...new Uint8Array(enc)]);
 
@@ -86,7 +86,7 @@ export const decryptArrayBuffer = async (
     rounds
   );
 
-  const crypto = (typeof window !== 'undefined' && window.crypto) || (typeof globalThis !== 'undefined' && globalThis.crypto);
+  const crypto = (typeof window !== 'undefined' && window.crypto);
   if (!crypto || !crypto.subtle || !crypto.subtle.importKey || !crypto.subtle.decrypt) {
     throw new Error('Crypto API not available');
   }
@@ -103,7 +103,7 @@ export const decryptArrayBuffer = async (
     { name: "AES-GCM", iv },
     keyCrypt,
     cipherText
-  )) as ArrayBuffer;
+  ));
 
   return dec;
 };

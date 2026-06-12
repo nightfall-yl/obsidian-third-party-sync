@@ -9,7 +9,7 @@ const log2 = origLog.getLogger("rs-default");
 
 const originalFactory = log2.methodFactory;
 
-export const applyLogWriterInplace = function (writer: (...msg: any[]) => any) {
+export const applyLogWriterInplace = function (writer: (...msg: unknown[]) => unknown) {
   log2.methodFactory = function (
     methodName: string,
     logLevel: LogLevelNumbers,
@@ -18,7 +18,7 @@ export const applyLogWriterInplace = function (writer: (...msg: any[]) => any) {
     // @ts-ignore
     const rawMethod = originalFactory(methodName, logLevel, loggerName);
 
-    return function (...msg: any[]) {
+    return function (...msg: unknown[]) {
       rawMethod.apply(undefined, msg);
       writer(...msg);
     };

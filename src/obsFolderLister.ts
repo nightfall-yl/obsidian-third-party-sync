@@ -1,7 +1,5 @@
 import { Vault, Stat, ListedFiles } from "obsidian";
 import { Queue } from "@fyears/tsqueue";
-import chunk from "lodash/chunk";
-import flatten from "lodash/flatten";
 import { statFix } from "./misc";
 
 export interface ObsConfigDirFileType {
@@ -74,6 +72,10 @@ export const listFilesInObsFolder = async (
   }
   const q = new Queue(searchFolders);
   const CHUNK_SIZE = 10;
+  const chunk = <T>(arr: T[], size: number): T[][] =>
+    Array.from({ length: Math.ceil(arr.length / size) }, (_, i) =>
+      arr.slice(i * size, i * size + size)
+    );
   const contents: ObsConfigDirFileType[] = [];
   while (q.length > 0) {
     const itemsToFetch = [];
@@ -100,7 +102,7 @@ export const listFilesInObsFolder = async (
           children: children,
         };
       });
-      const r2 = flatten(await Promise.all(r));
+      const r2 = (await Promise.all(r)).flat();
 
       for (const iter of r2) {
         contents.push(iter.itself);

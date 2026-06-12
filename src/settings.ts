@@ -9,7 +9,6 @@ import {
   requireApiVersion,
   setIcon,
 } from "obsidian";
-import cloneDeep from "lodash/cloneDeep";
 import type { TextComponent } from "obsidian";
 import {
   API_VER_REQURL,
@@ -72,7 +71,7 @@ class PasswordModal extends Modal {
   onOpen() {
     let { contentEl } = this;
 
-    const t = (x: TransItemType, vars?: any) => {
+    const t = (x: TransItemType, vars?: Record<string, string>) => {
       return this.plugin.i18n.t(x, vars);
     };
 
@@ -149,7 +148,7 @@ class ChangeRemoteBaseDirModal extends Modal {
   onOpen() {
     let { contentEl } = this;
 
-    const t = (x: TransItemType, vars?: any) => {
+    const t = (x: TransItemType, vars?: Record<string, string>) => {
       return this.plugin.i18n.t(x, vars);
     };
 
@@ -248,7 +247,7 @@ export class OnedriveAuthModal extends Modal {
     );
     this.plugin.oauth2Info.verifier = verifier;
 
-    const t = (x: TransItemType, vars?: any) => {
+    const t = (x: TransItemType, vars?: Record<string, string>) => {
       return this.plugin.i18n.t(x, vars);
     };
 
@@ -304,7 +303,7 @@ export class OnedriveRevokeAuthModal extends Modal {
 
   async onOpen() {
     let { contentEl } = this;
-    const t = (x: TransItemType, vars?: any) => {
+    const t = (x: TransItemType, vars?: Record<string, string>) => {
       return this.plugin.i18n.t(x, vars);
     };
 
@@ -330,7 +329,7 @@ export class OnedriveRevokeAuthModal extends Modal {
           try {
             this.plugin.settings.onedrive = JSON.parse(
               JSON.stringify(DEFAULT_ONEDRIVE_CONFIG)
-            );
+            ) as OnedriveConfig;
             await this.plugin.saveSettings();
             const isAuthed = this.plugin.settings.onedrive.username !== "";
             this.authSetting.settingEl.toggleClass("tp-sync-auth-hidden", isAuthed);
@@ -367,7 +366,7 @@ class SyncConfigDirModal extends Modal {
   async onOpen() {
     let { contentEl } = this;
 
-    const t = (x: TransItemType, vars?: any) => {
+    const t = (x: TransItemType, vars?: Record<string, string>) => {
       return this.plugin.i18n.t(x, vars);
     };
 
@@ -438,7 +437,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
 
     containerEl.empty();
 
-    const t = (x: TransItemType, vars?: any) => {
+    const t = (x: TransItemType, vars?: Record<string, string>) => {
       return this.plugin.i18n.t(x, vars);
     };
 
@@ -684,7 +683,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
             new Notice(t("settings_checkonnectivity_checking"));
             const client = new RemoteClient("s3", this.plugin.settings.s3);
             const errors = { msg: "" };
-            const res = await client.checkConnectivity((err: any) => {
+            const res = await client.checkConnectivity((err: string) => {
               errors.msg = err;
             });
             if (res) {
@@ -823,7 +822,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
             );
 
             const errors = { msg: "" };
-            const res = await client.checkConnectivity((err: any) => {
+            const res = await client.checkConnectivity((err: string) => {
               errors.msg = `${err}`;
             });
             if (res) {
@@ -1040,7 +1039,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
               () => self.plugin.saveSettings()
             );
             const errors = { msg: "" };
-            const res = await client.checkConnectivity((err: any) => {
+            const res = await client.checkConnectivity((err: string) => {
               errors.msg = `${err}`;
             });
             if (res) {
@@ -1511,7 +1510,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       .addButton(async (button) => {
         button.setButtonText(t("settings_export_s3_button"));
         button.onClick(async () => {
-          const settingsOnlyS3 = cloneDeep(this.plugin.settings);
+          const settingsOnlyS3 = structuredClone(this.plugin.settings);
           delete settingsOnlyS3.onedrive;
           delete settingsOnlyS3.webdav;
           delete settingsOnlyS3.vaultRandomID;
@@ -1527,7 +1526,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       .addButton(async (button) => {
         button.setButtonText(t("settings_export_webdav_button"));
         button.onClick(async () => {
-          const settingsOnlyWebdav = cloneDeep(this.plugin.settings);
+          const settingsOnlyWebdav = structuredClone(this.plugin.settings);
           delete settingsOnlyWebdav.onedrive;
           delete settingsOnlyWebdav.s3;
           delete settingsOnlyWebdav.vaultRandomID;
@@ -1606,7 +1605,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
             return;
           }
 
-          const copied = cloneDeep(parsed.result);
+          const copied = structuredClone(parsed.result);
           this.plugin.settings = {
             ...this.plugin.settings,
             ...copied,
@@ -1740,7 +1739,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
               .onChange(async (val: string) => {
                 const logToDB = val === "enable";
                 if (logToDB) {
-                  applyLogWriterInplace((...msg: any[]) => {
+                  applyLogWriterInplace((...msg: unknown[]) => {
                     insertLoggerOutputByVault(
                       this.plugin.db,
                       this.plugin.vaultRandomID,

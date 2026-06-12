@@ -25,7 +25,7 @@ export class RemoteClient {
     webdavConfig?: WebdavConfig,
     onedriveConfig?: OnedriveConfig,
     vaultName?: string,
-    saveUpdatedConfigFunc?: () => Promise<any>
+    saveUpdatedConfigFunc?: () => Promise<void>
   ) {
     this.serviceType = serviceType;
     // the client may modify the config inplace,
@@ -205,7 +205,7 @@ export class RemoteClient {
     }
   };
 
-  checkConnectivity = async (callbackFunc?: any) => {
+  checkConnectivity = async (callbackFunc?: (err?: string) => void) => {
     if (this.serviceType === "s3") {
       return await s3.checkConnectivity(
         s3.getS3Client(this.s3Config),

@@ -85,8 +85,8 @@ export class FakeFsLocal extends FakeFs {
     if (key.endsWith("/")) {
       // Folder
       const folderPath = key.slice(0, -1);
-      const folder = this.vault.getFolderByPath(folderPath);
-      if (!folder) {
+      const folder = this.vault.getAbstractFileByPath(folderPath);
+      if (!(folder instanceof TFolder)) {
         throw new Error(`Folder not found: ${folderPath}`);
       }
 
@@ -104,8 +104,8 @@ export class FakeFsLocal extends FakeFs {
       };
     } else {
       // File
-      const file = this.vault.getFileByPath(key);
-      if (!file) {
+      const file = this.vault.getAbstractFileByPath(key);
+      if (!(file instanceof TFile)) {
         throw new Error(`File not found: ${key}`);
       }
 
@@ -148,8 +148,8 @@ export class FakeFsLocal extends FakeFs {
     mtime: number,
     ctime: number
   ): Promise<Entity> {
-    const file = this.vault.getFileByPath(key);
-    if (file) {
+    const file = this.vault.getAbstractFileByPath(key);
+    if (file instanceof TFile) {
       await this.vault.modifyBinary(file, content);
     } else {
       // Create parent folders if they don't exist
@@ -160,8 +160,8 @@ export class FakeFsLocal extends FakeFs {
       await this.vault.createBinary(key, content);
     }
 
-    const newFile = this.vault.getFileByPath(key);
-    if (!newFile) {
+    const newFile = this.vault.getAbstractFileByPath(key);
+    if (!(newFile instanceof TFile)) {
       throw new Error(`Failed to create file: ${key}`);
     }
 
@@ -180,8 +180,8 @@ export class FakeFsLocal extends FakeFs {
   }
 
   async readFile(key: string): Promise<ArrayBuffer> {
-    const file = this.vault.getFileByPath(key);
-    if (!file) {
+    const file = this.vault.getAbstractFileByPath(key);
+    if (!(file instanceof TFile)) {
       throw new Error(`File not found: ${key}`);
     }
 
@@ -189,12 +189,12 @@ export class FakeFsLocal extends FakeFs {
   }
 
   async rename(key1: string, key2: string): Promise<void> {
-    const file = this.vault.getFileByPath(key1);
-    if (file) {
+    const file = this.vault.getAbstractFileByPath(key1);
+    if (file instanceof TFile) {
       await this.vault.rename(file, key2);
     } else {
-      const folder = this.vault.getFolderByPath(key1.slice(0, -1));
-      if (folder) {
+      const folder = this.vault.getAbstractFileByPath(key1.slice(0, -1));
+      if (folder instanceof TFolder) {
         await this.vault.rename(folder, key2.slice(0, -1));
       } else {
         throw new Error(`File or folder not found: ${key1}`);
@@ -204,13 +204,17 @@ export class FakeFsLocal extends FakeFs {
 
   async rm(key: string): Promise<void> {
     if (key.endsWith("/")) {
-      const folder = this.vault.getFolderByPath(key.slice(0, -1));
-      if (folder) {
-        await this.vault.delete(folder, true);
+      const folder = this.vault.getAbstractFileByPath(key.slice(0, -1));
+      if (folder instanceof TFolder) {
+        if (this.app) {
+          await this.app.fileManager.trashFile(folder);
+        } else {
+          await this.vault.delete(folder, true);
+        }
       }
     } else {
-      const file = this.vault.getFileByPath(key);
-      if (file) {
+      const file = this.vault.getAbstractFileByPath(key);
+      if (file instanceof TFile) {
         if (this.app) {
           await this.app.fileManager.trashFile(file);
         } else {
@@ -220,7 +224,7 @@ export class FakeFsLocal extends FakeFs {
     }
   }
 
-  async checkConnect(callbackFunc?: any): Promise<boolean> {
+  async checkConnect(callbackFunc?: (err?: string) => void): Promise<boolean> {
     // Local file system is always available
     return true;
   }
@@ -229,7 +233,7 @@ export class FakeFsLocal extends FakeFs {
     return "Local User";
   }
 
-  async revokeAuth(): Promise<any> {
+  async revokeAuth(): Promise<void> {
     return undefined;
   }
 

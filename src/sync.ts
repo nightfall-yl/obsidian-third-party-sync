@@ -1431,12 +1431,12 @@ export const doActualSyncV3 = async (
   syncPlan: SyncPlanType,
   sortedKeys: string[],
   sizesGoWrong: FileOrFolderMixedState[],
-  localDeleteFunc: any,
+  localDeleteFunc: (key: string) => Promise<void>,
   password: string = "",
   lastSynced?: number,
   concurrency: number = 1,
-  callbackSizesGoWrong?: any,
-  callbackSyncProcess?: any,
+  callbackSizesGoWrong?: (items: FileOrFolderMixedState[]) => void,
+  callbackSyncProcess?: (index: number, total: number) => Promise<void>,
   protectModifyPercentage?: number,
   callbackProtectModifyPercentage?: (errorMsg: string) => void
 ) => {
@@ -1512,7 +1512,7 @@ export const doActualSyncV3 = async (
             password
           );
 
-          if (!isDeleteOp && !val.decision!.startsWith("createFolder")) {
+          if (!isDeleteOp && !val.decision.startsWith("createFolder")) {
             queueIndex++;
             if (callbackSyncProcess !== undefined) {
               await callbackSyncProcess(queueIndex, queueTotal);
@@ -1729,7 +1729,7 @@ const dispatchOperationToActual = async (
   client: RemoteClient,
   db: InternalDBs,
   vault: Vault,
-  localDeleteFunc: any,
+  localDeleteFunc: (key: string) => Promise<void>,
   password: string = ""
 ) => {
   let remoteEncryptedKey = key;
@@ -1965,7 +1965,7 @@ function isCountableSyncItem(item: FileOrFolderMixedState) {
   return item.decision != "keepRemoteDelHist" && !item.decision.contains("skip");
 }
 
-async function syncIndividualItem(key: string, deletionOp: boolean, val: FileOrFolderMixedState, vaultRandomID: string, client: RemoteClient, db: InternalDBs, vault: Vault, localDeleteFunc: any, password: string) {
+async function syncIndividualItem(key: string, deletionOp: boolean, val: FileOrFolderMixedState, vaultRandomID: string, client: RemoteClient, db: InternalDBs, vault: Vault, localDeleteFunc: (key: string) => Promise<void>, password: string) {
   log.debug(`start syncing "${key}" with plan ${JSON.stringify(val)}`);
 
   await dispatchOperationToActual(
@@ -1995,12 +1995,12 @@ export const doActualSync = async (
   origMetadata: MetadataOnRemote,
   sizesGoWrong: FileOrFolderMixedState[],
   deletions: DeletionOnRemote[],
-  localDeleteFunc: any,
+  localDeleteFunc: (key: string) => Promise<void>,
   password: string = "",
   lastSynced?: number,
   concurrency: number = 1,
-  callbackSizesGoWrong?: any,
-  callbackSyncProcess?: any,
+  callbackSizesGoWrong?: (items: FileOrFolderMixedState[]) => void,
+  callbackSyncProcess?: (index: number, total: number) => Promise<void>,
   protectModifyPercentage?: number,
   callbackProtectModifyPercentage?: (errorMsg: string) => void
 ) => {
@@ -2019,6 +2019,7 @@ export const doActualSync = async (
     log.debug(`allFilesCount: ${allFilesCount}, realModifyDeleteCount: ${realModifyDeleteCount}`);
 
     if (protectModifyPercentage === 100 && realModifyDeleteCount === allFilesCount) {
+      // Allow full sync when protection threshold is 100%
     } else if (realModifyDeleteCount * 100 >= allFilesCount * protectModifyPercentage) {
       const percent = ((100 * realModifyDeleteCount) / allFilesCount).toFixed(1);
       const errorMsg = `syncrun_abort_protectmodifypercentage|${protectModifyPercentage}|${realModifyDeleteCount}|${allFilesCount}|${percent}`;
@@ -2074,7 +2075,7 @@ export const doActualSync = async (
             password
           );
 
-          if (!isDeleteOp && !val.decision!.startsWith("createFolder")) {
+          if (!isDeleteOp && !val.decision.startsWith("createFolder")) {
             queueIndex++;
             if (callbackSyncProcess !== undefined) {
               await callbackSyncProcess(queueIndex, queueTotal);

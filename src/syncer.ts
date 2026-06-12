@@ -161,23 +161,23 @@ const generateSyncPlan = async (
 
   // Add remote entities
   for (const remote of remoteEntityList) {
-    syncPlan[remote.key!] = {
+    syncPlan[remote.key] = {
       path: remote.path,
       type: remote.type,
-      key: remote.key!,
+      key: remote.key,
       remote: remote
     };
   }
 
   // Add local entities
   for (const local of localEntityList) {
-    if (syncPlan[local.key!]) {
-      syncPlan[local.key!].local = local;
+    if (syncPlan[local.key]) {
+      syncPlan[local.key].local = local;
     } else {
-      syncPlan[local.key!] = {
+      syncPlan[local.key] = {
         path: local.path,
         type: local.type,
-        key: local.key!,
+        key: local.key,
         local: local
       };
     }
@@ -185,13 +185,13 @@ const generateSyncPlan = async (
 
   // Add previous sync entities
   for (const prevSync of prevSyncEntityList) {
-    if (syncPlan[prevSync.key!]) {
-      syncPlan[prevSync.key!].prevSync = prevSync;
+    if (syncPlan[prevSync.key]) {
+      syncPlan[prevSync.key].prevSync = prevSync;
     } else {
-      syncPlan[prevSync.key!] = {
+      syncPlan[prevSync.key] = {
         path: prevSync.path,
         type: prevSync.type,
-        key: prevSync.key!,
+        key: prevSync.key,
         prevSync: prevSync
       };
     }

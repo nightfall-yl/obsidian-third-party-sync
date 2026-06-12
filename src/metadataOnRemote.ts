@@ -1,4 +1,4 @@
-import isEqual from "lodash/isEqual";
+import { deepEqual } from "fast-equals";
 import { base64url } from "rfc4648";
 import { reverseString } from "./misc";
 import { log } from "./moreOnLog";
@@ -48,7 +48,7 @@ export const isEqualMetadataOnRemote = (
   // we only need to compare deletions
   const d1 = m1.deletions === undefined ? [] : m1.deletions;
   const d2 = m2.deletions === undefined ? [] : m2.deletions;
-  return isEqual(d1, d2);
+  return deepEqual(d1, d2);
 };
 
 export const serializeMetadataOnRemote = (x: MetadataOnRemote) => {
@@ -84,9 +84,9 @@ export const deserializeMetadataOnRemote = (x: string | ArrayBuffer) => {
     y1 = new TextDecoder().decode(x);
   }
 
-  let y2: any;
+  let y2: Record<string, unknown>;
   try {
-    y2 = JSON.parse(y1);
+    y2 = JSON.parse(y1) as Record<string, unknown>;
   } catch (e) {
     throw new Error(
       `invalid remote meta data file with first few chars: ${y1.slice(0, 5)}`
@@ -102,8 +102,8 @@ export const deserializeMetadataOnRemote = (x: string | ArrayBuffer) => {
   let y3: string;
   try {
     y3 = (
-      base64url.parse(reverseString(y2["d"]), {
-        out: Buffer.allocUnsafe as any,
+      base64url.parse(reverseString(y2["d"] as string), {
+        out: (size: number) => Buffer.allocUnsafe(size) as unknown as Uint8Array,
         loose: true,
       }) as Buffer
     ).toString("utf-8");

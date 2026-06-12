@@ -17,7 +17,7 @@ import {
 import { log } from "./moreOnLog";
 
 const turnSyncPlanToTable = (record: string) => {
-  const syncPlan: SyncPlanType = JSON.parse(record);
+  const syncPlan: SyncPlanType = JSON.parse(record) as SyncPlanType;
   const { ts, tsFmt, remoteType, mixedStates } = syncPlan;
 
   type allowedHeadersType = keyof FileOrFolderMixedState;
@@ -47,8 +47,8 @@ const turnSyncPlanToTable = (record: string) => {
     `| ${headers.map((x) => "---").join(" | ")} |`,
   ];
   for (const [k1, v1] of Object.entries(syncPlan.mixedStates)) {
-    const k = k1 as string;
-    const v = v1 as FileOrFolderMixedState;
+    const k = k1;
+    const v = v1;
     const singleLine = [];
     for (const h of headers) {
       const field = v[h];

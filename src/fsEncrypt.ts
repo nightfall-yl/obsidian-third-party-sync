@@ -1,7 +1,7 @@
 import type { CipherMethodType, Entity } from "./baseTypes";
 import * as openssl from "./encrypt";
 import { FakeFs } from "./fsAll";
-import cloneDeep from "lodash/cloneDeep";
+
 
 export class FakeFsEncrypt extends FakeFs {
   innerFs: FakeFs;
@@ -63,13 +63,13 @@ export class FakeFsEncrypt extends FakeFs {
           path: key,
           type: key.endsWith("/") ? 'folder' : 'file',
           key: key,
-          keyRaw: innerEntity.key!,
-          keyEnc: innerEntity.key!,
+          keyRaw: innerEntity.key,
+          keyEnc: innerEntity.key,
           mtimeCli: innerEntity.mtimeCli,
           mtimeSvr: innerEntity.mtimeSvr,
           size: size,
-          sizeEnc: innerEntity.size!,
-          sizeRaw: innerEntity.size!,
+          sizeEnc: innerEntity.size,
+          sizeRaw: innerEntity.size,
           hash: undefined,
           synthesizedFolder: innerEntity.synthesizedFolder,
         });
@@ -99,7 +99,7 @@ export class FakeFsEncrypt extends FakeFs {
         type: key.endsWith("/") ? 'folder' : 'file',
         key: key,
         keyRaw: innerEntity.keyRaw,
-        keyEnc: innerEntity.key!,
+        keyEnc: innerEntity.key,
         mtimeCli: innerEntity.mtimeCli,
         mtimeSvr: innerEntity.mtimeSvr,
         size: undefined,
@@ -202,11 +202,11 @@ export class FakeFsEncrypt extends FakeFs {
         type: 'file',
         key: key,
         keyRaw: innerEntity.keyRaw,
-        keyEnc: innerEntity.key!,
+        keyEnc: innerEntity.key,
         mtimeCli: innerEntity.mtimeCli,
         mtimeSvr: innerEntity.mtimeSvr,
         size: undefined,
-        sizeEnc: innerEntity.size!,
+        sizeEnc: innerEntity.size,
         sizeRaw: innerEntity.sizeRaw,
         hash: undefined,
         synthesizedFolder: innerEntity.synthesizedFolder,
@@ -268,7 +268,7 @@ export class FakeFsEncrypt extends FakeFs {
     return await this.innerFs.rm(keyEnc);
   }
 
-  async checkConnect(callbackFunc?: any): Promise<boolean> {
+  async checkConnect(callbackFunc?: (err?: string) => void): Promise<boolean> {
     return await this.innerFs.checkConnect(callbackFunc);
   }
 
@@ -276,7 +276,7 @@ export class FakeFsEncrypt extends FakeFs {
     return await this.innerFs.getUserDisplayName();
   }
 
-  async revokeAuth(): Promise<any> {
+  async revokeAuth(): Promise<void> {
     return await this.innerFs.revokeAuth();
   }
 
@@ -293,7 +293,7 @@ export class FakeFsEncrypt extends FakeFs {
       return this._copyEntityAndCopyKeyEncSizeEnc(input);
     }
 
-    const local = cloneDeep(input);
+    const local = structuredClone(input);
     if (local.sizeEnc === undefined && local.size !== undefined) {
       local.sizeEnc = this._getSizeFromOrigToEnc(local.size);
     }
@@ -312,7 +312,7 @@ export class FakeFsEncrypt extends FakeFs {
   }
 
   private _copyEntityAndCopyKeyEncSizeEnc(entity: Entity) {
-    const res = cloneDeep(entity);
+    const res = structuredClone(entity);
     res["keyEnc"] = res["key"];
     res["sizeEnc"] = res["size"];
     return res;

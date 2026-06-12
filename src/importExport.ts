@@ -1,4 +1,4 @@
-import cloneDeep from "lodash/cloneDeep";
+
 import pako from "pako";
 
 import {
@@ -18,14 +18,14 @@ export const exportSettingsUri = (
   currentVaultName: string,
   pluginVersion: string
 ) => {
-  const settings2 = cloneDeep(settings);
+  const settings2 = structuredClone(settings);
   delete settings2.onedrive;
   delete settings2.vaultRandomID;
   const jsonStr = JSON.stringify(settings2);
 
   // Compress data to fit in URI
   const compressed = pako.deflate(jsonStr);
-  const base64 = btoa(String.fromCharCode.apply(null, compressed as unknown as number[]));
+  const base64 = btoa(String.fromCharCode(...compressed));
   const data = encodeURIComponent(base64);
   const vault = encodeURIComponent(currentVaultName);
   const version = encodeURIComponent(pluginVersion);
@@ -40,10 +40,10 @@ export interface ProcessQrCodeResultType {
 }
 
 export const importQrCodeUri = (
-  inputParams: any,
+  inputParams: Record<string, unknown>,
   currentVaultName: string
 ): ProcessQrCodeResultType => {
-  const decodeMaybe = (v: any) => {
+  const decodeMaybe = (v: unknown): unknown => {
     if (typeof v !== "string") {
       return v;
     }
@@ -55,14 +55,14 @@ export const importQrCodeUri = (
   };
 
   const normalizeImportedSettings = (
-    imported: any
+    imported: Record<string, unknown>
   ): ThirdPartySyncPluginSettings => {
     const serviceTypeSet = new Set<SUPPORTED_SERVICES_TYPE>([
       "s3",
       "webdav",
       "onedrive",
     ]);
-    const importedServiceType = imported?.serviceType as
+    const importedServiceType = imported["serviceType"] as
       | SUPPORTED_SERVICES_TYPE
       | undefined;
     const serviceType = serviceTypeSet.has(importedServiceType)
@@ -74,15 +74,15 @@ export const importQrCodeUri = (
       serviceType,
       s3: {
         ...DEFAULT_S3_CONFIG,
-        ...(imported?.s3 ?? {}),
+        ...(imported["s3"] ?? {}),
       },
       webdav: {
         ...DEFAULT_WEBDAV_CONFIG,
-        ...(imported?.webdav ?? {}),
+        ...(imported["webdav"] ?? {}),
       },
       onedrive: {
         ...DEFAULT_ONEDRIVE_CONFIG,
-        ...(imported?.onedrive ?? {}),
+        ...(imported["onedrive"] ?? {}),
       },
     };
   };
@@ -130,7 +130,7 @@ export const importQrCodeUri = (
         for (let i = 0; i < binary.length; i++) {
           bytes[i] = binary.charCodeAt(i);
         }
-        const decompressed = pako.inflate(bytes, { to: "string" });
+        const decompressed = pako.inflate(bytes, { to: "string" }) as unknown as string;
         dataStr = decompressed;
       } catch (e) {
         return {

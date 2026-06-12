@@ -46,7 +46,7 @@ export const copyFolder = async (
       if (item.type === 'folder') {
         await destFs.mkdir(destItemPath, item.mtime, item.mtime);
       } else {
-        await copyFile(sourceFs, item.key!, destFs, destItemPath);
+        await copyFile(sourceFs, item.key, destFs, destItemPath);
       }
     }
   } catch (error) {

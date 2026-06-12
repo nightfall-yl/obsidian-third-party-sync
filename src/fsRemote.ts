@@ -86,9 +86,10 @@ export class FakeFsRemote extends FakeFs {
     mtime: number,
     ctime: number
   ): Promise<Entity> {
+    const noVault = null as unknown as Parameters<RemoteClient["uploadToRemote"]>[1];
     const remoteObjMeta = await this.client.uploadToRemote(
       key,
-      null as any, // vault is not needed for raw content
+      noVault, // vault is not needed for raw content
       false, // isRecursively
       "", // password
       "", // remoteEncryptedKey
@@ -114,9 +115,10 @@ export class FakeFsRemote extends FakeFs {
   async readFile(key: string): Promise<ArrayBuffer> {
     // This is a simplified implementation
     // In a real implementation, you would need to handle password and remoteEncryptedKey
+    const noVaultDownload = null as unknown as Parameters<RemoteClient["downloadFromRemote"]>[1];
     const buffer = await this.client.downloadFromRemote(
       key,
-      null as any, // vault is not needed for skipSaving
+      noVaultDownload, // vault is not needed for skipSaving
       0, // mtime
       "", // password
       "", // remoteEncryptedKey
@@ -151,7 +153,7 @@ export class FakeFsRemote extends FakeFs {
     }
   }
 
-  async revokeAuth(): Promise<any> {
+  async revokeAuth(): Promise<void> {
     return await this.client.revokeAuth();
   }
 

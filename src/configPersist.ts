@@ -20,19 +20,19 @@ export const messyConfigToNormal = (
   x: MessyConfigType | ThirdPartySyncPluginSettings | null | undefined
 ): ThirdPartySyncPluginSettings | null | undefined => {
   if (x === null || x === undefined) {
-    return x as any;
+    return x;
   }
   if ("readme" in x && "d" in x) {
     // we should decode
     const y = JSON.parse(
       (
         base64url.parse(reverseString(x["d"]), {
-          out: Buffer.allocUnsafe as any,
+          out: (size: number) => Buffer.allocUnsafe(size) as unknown as Uint8Array,
           loose: true,
         }) as Buffer
       ).toString("utf-8")
-    );
-    return y;
+    ) as ThirdPartySyncPluginSettings;
+    return y as ThirdPartySyncPluginSettings;
   } else {
     return x;
   }

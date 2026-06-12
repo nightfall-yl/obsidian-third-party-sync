@@ -15,8 +15,8 @@ export abstract class FakeFs {
   abstract readFile(key: string): Promise<ArrayBuffer>;
   abstract rename(key1: string, key2: string): Promise<void>;
   abstract rm(key: string): Promise<void>;
-  abstract checkConnect(callbackFunc?: any): Promise<boolean>;
+  abstract checkConnect(callbackFunc?: (err?: string) => void): Promise<boolean>;
   abstract getUserDisplayName(): Promise<string>;
-  abstract revokeAuth(): Promise<any>;
+  abstract revokeAuth(): Promise<void>;
   abstract allowEmptyFile(): boolean;
 }

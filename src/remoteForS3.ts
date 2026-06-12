@@ -82,7 +82,7 @@ class ObsHttpHandler extends FetchHttpHandler {
       port ? `:${port}` : ""
     }${path}`;
     const body =
-      method === "GET" || method === "HEAD" ? undefined : request.body;
+      method === "GET" || method === "HEAD" ? undefined : (request.body as string | ArrayBuffer | undefined);
 
     const transformedHeaders: Record<string, string> = {};
     for (const key of Object.keys(request.headers)) {
@@ -146,7 +146,7 @@ class ObsHttpHandler extends FetchHttpHandler {
         })
       );
     }
-    return Promise.race(raceOfPromises);
+    return Promise.race(raceOfPromises) as Promise<{ response: HttpResponse }>;
   }
   updateHttpClientConfig(key: never, value: never): void {
     // Implement this method if necessary
@@ -237,7 +237,7 @@ export const getS3Client = (s3Config: S3Config) => {
 
   s3Client.middlewareStack.add(
     (next, context) => (args) => {
-      (args.request as any).headers["cache-control"] = "no-cache";
+      (args.request as Record<string, unknown>).headers["cache-control"] = "no-cache";
       return next(args);
     },
     {
@@ -344,7 +344,7 @@ export const uploadToRemote = async (
       queueSize: s3Config.partsConcurrency, // concurrency
       partSize: bytesIn5MB, // minimal 5MB by default
       leavePartsOnError: false,
-      params: uploadParams,
+      params: uploadParams as Record<string, unknown>,
     });
 
     try {
@@ -352,13 +352,13 @@ export const uploadToRemote = async (
     } catch (err) {
       // Some S3-compatible providers reject custom metadata writes (e.g. x-amz-meta-*),
       // which can surface as 401/Signature related failures. Retry once without metadata.
-      if (!s3Config.disableS3MetadataSync && uploadParams.Metadata !== undefined) {
+      if (!s3Config.disableS3MetadataSync && (uploadParams as Record<string, string | undefined>).Metadata !== undefined) {
         log.warn(
           "S3 upload with metadata failed, retrying once without metadata",
           err
         );
         const uploadParamsNoMetadata = { ...uploadParams };
-        delete uploadParamsNoMetadata.Metadata;
+        delete (uploadParamsNoMetadata as Record<string, string | undefined>).Metadata;
 
         const retryUpload = new Upload({
           client: s3Client,
@@ -446,7 +446,7 @@ const getObjectBodyToArrayBuffer = async (
   if (b instanceof Readable) {
     return (await new Promise((resolve, reject) => {
       const chunks: Uint8Array[] = [];
-      b.on("data", (chunk) => chunks.push(chunk));
+      b.on("data", (chunk) => chunks.push(chunk as Uint8Array));
       b.on("error", reject);
       b.on("end", () => {
         const totalLen = chunks.reduce((acc, c) => acc + c.byteLength, 0);
@@ -458,7 +458,7 @@ const getObjectBodyToArrayBuffer = async (
         }
         resolve(bufferToArrayBuffer(result));
       });
-    })) as ArrayBuffer;
+    }));
   } else if (b instanceof ReadableStream) {
     return await new Response(b, {}).arrayBuffer();
   } else if (b instanceof Blob) {

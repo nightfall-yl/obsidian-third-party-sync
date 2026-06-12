@@ -7,7 +7,7 @@ import {
   FileSystemAdapter,
   Platform, TAbstractFile, Vault, EventRef,
 } from "obsidian";
-import cloneDeep from "lodash/cloneDeep";
+
 import type {
   FileOrFolderMixedState, RemoteItem,
   ThirdPartySyncPluginSettings,
@@ -133,7 +133,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
     const MAX_STEPS = this.settings.debugEnabled ? 8 : 2;
     await this.createTrashIfDoesNotExist();
 
-    const t = (x: TransItemType, vars?: any) => {
+    const t = (x: TransItemType, vars?: Record<string, string>) => {
       return this.i18n.t(x, vars);
     };
 
@@ -167,7 +167,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
           case 4:
           case 5:
           case 6:
-            getNotice(s, t(`syncrun_step${step}` as any, {
+            getNotice(s, t(`syncrun_step${step}` as TransItemType, {
               current: `${step}`, maxSteps: "8"
             }));
             break;
@@ -353,10 +353,10 @@ export default class ThirdPartySyncPlugin extends Plugin {
       getNotice(triggerSource, msg, 10 * 1000);
       if (error instanceof AggregateError) {
         for (const e of error.errors) {
-          getNotice(triggerSource, e.message, 10 * 1000);
+          getNotice(triggerSource, (e as Error).message, 10 * 1000);
         }
       } else {
-        getNotice(triggerSource, error.message, 10 * 1000);
+        getNotice(triggerSource, (error as Error).message, 10 * 1000);
       }
       this.updateSyncStatus("idle");
       this.setSyncIcon(false);
@@ -374,7 +374,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
     for (const key in syncPlan.mixedStates) {
       const fileState = syncPlan.mixedStates[key];
 
-      if (fileState.existLocal && fileState.existRemote && fileState.mtimeLocal! > fileState.mtimeRemote!) {
+      if (fileState.existLocal && fileState.existRemote && fileState.mtimeLocal > fileState.mtimeRemote) {
         return true;
       }
     }
@@ -382,7 +382,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
   };
 
   private async doActualSyncV3(client: RemoteClient, plan: SyncPlanType, sortedKeys: string[], sizesGoWrong: FileOrFolderMixedState[], deletions: DeletionOnRemote[], self: this) {
-    const t = (x: TransItemType, vars?: any) => {
+    const t = (x: TransItemType, vars?: Record<string, string>) => {
       return this.i18n.t(x, vars);
     };
     const effectiveConcurrency =
@@ -429,7 +429,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
   }
 
   private async doActualSync(client: RemoteClient, plan: SyncPlanType, sortedKeys: string[], metadataFile: FileOrFolderMixedState, origMetadataOnRemote: MetadataOnRemote, sizesGoWrong: FileOrFolderMixedState[], deletions: DeletionOnRemote[], self: this) {
-    const t = (x: TransItemType, vars?: any) => {
+    const t = (x: TransItemType, vars?: Record<string, string>) => {
       return this.i18n.t(x, vars);
     };
     const effectiveConcurrency =
@@ -667,7 +667,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
       this.settings.lang = lang;
       await this.saveSettings();
     });
-    const t = (x: TransItemType, vars?: any) => {
+    const t = (x: TransItemType, vars?: Record<string, string>) => {
       return this.i18n.t(x, vars);
     };
 
@@ -731,7 +731,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
       if (parsed.status === "error") {
         new Notice(parsed.message);
       } else {
-        const copied = cloneDeep(parsed.result);
+        const copied = structuredClone(parsed.result);
         // new Notice(JSON.stringify(copied))
         this.settings = {
           ...this.settings,
@@ -797,8 +797,9 @@ export default class ThirdPartySyncPlugin extends Plugin {
               this.oauth2Info.verifier
             );
 
-            if ((rsp as any).error !== undefined) {
-              const errorMsg = (rsp as any).error_description || JSON.stringify(rsp);
+            const rsp2 = rsp as Record<string, unknown>;
+            if (rsp2.error !== undefined) {
+              const errorMsg = rsp2.error_description || JSON.stringify(rsp);
               throw Error(`Azure API 错误: ${errorMsg}`);
             }
 
@@ -851,15 +852,15 @@ export default class ThirdPartySyncPlugin extends Plugin {
               })
             );
           }
-        } catch (err: any) {
+        } catch (err: unknown) {
           console.error("OneDrive auth protocol handler error:", err);
-          
+          const error = err as { message?: string };
           // 关闭 helper modal 并显示错误
           if (this.oauth2Info.helperModal) {
             this.oauth2Info.helperModal.contentEl.empty();
             this.oauth2Info.helperModal.contentEl.createEl("p", { text: "鉴权失败" });
             this.oauth2Info.helperModal.contentEl.createEl("p", { 
-              text: err.message || "未知错误",
+              text: error.message || "未知错误",
               cls: "onedrive-auth-error"
             });
           }
@@ -1008,9 +1009,9 @@ export default class ThirdPartySyncPlugin extends Plugin {
   }
 
   async loadSettings() {
-    let rawData = null;
+    let rawData: Record<string, unknown> | null = null;
     try {
-      rawData = await this.loadData();
+      rawData = await this.loadData() as Record<string, unknown> | null;
     } catch (e) {
       console.warn("Failed to load settings, using defaults:", e);
       rawData = null;
@@ -1023,8 +1024,8 @@ export default class ThirdPartySyncPlugin extends Plugin {
 
     this.settings = Object.assign(
       {},
-      cloneDeep(DEFAULT_SETTINGS),
-      messyConfigToNormal(rawData)
+      structuredClone(DEFAULT_SETTINGS),
+      messyConfigToNormal(rawData as ThirdPartySyncPluginSettings)
     );
     if (this.settings.onedrive.clientID === "") {
       this.settings.onedrive.clientID = DEFAULT_SETTINGS.onedrive.clientID;
@@ -1090,7 +1091,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
       current >= this.settings.onedrive.credentialsShouldBeDeletedAtTime
     ) {
       onedriveExpired = true;
-      this.settings.onedrive = cloneDeep(DEFAULT_ONEDRIVE_CONFIG);
+      this.settings.onedrive = structuredClone(DEFAULT_ONEDRIVE_CONFIG);
       needSave = true;
     }
 

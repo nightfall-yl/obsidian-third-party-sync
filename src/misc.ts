@@ -1,7 +1,7 @@
 import { Vault, moment } from "obsidian";
 import { base32, base64url } from "rfc4648";
 import XRegExp from "xregexp";
-import emojiRegex from "emoji-regex";
+import emojiRegex from "emoji-regex-xs";
 
 import type { I18n, LangType, LangTypeAndAuto, TransItemType } from "./i18n";
 
@@ -303,7 +303,7 @@ export const extractSvgSub = (x: string, subEl: string = "rect") => {
  * @returns
  */
 export const getRandomIntInclusive = (min: number, max: number) => {
-  const crypto = (typeof window !== 'undefined' && window.crypto) || (typeof globalThis !== 'undefined' && globalThis.crypto);
+  const crypto = (typeof window !== 'undefined' && window.crypto);
   if (!crypto || !crypto.getRandomValues) {
     throw new Error('Crypto API not available');
   }
@@ -321,7 +321,7 @@ export const getRandomIntInclusive = (min: number, max: number) => {
  * @returns
  */
 export const getRandomArrayBuffer = (byteLength: number) => {
-  const crypto = (typeof window !== 'undefined' && window.crypto) || (typeof globalThis !== 'undefined' && globalThis.crypto);
+  const crypto = (typeof window !== 'undefined' && window.crypto);
   if (!crypto || !crypto.getRandomValues) {
     throw new Error('Crypto API not available');
   }
@@ -371,7 +371,7 @@ export const getSplitRanges = (bytesTotal: number, bytesEachPart: number) => {
  * @param obj anything
  * @returns string of the name of the object
  */
-export const getTypeName = (obj: any) => {
+export const getTypeName = (obj: any): string => {
   return Object.prototype.toString.call(obj).slice(8, -1);
 };
 
@@ -414,7 +414,7 @@ export const unixTimeToStr = (x: number | undefined | null) => {
  */
 const getCircularReplacer = () => {
   const seen = new WeakSet();
-  return (key: any, value: any) => {
+  return (key: string, value: unknown): unknown => {
     if (typeof value === "object" && value !== null) {
       if (seen.has(value)) {
         return;
@@ -495,7 +495,7 @@ export const statFix = async (vault: Vault, path: string) => {
 };
 
 export function getLastSynced(i18n: I18n, lastSuccessSyncMillis?: number): {lastSyncMsg: string, lastSyncLabelMsg: string} {
-  const t = (x: TransItemType, vars?: any) => {
+  const t = (x: TransItemType, vars?: Record<string, string>) => {
     return i18n.t(x, vars);
   };
 
@@ -549,7 +549,7 @@ export function getLastSynced(i18n: I18n, lastSuccessSyncMillis?: number): {last
  * @param obj
  * @returns
  */
-export const roughSizeOfObject = (obj: any) => {
+export const roughSizeOfObject = (obj: unknown) => {
   const str = JSON.stringify(obj);
   // rough calculation, assuming 2 bytes per character
   return str.length * 2;

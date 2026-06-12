@@ -2,8 +2,6 @@ import { Buffer } from "buffer";
 import { Vault, requestUrl } from "obsidian";
 
 import { Queue } from "@fyears/tsqueue";
-import chunk from "lodash/chunk";
-import flatten from "lodash/flatten";
 import { getReasonPhrase } from "http-status-codes";
 import { RemoteItem, VALID_REQURL, WebdavConfig } from "./baseTypes";
 import { decryptArrayBuffer, encryptArrayBuffer } from "./encrypt";
@@ -127,21 +125,21 @@ if (VALID_REQURL) {
   getPatcher().patch(
     "request",
     async (
-      options: any
-    ): Promise<Response | ResponseDataDetailed<any>> => {
-      const transformedHeaders = { ...options.headers };
+      options: Record<string, unknown>
+    ): Promise<Response | ResponseDataDetailed<unknown>> => {
+      const transformedHeaders = { ...(options.headers as Record<string, string>) };
       delete transformedHeaders["host"];
       delete transformedHeaders["Host"];
       delete transformedHeaders["content-length"];
       delete transformedHeaders["Content-Length"];
       const r = await requestUrlWith503Retry({
-        url: options.url,
-        method: options.method,
+        url: options.url as string,
+        method: options.method as string,
         body: options.data as string | ArrayBuffer,
         headers: transformedHeaders,
       });
 
-      let r2: Response | ResponseDataDetailed<any> = undefined;
+      let r2: Response | ResponseDataDetailed<unknown> = undefined;
       if (options.responseType === undefined) {
         r2 = {
           data: undefined,
@@ -306,7 +304,7 @@ export class WrappedWebdavClient {
     if (this.webdavConfig.depth === "auto_unknown") {
       let testPassed = false;
       try {
-        const res = await webdavCallWith503Retry<any>(
+        const res = await webdavCallWith503Retry<unknown>(
           "customRequest(PROPFIND infinity)",
           () =>
             this.client.customRequest(`/${this.remoteBaseDir}/`, {
@@ -315,7 +313,7 @@ export class WrappedWebdavClient {
                 Depth: "infinity",
               },
               responseType: "text",
-            } as any)
+            } as Parameters<typeof this.client.customRequest>[1])
         );
         if (res.status === 403) {
           throw Error("not support Infinity, get 403");
@@ -338,7 +336,7 @@ export class WrappedWebdavClient {
                   Depth: "1",
                 },
                 responseType: "text",
-              } as any)
+              } as unknown as Parameters<typeof this.client.customRequest>[1])
           );
           testPassed = true;
           this.webdavConfig.depth = "auto_1";
@@ -480,6 +478,10 @@ export const listFromRemote = async (
     // we need to do a bfs here
     const q = new Queue([`/${client.remoteBaseDir}`]);
     const CHUNK_SIZE = 2;
+    const chunk = <T>(arr: T[], size: number): T[][] =>
+      Array.from({ length: Math.ceil(arr.length / size) }, (_, i) =>
+        arr.slice(i * size, i * size + size)
+      );
     while (q.length > 0) {
       const itemsToFetch = [];
       while (q.length > 0) {
@@ -498,10 +500,10 @@ export const listFromRemote = async (
               // we need to load all files including dot,
               // anyway to reduce the resources?
               // glob: "/**" /* avoid dot files by using glob */,
-            }) as Promise<FileStat[]>
+            })
           );
         });
-        const r2 = flatten(await Promise.all(r));
+        const r2 = (await Promise.all(r)).flat();
         subContents.push(...r2);
       }
       for (let i = 0; i < subContents.length; ++i) {
@@ -514,7 +516,7 @@ export const listFromRemote = async (
     }
   } else {
     // the remote supports infinity propfind
-    contents = (await webdavCallWith503Retry("getDirectoryContents(deep=true)", () =>
+    contents = await webdavCallWith503Retry("getDirectoryContents(deep=true)", () =>
       client.client.getDirectoryContents(`/${client.remoteBaseDir}`, {
         deep: true,
         details: false /* no need for verbose details here */,
@@ -523,7 +525,7 @@ export const listFromRemote = async (
         // anyway to reduce the resources?
         // glob: "/**" /* avoid dot files by using glob */,
       })
-    )) as FileStat[];
+    );
   }
   const unifiedContents: RemoteItem[] = [];
   for (const x of contents) {
@@ -640,7 +642,7 @@ export const deleteFromRemote = async (
 
 export const checkConnectivity = async (
   client: WrappedWebdavClient,
-  callbackFunc?: any
+  callbackFunc?: (err?: string) => void
 ) => {
   if (
     !(

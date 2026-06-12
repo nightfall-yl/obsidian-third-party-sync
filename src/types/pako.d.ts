@@ -1,6 +1,6 @@
 declare module 'pako' {
-  export function inflate(data: any, options?: any): any;
-  export function deflate(data: any, options?: any): any;
+  export function inflate(data: Uint8Array, options?: Record<string, unknown>): Uint8Array;
+  export function deflate(data: Uint8Array, options?: Record<string, unknown>): Uint8Array;
 
   const pako: {
     inflate: typeof inflate;

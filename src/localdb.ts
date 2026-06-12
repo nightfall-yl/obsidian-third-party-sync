@@ -82,7 +82,7 @@ const migrateDBsFrom20211114To20220108 = async (
   const oldVer = 20211114;
   const newVer = 20220108;
 
-  const allPromisesToWait: Promise<any>[] = [];
+  const allPromisesToWait: Promise<void>[] = [];
 
   const keysInDeleteHistoryTbl = await db.fileHistoryTbl.keys();
   for (const key of keysInDeleteHistoryTbl) {
@@ -127,7 +127,7 @@ const migrateDBsFrom20211114To20220108 = async (
     if (key.startsWith(vaultRandomID)) {
       continue;
     }
-    const value = (await db.syncPlansTbl.getItem(key)) as SyncPlanRecord;
+    const value = await db.syncPlansTbl.getItem(key);
     if (value === null || value === undefined) {
       continue;
     }
@@ -541,9 +541,9 @@ export const getSyncMetaMappingByRemoteKeyAndVault = async (
   remoteExtraKey: string,
   vaultRandomID: string
 ) => {
-  const potentialItem = (await db.syncMappingTbl.getItem(
+  const potentialItem = await db.syncMappingTbl.getItem(
     `${vaultRandomID}\t${remoteKey}`
-  )) as SyncMetaMappingRecord;
+  );
 
   if (potentialItem === null) {
     // no result was found
@@ -728,7 +728,7 @@ export const clearExpiredLoggerOutputRecords = async (db: InternalDBs) => {
     });
   }
 
-  const ps: Promise<any>[] = [];
+  const ps: Promise<void>[] = [];
   keysToRemove.forEach((element) => {
     ps.push(db.loggerOutputTbl.removeItem(element));
   });

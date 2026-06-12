@@ -4,7 +4,6 @@ import type {
   UploadSession,
   User,
 } from "@microsoft/microsoft-graph-types";
-import cloneDeep from "lodash/cloneDeep";
 import { request, requestUrl, RequestUrlParam, requireApiVersion, Vault } from "obsidian";
 import {
   VALID_REQURL,
@@ -47,7 +46,7 @@ export const DEFAULT_ONEDRIVE_CONFIG: OnedriveConfig = {
 // Helper functions for PKCE
 async function generateCodeVerifier(): Promise<string> {
   const arrayBuffer = new Uint8Array(32);
-  const crypto = (typeof window !== 'undefined' && window.crypto) || (typeof globalThis !== 'undefined' && globalThis.crypto);
+  const crypto = (typeof window !== 'undefined' && window.crypto);
   if (!crypto || !crypto.getRandomValues) {
     throw new Error('Crypto API not available');
   }
@@ -61,7 +60,7 @@ async function generateCodeVerifier(): Promise<string> {
 async function generateCodeChallenge(verifier: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(verifier);
-  const crypto = (typeof window !== 'undefined' && window.crypto) || (typeof globalThis !== 'undefined' && globalThis.crypto);
+  const crypto = (typeof window !== 'undefined' && window.crypto);
   if (!crypto || !crypto.subtle || !crypto.subtle.digest) {
     throw new Error('Crypto subtle API not available');
   }
@@ -176,13 +175,14 @@ export const sendAuthReq = async (
     } else {
       return rsp as AccessCodeResponseSuccessfulType;
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("OneDrive auth request failed:", err);
+    const error = err as { response?: { data?: string | Record<string, unknown> }; message?: string };
     // 尝试解析响应体获取更详细的错误信息
-    if (err.response && err.response.data) {
-      const errorData = typeof err.response.data === 'string' 
-        ? JSON.parse(err.response.data) 
-        : err.response.data;
+    if (error.response && error.response.data) {
+      const errorData = typeof error.response.data === 'string' 
+        ? JSON.parse(error.response.data as string) 
+        : error.response.data;
       throw Error(`Azure API 错误: ${errorData.error_description || errorData.error || JSON.stringify(errorData)}`);
     }
     
@@ -217,7 +217,7 @@ export const sendRefreshTokenReq = async (
       reject(Error("请求超时（30秒）。请检查网络连接后重试。"));
     }, ONEDRIVE_AUTH_TIMEOUT_MS);
   });
-  const rsp = await Promise.race([requestPromise, timeoutPromise]);
+  const rsp = await Promise.race([requestPromise, timeoutPromise]) as Record<string, unknown>;
 
   if (rsp.error !== undefined) {
     return rsp as AccessCodeResponseFailedType;
@@ -380,10 +380,10 @@ const fromDriveItemToRemoteItem = (
 // to adapt to the required interface
 class MyAuthProvider implements AuthenticationProvider {
   onedriveConfig: OnedriveConfig;
-  saveUpdatedConfigFunc: () => Promise<any>;
+  saveUpdatedConfigFunc: () => Promise<void>;
   constructor(
     onedriveConfig: OnedriveConfig,
-    saveUpdatedConfigFunc: () => Promise<any>
+    saveUpdatedConfigFunc: () => Promise<void>
   ) {
     this.onedriveConfig = onedriveConfig;
     this.saveUpdatedConfigFunc = saveUpdatedConfigFunc;
@@ -406,7 +406,7 @@ class MyAuthProvider implements AuthenticationProvider {
         this.onedriveConfig.authority,
         this.onedriveConfig.refreshToken
       );
-      if ((r as any).error !== undefined) {
+      if ((r as Record<string, unknown>).error !== undefined) {
         const r2 = r as AccessCodeResponseFailedType;
         throw Error(
           `Error while refreshing accessToken: ${r2.error}, ${r2.error_codes}: ${r2.error_description}`
@@ -429,11 +429,11 @@ export class WrappedOnedriveClient {
   remoteBaseDir: string;
   vaultFolderExists: boolean;
   authGetter: MyAuthProvider;
-  saveUpdatedConfigFunc: () => Promise<any>;
+  saveUpdatedConfigFunc: () => Promise<void>;
   constructor(
     onedriveConfig: OnedriveConfig,
     remoteBaseDir: string,
-    saveUpdatedConfigFunc: () => Promise<any>
+    saveUpdatedConfigFunc: () => Promise<void>
   ) {
     this.onedriveConfig = onedriveConfig;
     this.remoteBaseDir = remoteBaseDir;
@@ -453,7 +453,7 @@ export class WrappedOnedriveClient {
 
     // check vault folder
     if (!this.vaultFolderExists) {
-      const k = await this.getJson("/drive/special/approot/children");
+      const k = await this.getJson("/drive/special/approot/children") as Record<string, unknown>;
       this.vaultFolderExists =
         (k.value as DriveItem[]).filter((x) => x.name === this.remoteBaseDir)
           .length > 0;
@@ -499,7 +499,7 @@ export class WrappedOnedriveClient {
       headers: headers,
     };
 
-    return await requestUrl(requestParams).json;
+    return (await requestUrl(requestParams).json) as Record<string, unknown>;
   };
 
   postJson = async (pathFragOrig: string, payload: any) => {
@@ -518,7 +518,7 @@ export class WrappedOnedriveClient {
       headers: headers,
     };
 
-    return await requestUrl(requestParams).json;
+    return (await requestUrl(requestParams).json) as Record<string, unknown>;
   };
 
   patchJson = async (pathFragOrig: string, payload: any) => {
@@ -638,24 +638,24 @@ export const listFromRemote = async (
 
   let res = await client.getJson(
     `/drive/special/approot:/${client.remoteBaseDir}:/delta`
-  );
-  let driveItems = res.value as DriveItem[];
+  ) as Record<string, unknown>;
+  let driveItems = (res.value as DriveItem[]);
 
   while (NEXT_LINK_KEY in res) {
-    res = await client.getJson(res[NEXT_LINK_KEY]);
-    driveItems.push(...cloneDeep(res.value as DriveItem[]));
+    res = await client.getJson(res[NEXT_LINK_KEY] as string) as Record<string, unknown>;
+    driveItems.push(...structuredClone(res.value as unknown as DriveItem[]));
   }
 
   // lastly we should have delta link?
   if (DELTA_LINK_KEY in res) {
-    client.onedriveConfig.deltaLink = res[DELTA_LINK_KEY];
+    client.onedriveConfig.deltaLink = res[DELTA_LINK_KEY] as string;
     await client.saveUpdatedConfigFunc();
   }
 
   // unify everything to RemoteItem
   const unifiedContents: RemoteItem[] = [];
   for (const item of driveItems) {
-    if ((item as any).deleted !== undefined) {
+    if ((item as Record<string, unknown>).deleted !== undefined) {
       continue;
     }
     try {
@@ -800,14 +800,14 @@ export const uploadToRemote = async (
 
       // 1. create uploadSession
       // uploadFile already starts with /drive/special/approot:/${remoteBaseDir}
-      const s: UploadSession = await client.postJson(
+      const s = await client.postJson(
         `${uploadFile}:/createUploadSession`,
         {
           item: {
             "@microsoft.graph.conflictBehavior": "replace",
           },
         }
-      );
+      ) as unknown as UploadSession;
       const uploadUrl = s.uploadUrl;
       log.debug("uploadSession = ");
       log.debug(s);
@@ -932,7 +932,7 @@ export const checkConnectivity = async (
 
 export const getUserDisplayName = async (client: WrappedOnedriveClient) => {
   await client.init();
-  const res: User = await client.getJson("/me?$select=displayName");
+  const res = await client.getJson("/me?$select=displayName") as User;
   return res.displayName || "<unknown display name>";
 };
 
