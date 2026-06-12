@@ -25,12 +25,12 @@ export const messyConfigToNormal = (
   if ("readme" in x && "d" in x) {
     // we should decode
     const y = JSON.parse(
-      (
+      new TextDecoder().decode(
         base64url.parse(reverseString(x["d"]), {
-          out: (size: number) => Buffer.allocUnsafe(size) as unknown as Uint8Array,
+          out: Uint8Array,
           loose: true,
-        }) as Buffer
-      ).toString("utf-8")
+        }) as Uint8Array
+      )
     ) as ThirdPartySyncPluginSettings;
     return y as ThirdPartySyncPluginSettings;
   } else {
@@ -50,9 +50,11 @@ export const normalConfigToMessy = (
   const y = {
     readme: DEFAULT_README,
     d: reverseString(
-      base64url.stringify(Buffer.from(JSON.stringify(x), "utf-8"), {
-        pad: false,
-      })
+      base64url.stringify(
+        new TextEncoder().encode(JSON.stringify(x)), {
+          pad: false,
+        }
+      )
     ),
   };
   return y;

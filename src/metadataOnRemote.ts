@@ -67,9 +67,11 @@ export const serializeMetadataOnRemote = (x: MetadataOnRemote) => {
   const z = {
     readme: DEFAULT_README_FOR_METADATAONREMOTE,
     d: reverseString(
-      base64url.stringify(Buffer.from(JSON.stringify(x), "utf-8"), {
-        pad: false,
-      })
+      base64url.stringify(
+        new TextEncoder().encode(JSON.stringify(x)), {
+          pad: false,
+        }
+      )
     ),
   };
 
@@ -101,12 +103,12 @@ export const deserializeMetadataOnRemote = (x: string | ArrayBuffer) => {
 
   let y3: string;
   try {
-    y3 = (
+    y3 = new TextDecoder().decode(
       base64url.parse(reverseString(y2["d"] as string), {
-        out: (size: number) => Buffer.allocUnsafe(size) as unknown as Uint8Array,
+        out: Uint8Array,
         loose: true,
-      }) as Buffer
-    ).toString("utf-8");
+      }) as Uint8Array
+    );
   } catch (e) {
     throw new Error('invalid remote meta data file (invalid "d" field)!');
   }
