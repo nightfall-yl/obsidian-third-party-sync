@@ -308,12 +308,12 @@ const fromDriveItemToRemoteItem = (
   let key = "";
 
   // possible prefix:
-  // pure english: /drive/root:/Apps/obsidian-third-party-sync/${remoteBaseDir}
-  // or localized, e.g.: /drive/root:/应用/obsidian-third-party-sync/${remoteBaseDir}
+  // pure english: /drive/root:/Apps/third-party-sync/${remoteBaseDir}
+  // or localized, e.g.: /drive/root:/应用/third-party-sync/${remoteBaseDir}
   const FIRST_COMMON_PREFIX_REGEX =
     /^\/drive\/root:\/[^\/]+\/Remotely (Sync|Secure|Save)\//g;
   // or the root is absolute path /Livefolders,
-  // e.g.: /Livefolders/应用/obsidian-third-party-sync/${remoteBaseDir}
+  // e.g.: /Livefolders/应用/third-party-sync/${remoteBaseDir}
   const SECOND_COMMON_PREFIX_REGEX =
     /^\/Livefolders\/[^\/]+\/Remotely (Sync|Secure|Save)\//g;
 

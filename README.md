@@ -73,7 +73,7 @@ Compared to the original, this fork makes the following simplifications:
 
 **Option 2**: Use [Obsidian42 - BRAT](https://github.com/TfTHacker/obsidian42-brat), add repo `nightfall-yl/obsidian-third-party-sync`.
 
-**Option 3**: Manually download `main.js`, `manifest.json`, `styles.css` from the latest release and place them in your vault's `.obsidian/plugins/obsidian-third-party-sync/` directory.
+**Option 3**: Manually download `main.js`, `manifest.json`, `styles.css` from the latest release and place them in your vault's `.obsidian/plugins/third-party-sync/` directory.
 
 ## Building
 
@@ -91,7 +91,7 @@ npm run build
 
 Deploy to plugin directory:
 ```bash
-cp main.js styles.css manifest.json /your/path/to/vault/.obsidian/plugins/obsidian-third-party-sync
+cp main.js styles.css manifest.json /your/path/to/vault/.obsidian/plugins/third-party-sync
 ```
 
 ## Usage
@@ -110,7 +110,7 @@ cp main.js styles.css manifest.json /your/path/to/vault/.obsidian/plugins/obsidi
 ### OneDrive (Personal)
 
 - Personal accounts only — OneDrive for Business is not supported.
-- Plugin reads/writes under `/Apps/obsidian-third-party-sync/` after authorization.
+- Plugin reads/writes under `/Apps/third-party-sync/` after authorization.
 - E2E encryption supported (vault name itself is not encrypted).
 
 ## Auto Sync

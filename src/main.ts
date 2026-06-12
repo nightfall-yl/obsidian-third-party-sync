@@ -1335,7 +1335,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
       for (let i = 0; i < localConfigContents.length; i++) {
         const file = localConfigContents[i];
 
-        if (file.key.includes(".obsidian/plugins/obsidian-third-party-sync/")) {
+        if (file.key.includes(".obsidian/plugins/third-party-sync/")) {
           continue;
         }
 

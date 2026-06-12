@@ -73,7 +73,7 @@
 
 **方式二**：使用 [Obsidian42 - BRAT](https://github.com/TfTHacker/obsidian42-brat)，添加仓库 `nightfall-yl/obsidian-third-party-sync`。
 
-**方式三**：手动下载最新 Release 的 `main.js`、`manifest.json`、`styles.css`，放入 Vault 的 `.obsidian/plugins/obsidian-third-party-sync/` 目录。
+**方式三**：手动下载最新 Release 的 `main.js`、`manifest.json`、`styles.css`，放入 Vault 的 `.obsidian/plugins/third-party-sync/` 目录。
 
 ## 构建
 
@@ -91,7 +91,7 @@ npm run build
 
 部署到插件目录：
 ```bash
-cp main.js styles.css manifest.json /your/path/to/vault/.obsidian/plugins/obsidian-third-party-sync
+cp main.js styles.css manifest.json /your/path/to/vault/.obsidian/plugins/third-party-sync
 ```
 
 ## 使用
@@ -110,7 +110,7 @@ cp main.js styles.css manifest.json /your/path/to/vault/.obsidian/plugins/obsidi
 ### OneDrive（个人版）
 
 - 仅支持个人版，不支持企业版。
-- 授权后插件在 `/Apps/obsidian-third-party-sync/` 下读写文件。
+- 授权后插件在 `/Apps/third-party-sync/` 下读写文件。
 - 支持端到端加密（Vault 名称本身不加密）。
 
 ## 自动同步
