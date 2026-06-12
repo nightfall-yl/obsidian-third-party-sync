@@ -79,7 +79,7 @@ const migrateDBsFrom20211114To20220108 = async (
   db: InternalDBs,
   vaultRandomID: string
 ) => {
-  const oldVer = 20211114;
+  const _oldVer = 20211114;
   const newVer = 20220108;
 
   const allPromisesToWait: Promise<void>[] = [];
@@ -684,7 +684,7 @@ export const insertLoggerOutputByVault = async (
   try {
     const val = [`[${tsFmt}]`, ...msg.map((x) => toText(x))].join(" ");
     db.loggerOutputTbl.setItem(key, val);
-  } catch (err) {
+  } catch (_err) {
     // give up, and let it pass
   }
 };

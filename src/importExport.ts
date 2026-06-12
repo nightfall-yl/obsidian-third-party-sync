@@ -11,8 +11,6 @@ import { DEFAULT_S3_CONFIG } from "./remoteForS3";
 import { DEFAULT_WEBDAV_CONFIG } from "./remoteForWebdav";
 import { DEFAULT_ONEDRIVE_CONFIG } from "./remoteForOnedrive";
 
-import { log } from "./moreOnLog";
-
 export const exportSettingsUri = (
   settings: ThirdPartySyncPluginSettings,
   currentVaultName: string,
@@ -20,12 +18,12 @@ export const exportSettingsUri = (
 ) => {
   const settings2 = structuredClone(settings);
   delete settings2.onedrive;
-  delete settings2.vaultRandomID;
+  delete (settings2 as Record<string, unknown>)["vaultRandomID"];
   const jsonStr = JSON.stringify(settings2);
 
   // Compress data to fit in URI
   const compressed = pako.deflate(jsonStr);
-  const base64 = btoa(String.fromCharCode(...compressed));
+  const base64 = Buffer.from(compressed).toString("base64");
   const data = encodeURIComponent(base64);
   const vault = encodeURIComponent(currentVaultName);
   const version = encodeURIComponent(pluginVersion);
@@ -49,7 +47,7 @@ export const importQrCodeUri = (
     }
     try {
       return decodeURIComponent(v);
-    } catch (e) {
+    } catch (_e) {
       return v;
     }
   };
@@ -125,17 +123,13 @@ export const importQrCodeUri = (
     // Decompress if data is compressed
     if (params.compressed === "1" || params.compressed === "true") {
       try {
-        const binary = atob(dataStr);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) {
-          bytes[i] = binary.charCodeAt(i);
-        }
+        const bytes = new Uint8Array(Buffer.from(dataStr, "base64"));
         const decompressed = pako.inflate(bytes, { to: "string" }) as unknown as string;
         dataStr = decompressed;
-      } catch (e) {
+      } catch (_e) {
         return {
           status: "error",
-          message: `failed to decompress settings: ${e}`,
+          message: `failed to decompress settings: ${_e}`,
         };
       }
     }

@@ -12,7 +12,7 @@ import {
   S3ClientConfig,
 } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
-import { HttpHandler, HttpRequest, HttpResponse } from "@aws-sdk/protocol-http";
+import { HttpRequest, HttpResponse } from "@aws-sdk/protocol-http";
 import {
   FetchHttpHandler,
   FetchHttpHandlerOptions,
@@ -24,7 +24,6 @@ import { HttpHandlerOptions } from "@aws-sdk/types";
 
 import * as mime from "mime-types";
 import { Vault, requestUrl, RequestUrlParam } from "obsidian";
-import { Readable } from "stream";
 import AggregateError from "aggregate-error";
 import {
   DEFAULT_CONTENT_TYPE,
@@ -132,7 +131,7 @@ class ObsHttpHandler extends FetchHttpHandler {
           }),
         };
       }),
-      requestTimeout(this.requestTimeoutInMs),
+      (requestTimeout as (ms: number) => Promise<never>)(this.requestTimeoutInMs),
     ];
 
     if (abortSignal) {
@@ -152,7 +151,7 @@ class ObsHttpHandler extends FetchHttpHandler {
     // Implement this method if necessary
   }
 
-  httpHandlerConfigs(): {} {
+  httpHandlerConfigs(): object {
     // Implement this method if necessary
     return {};
   }
@@ -328,7 +327,7 @@ export const uploadToRemote = async (
 
     let mtime = fileStat == undefined ? undefined : fileStat.mtime.toString();
 
-    let uploadParams : any = {
+    let uploadParams: Record<string, unknown> = {
       Bucket: s3Config.s3BucketName,
       Key: uploadFile,
       Body: body,
@@ -440,10 +439,17 @@ export const listFromRemote = async (
  * @param b The Body of GetObject
  * @returns Promise<ArrayBuffer>
  */
+interface ReadableLike {
+  on(event: "data", callback: (chunk: unknown) => void): void;
+  on(event: "error", callback: (err: Error) => void): void;
+  on(event: "end", callback: () => void): void;
+}
+const isReadableLike = (b: unknown): b is ReadableLike =>
+  typeof (b as { on?: unknown }).on === "function";
 const getObjectBodyToArrayBuffer = async (
-  b: Readable | ReadableStream | Blob
+  b: ReadableLike | ReadableStream | Blob
 ) => {
-  if (b instanceof Readable) {
+  if (isReadableLike(b)) {
     return (await new Promise((resolve, reject) => {
       const chunks: Uint8Array[] = [];
       b.on("data", (chunk) => chunks.push(chunk as Uint8Array));

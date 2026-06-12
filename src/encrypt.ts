@@ -1,7 +1,5 @@
 import { base32, base64url } from "rfc4648";
-import { bufferToArrayBuffer, hexStringToTypedArray } from "./misc";
-
-import { log } from "./moreOnLog";
+import { bufferToArrayBuffer } from "./misc";
 
 const DEFAULT_ITER = 20000;
 

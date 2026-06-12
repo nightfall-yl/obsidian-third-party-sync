@@ -5,9 +5,8 @@ import {
   PluginSettingTab,
   Setting,
   SettingGroup,
-  Platform,
-  requireApiVersion,
   setIcon,
+  activeDocument,
 } from "obsidian";
 import type { TextComponent } from "obsidian";
 import {
@@ -462,8 +461,8 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
     const sgServiceDetail = new SettingGroup(containerEl);
     sgServiceDetail.addClass("service-detail-group");
 
-    const serviceHeadingFrag = document.createDocumentFragment();
-    const serviceHeadingName = serviceHeadingFrag.createEl("div", { text: serviceHeadings[this.plugin.settings.serviceType], cls: "setting-item-name" });
+    const serviceHeadingFrag = activeDocument.createDocumentFragment();
+    const _serviceHeadingName = serviceHeadingFrag.createEl("div", { text: serviceHeadings[this.plugin.settings.serviceType], cls: "setting-item-name" });
 
     const s3DescEl = serviceHeadingFrag.createDiv({ cls: "settings-long-desc s3-hide" });
     const onedriveDescEl = serviceHeadingFrag.createDiv({ cls: "settings-long-desc onedrive-hide" });
@@ -1029,14 +1028,13 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
           button.setButtonText(t("settings_checkonnectivity_button"));
           button.onClick(async () => {
             new Notice(t("settings_checkonnectivity_checking"));
-            const self = this;
             const client = new RemoteClient(
               "webdav",
               undefined,
               this.plugin.settings.webdav,
               undefined,
               this.app.vault.getName(),
-              () => self.plugin.saveSettings()
+              () => this.plugin.saveSettings()
             );
             const errors = { msg: "" };
             const res = await client.checkConnectivity((err: string) => {
@@ -1276,7 +1274,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       })
     );
 
-    const statusBarOptions = (sgBasic as any).groupEl.createDiv({ cls: "third-party-sync-hidden" });
+    const statusBarOptions: HTMLElement = (sgBasic as SettingGroup)["groupEl"].createDiv({ cls: "third-party-sync-hidden" });
 
     statusBarOptions.toggleClass(
       "third-party-sync-hidden",
@@ -1390,11 +1388,11 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       return setting
         .setName(t("setting_syncdirection"))
         .setDesc(((desc: string) => {
-          const frag = document.createDocumentFragment();
+          const frag = activeDocument.createDocumentFragment();
           const parts = desc.split("\n");
           parts.forEach((part, i) => {
-            if (i > 0) frag.appendChild(document.createElement("br"));
-            frag.appendChild(document.createTextNode(part));
+            if (i > 0) frag.appendChild(activeDocument.createElement("br"));
+            frag.appendChild(activeDocument.createTextNode(part));
           });
           return frag;
         })(t("setting_syncdirection_desc")))
@@ -1529,7 +1527,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
           const settingsOnlyWebdav = structuredClone(this.plugin.settings);
           delete settingsOnlyWebdav.onedrive;
           delete settingsOnlyWebdav.s3;
-          delete settingsOnlyWebdav.vaultRandomID;
+          delete (settingsOnlyWebdav as Record<string, unknown>)["vaultRandomID"];
           const uri = exportSettingsUri(
             settingsOnlyWebdav,
             this.app.vault.getName(),
@@ -1565,7 +1563,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
             const normalizeParams = (sp: URLSearchParams) => {
               const params = {} as UriParams;
               sp.forEach((v, k) => {
-                (params as any)[k] = v;
+                params[k as keyof UriParams] = v;
               });
               return params;
             };
@@ -1573,7 +1571,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
             try {
               const u = new URL(raw);
               return normalizeParams(u.searchParams);
-            } catch (e) {
+            } catch (_e) {
               // fallback below
             }
 
@@ -1586,7 +1584,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
               try {
                 const sp = new URLSearchParams(maybeQuery);
                 return normalizeParams(sp);
-              } catch (e) {
+              } catch (_e) {
                 return undefined;
               }
             }
@@ -1665,7 +1663,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
     );
 
     // Container for debug options (hidden when debug is disabled)
-    const debugOptionsDiv = (sgDebug as any).groupEl.createEl("div", {
+    const debugOptionsDiv: HTMLElement = (sgDebug as SettingGroup)["groupEl"].createEl("div", {
       cls: "remotely-sync-debug-options"
     });
 

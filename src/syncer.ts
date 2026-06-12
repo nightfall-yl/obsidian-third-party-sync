@@ -1,4 +1,3 @@
-import AggregateError from "aggregate-error";
 import PQueue from "p-queue";
 import type { Entity, MixedEntity, ThirdPartySyncPluginSettings, SyncTriggerSourceType } from "./baseTypes";
 import { copyFile, copyFileOrFolder, copyFolder } from "./copyLogic";
@@ -6,22 +5,9 @@ import type { FakeFs } from "./fsAll";
 import type { FakeFsEncrypt } from "./fsEncrypt";
 import { 
   DEFAULT_FILE_NAME_FOR_METADATAONREMOTE, 
-  DEFAULT_FILE_NAME_FOR_METADATAONREMOTE2,
-  MetadataOnRemote,
-  serializeMetadataOnRemote,
-  deserializeMetadataOnRemote
+  DEFAULT_FILE_NAME_FOR_METADATAONREMOTE2
 } from "./metadataOnRemote";
-import { 
-  atWhichLevel, 
-  getParentFolder, 
-  isHiddenPath,
-  isSpecialFolderNameToSkip,
-  unixTimeToStr
-} from "./misc";
 import type { InternalDBs } from "./localdb";
-import { 
-  insertSyncPlanRecordByVault
-} from "./localdb";
 
 export const syncer = async (
   fsLocal: FakeFs,

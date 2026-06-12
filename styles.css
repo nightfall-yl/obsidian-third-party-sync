@@ -95,11 +95,11 @@
 }
 
 /* Remove border/shadow for service settings */
-.tp-no-border-top {
-  border-top: none !important;
+.tp-no-border-top.tp-no-border-top {
+  border-top: none;
 }
-.tp-no-box-shadow {
-  box-shadow: none !important;
+.tp-no-box-shadow.tp-no-box-shadow {
+  box-shadow: none;
 }
 
 /* Full width input */

@@ -1,4 +1,4 @@
-import { TAbstractFile, TFolder, TFile, Vault } from "obsidian";
+import { TFile, Vault } from "obsidian";
 
 import type { SyncPlanType } from "./sync";
 import {
@@ -13,8 +13,6 @@ import {
   DEFAULT_SYNC_PLANS_HISTORY_FILE_PREFIX,
   FileOrFolderMixedState,
 } from "./baseTypes";
-
-import { log } from "./moreOnLog";
 
 const turnSyncPlanToTable = (record: string) => {
   const syncPlan: SyncPlanType = JSON.parse(record) as SyncPlanType;
@@ -47,7 +45,6 @@ const turnSyncPlanToTable = (record: string) => {
     `| ${headers.map((x) => "---").join(" | ")} |`,
   ];
   for (const [k1, v1] of Object.entries(syncPlan.mixedStates)) {
-    const k = k1;
     const v = v1;
     const singleLine = [];
     for (const h of headers) {

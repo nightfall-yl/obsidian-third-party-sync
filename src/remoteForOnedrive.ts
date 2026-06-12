@@ -4,9 +4,8 @@ import type {
   UploadSession,
   User,
 } from "@microsoft/microsoft-graph-types";
-import { request, requestUrl, RequestUrlParam, requireApiVersion, Vault } from "obsidian";
+import { requestUrl, RequestUrlParam, Vault } from "obsidian";
 import {
-  VALID_REQURL,
   COMMAND_CALLBACK_ONEDRIVE,
   DEFAULT_CONTENT_TYPE,
   OAUTH2_FORCE_EXPIRE_MILLISECONDS,
@@ -51,7 +50,7 @@ async function generateCodeVerifier(): Promise<string> {
     throw new Error('Crypto API not available');
   }
   crypto.getRandomValues(arrayBuffer);
-  return btoa(String.fromCharCode(...arrayBuffer))
+  return Buffer.from(arrayBuffer).toString("base64")
     .replace(/=/g, '')
     .replace(/\+/g, '-')
     .replace(/\//g, '_');
@@ -65,7 +64,7 @@ async function generateCodeChallenge(verifier: string): Promise<string> {
     throw new Error('Crypto subtle API not available');
   }
   const digest = await crypto.subtle.digest('SHA-256', data);
-  return btoa(String.fromCharCode(...new Uint8Array(digest)))
+  return Buffer.from(digest).toString("base64")
     .replace(/=/g, '')
     .replace(/\+/g, '-')
     .replace(/\//g, '_');
@@ -165,9 +164,10 @@ export const sendAuthReq = async (
 
     console.log("OneDrive token response:", rsp);
 
-    if (rsp.error !== undefined) {
+    const resp = rsp as { error?: unknown; error_description?: unknown };
+    if (resp.error !== undefined) {
       console.error("OneDrive auth error:", rsp);
-      const errorMsg = rsp.error_description || rsp.error || "未知错误";
+      const errorMsg = resp.error_description || resp.error || "未知错误";
       return {
         ...rsp as AccessCodeResponseFailedType,
         error_description: errorMsg,
@@ -183,7 +183,8 @@ export const sendAuthReq = async (
       const errorData = typeof error.response.data === 'string' 
         ? JSON.parse(error.response.data as string) 
         : error.response.data;
-      throw Error(`Azure API 错误: ${errorData.error_description || errorData.error || JSON.stringify(errorData)}`);
+      const ed = errorData as { error_description?: unknown; error?: unknown };
+      throw Error(`Azure API 错误: ${ed.error_description || ed.error || JSON.stringify(errorData)}`);
     }
     
     throw Error(`网络请求失败: ${err.message || err}`);
@@ -311,11 +312,11 @@ const fromDriveItemToRemoteItem = (
   // pure english: /drive/root:/Apps/third-party-sync/${remoteBaseDir}
   // or localized, e.g.: /drive/root:/应用/third-party-sync/${remoteBaseDir}
   const FIRST_COMMON_PREFIX_REGEX =
-    /^\/drive\/root:\/[^\/]+\/Remotely (Sync|Secure|Save)\//g;
+    /^\/drive\/root:\/[^/]+\/Remotely (Sync|Secure|Save)\//g;
   // or the root is absolute path /Livefolders,
   // e.g.: /Livefolders/应用/third-party-sync/${remoteBaseDir}
   const SECOND_COMMON_PREFIX_REGEX =
-    /^\/Livefolders\/[^\/]+\/Remotely (Sync|Secure|Save)\//g;
+    /^\/Livefolders\/[^/]+\/Remotely (Sync|Secure|Save)\//g;
 
   // another possibile prefix
   const THIRD_COMMON_PREFIX_RAW = `/drive/items/`;

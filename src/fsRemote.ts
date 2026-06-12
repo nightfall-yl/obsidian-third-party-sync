@@ -148,7 +148,7 @@ export class FakeFsRemote extends FakeFs {
   async getUserDisplayName(): Promise<string> {
     try {
       return await this.client.getUser();
-    } catch (error) {
+    } catch (_error) {
       return "Unknown User";
     }
   }

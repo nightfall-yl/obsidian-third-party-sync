@@ -1,10 +1,10 @@
 // It's very dangerous for this file to depend on other files in the same project.
 // We should avoid this situation as much as possible.
 
-import { TAbstractFile, TFolder, TFile, Vault } from "obsidian";
+import { TFile, Vault } from "obsidian";
 
 import * as origLog from "loglevel";
-import type { LogLevelNumbers, Logger, LogLevel, LogLevelDesc } from "loglevel";
+import type { LogLevelNumbers } from "loglevel";
 const log2 = origLog.getLogger("rs-default");
 
 const originalFactory = log2.methodFactory;
@@ -19,7 +19,7 @@ export const applyLogWriterInplace = function (writer: (...msg: unknown[]) => un
     const rawMethod = originalFactory(methodName, logLevel, loggerName);
 
     return function (...msg: unknown[]) {
-      rawMethod.apply(undefined, msg);
+      rawMethod(...msg);
       writer(...msg);
     };
   };

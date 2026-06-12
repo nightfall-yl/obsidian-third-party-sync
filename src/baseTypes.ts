@@ -4,7 +4,7 @@
  */
 
 import { Platform, requireApiVersion } from "obsidian";
-import type { LangType, LangTypeAndAuto } from "./i18n";
+import type { LangTypeAndAuto } from "./i18n";
 
 export const DEFAULT_CONTENT_TYPE = "application/octet-stream";
 

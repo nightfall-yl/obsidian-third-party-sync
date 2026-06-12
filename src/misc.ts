@@ -1,9 +1,8 @@
 import { Vault, moment } from "obsidian";
-import { base32, base64url } from "rfc4648";
-import XRegExp from "xregexp";
+import { base32 } from "rfc4648";
 import emojiRegex from "emoji-regex-xs";
 
-import type { I18n, LangType, LangTypeAndAuto, TransItemType } from "./i18n";
+import type { I18n, TransItemType } from "./i18n";
 
 import { log } from "./moreOnLog";
 
@@ -106,7 +105,7 @@ export const getFolderLevels = (x: string, addEndingSlash: boolean = false) => {
   }
 
   const y1 = x.split("/");
-  let i = 0;
+  let _i = 0;
   for (let index = 0; index + 1 < y1.length; index++) {
     let k = y1.slice(0, index + 1).join("/");
     if (k === "" || k === "/") {
@@ -173,12 +172,7 @@ export const arrayBufferToHex = (b: ArrayBuffer) => {
  * @returns ArrayBuffer
  */
 export const base64ToArrayBuffer = (b64text: string) => {
-  const binary = atob(b64text);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes.buffer as ArrayBuffer;
+  return (new Uint8Array(Buffer.from(b64text, "base64"))).buffer as ArrayBuffer;
 };
 
 /**
@@ -195,11 +189,7 @@ export const hexStringToTypedArray = (hex: string) => {
 };
 
 export const base64ToBase32 = (a: string) => {
-  const binary = atob(a);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
+  const bytes = new Uint8Array(Buffer.from(a, "base64"));
   return base32.stringify(bytes);
 };
 
@@ -282,7 +272,7 @@ export const setToString = (a: Set<string>, delimiter: string = ",") => {
 };
 
 export const extractSvgSub = (x: string, subEl: string = "rect") => {
-  const DOMParser = (typeof window !== 'undefined' && window.DOMParser) || (typeof globalThis !== 'undefined' && globalThis.DOMParser);
+  const DOMParser = (typeof window !== 'undefined' && window.DOMParser);
   if (!DOMParser) {
     throw new Error('DOMParser not available');
   }
@@ -371,8 +361,8 @@ export const getSplitRanges = (bytesTotal: number, bytesEachPart: number) => {
  * @param obj anything
  * @returns string of the name of the object
  */
-export const getTypeName = (obj: any): string => {
-  return Object.prototype.toString.call(obj).slice(8, -1);
+export const getTypeName = (obj: unknown): string => {
+  return (Object.prototype.toString.call(obj) as string).slice(8, -1);
 };
 
 /**
@@ -405,7 +395,8 @@ export const unixTimeToStr = (x: number | undefined | null) => {
   if (x === undefined || x === null || Number.isNaN(x)) {
     return undefined;
   }
-  return (moment as any)(x).format() as string;
+  const momentFn = moment as unknown as (x: unknown) => { format: () => string };
+  return momentFn(x).format();
 };
 
 /**
@@ -447,15 +438,16 @@ export const toText = (x: any) => {
     return `${x}`;
   }
 
+  const e = x as { stack?: unknown; message?: unknown };
   if (
     x instanceof Error ||
-    (x &&
-      x.stack &&
-      x.message &&
-      typeof x.stack === "string" &&
-      typeof x.message === "string")
+    (e &&
+      e.stack &&
+      e.message &&
+      typeof e.stack === "string" &&
+      typeof e.message === "string")
   ) {
-    return `ERROR! MESSAGE: ${x.message}, STACK: ${x.stack}`;
+    return `ERROR! MESSAGE: ${e.message}, STACK: ${e.stack}`;
   }
 
   try {

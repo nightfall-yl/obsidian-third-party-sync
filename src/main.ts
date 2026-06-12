@@ -6,10 +6,11 @@ import {
   setIcon,
   FileSystemAdapter,
   Platform, TAbstractFile, Vault, EventRef,
+  activeDocument,
 } from "obsidian";
 
 import type {
-  FileOrFolderMixedState, RemoteItem,
+  FileOrFolderMixedState,
   ThirdPartySyncPluginSettings,
   SyncTriggerSourceType,
   SyncPlanType,
@@ -47,7 +48,7 @@ import { DeletionOnRemote, MetadataOnRemote, deserializeMetadataOnRemote } from 
 import { messyConfigToNormal, normalConfigToMessy } from "./configPersist";
 import { ObsConfigDirFileType, listFilesInObsFolder } from "./obsFolderLister";
 import { I18n } from "./i18n";
-import type { LangType, LangTypeAndAuto, TransItemType } from "./i18n";
+import type { LangTypeAndAuto, TransItemType } from "./i18n";
 import { SyncAlgoV2Modal } from "./syncAlgoV2Notice";
 import { applyPresetRulesInplace } from "./presetRules";
 
@@ -58,13 +59,7 @@ import {
   exportVaultSyncPlansToFiles,
 } from "./debugMode";
 import { SizesConflictModal } from "./syncSizesConflictNotice";
-import {mkdirpInVault, getLastSynced} from "./misc";
-
-// File system abstraction layers
-import { FakeFsLocal } from "./fsLocal";
-import { FakeFsRemote } from "./fsRemote";
-import { FakeFsEncrypt } from "./fsEncrypt";
-import { syncer } from "./syncer";
+import { getLastSynced} from "./misc";
 
 const DEFAULT_SETTINGS: ThirdPartySyncPluginSettings = {
   s3: DEFAULT_S3_CONFIG,
@@ -223,18 +218,6 @@ export default class ThirdPartySyncPlugin extends Plugin {
       }
     };
 
-    // Ribbon function - updates ribbon icon
-    const ribboonFunc = async (s: SyncTriggerSourceType, step: number) => {
-      // Handled by setSyncIcon
-    };
-
-    // Sync process callback
-    const callbackSyncProcess = async (s: SyncTriggerSourceType, realCounter: number, realTotalCount: number, pathName: string, decision: string) => {
-      if (this.settings.enableStatusBarInfo) {
-        this.setCurrSyncMsg(realCounter, realTotalCount, pathName);
-      }
-    };
-
     // Make sure two syncs can't run at the same time
     if (this.syncStatus !== "idle") {
       if (triggerSource == "manual") {
@@ -256,7 +239,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
       return;
     }
 
-    let everythingOk = true;
+    let _everythingOk = true;
     try {
       this.setSyncIcon(true, triggerSource);
 
@@ -270,8 +253,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
       statusBarFunc(triggerSource, 1, true);
 
       // Step 2 - prepare for sync
-      const self = this;
-      const client = this.getRemoteClient(self);
+      const client = this.getRemoteClient(this);
 
       // Step 3 - list remote files
       await notifyFunc(triggerSource, 2);
@@ -279,7 +261,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
 
       // Step 4 - check password
       await notifyFunc(triggerSource, 3);
-      const passwordCheckResult = await isPasswordOk(
+      const _passwordCheckResult = await isPasswordOk(
         remoteRsp.Contents,
         this.settings.password
       );
@@ -415,7 +397,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
       (errorMsg: string) => {
         const parts = errorMsg.split("|");
         if (parts[0] === "syncrun_abort_protectmodifypercentage") {
-          const [_, threshold, realCount, allCount, percent] = parts;
+          const [_kind, threshold, realCount, allCount, percent] = parts;
           const msg = t("syncrun_abort_protectmodifypercentage", {
             protectModifyPercentage: parseInt(threshold),
             realModifyDeleteCount: parseInt(realCount),
@@ -803,11 +785,10 @@ export default class ThirdPartySyncPlugin extends Plugin {
               throw Error(`Azure API 错误: ${errorMsg}`);
             }
 
-            const self = this;
             await setConfigBySuccessfullAuthInplaceOnedrive(
               this.settings.onedrive,
               rsp as AccessCodeResponseSuccessfulType,
-              () => self.saveSettings()
+              () => this.saveSettings()
             );
 
             const client = new RemoteClient(
@@ -816,17 +797,17 @@ export default class ThirdPartySyncPlugin extends Plugin {
               undefined,
               this.settings.onedrive,
               this.app.vault.getName(),
-              () => self.saveSettings()
+              () => this.saveSettings()
             );
             this.settings.onedrive.username = await client.getUser();
-            await self.saveSettings();
+            await this.saveSettings();
 
             this.oauth2Info.verifier = ""; // reset it
             this.oauth2Info.helperModal?.close(); // close it
             this.oauth2Info.helperModal = undefined;
 
             const isAuthed = this.settings.onedrive.username !== "";
-            if (this.oauth2Info.authSetting) {
+            if (this.oauth2Info.authSetting !== undefined) {
               this.oauth2Info.authSetting.settingEl.toggleClass("tp-sync-auth-hidden", isAuthed);
             }
             this.oauth2Info.authSetting = undefined;
@@ -994,7 +975,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
     this.updateSyncStatus("idle");
   }
 
-  async onunload() {
+  onunload() {
     this.syncRibbon = undefined;
     if (this.oauth2Info !== undefined) {
       this.oauth2Info.helperModal = undefined;
@@ -1111,14 +1092,14 @@ export default class ThirdPartySyncPlugin extends Plugin {
 
   async getVaultRandomIDFromOldConfigFile() {
     let vaultRandomID = "";
-    if (this.settings.vaultRandomID !== undefined) {
+    if (this.settings["vaultRandomID"] !== undefined) {
       // In old version, the vault id is saved in data.json
       // But we want to store it in localForage later
-      if (this.settings.vaultRandomID !== "") {
+      if (this.settings["vaultRandomID"] !== "") {
         // a real string was assigned before
-        vaultRandomID = this.settings.vaultRandomID;
+        vaultRandomID = this.settings["vaultRandomID"];
       }
-      delete this.settings.vaultRandomID;
+      delete this.settings["vaultRandomID"];
       await this.saveSettings();
     }
     return vaultRandomID;
@@ -1180,7 +1161,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
   toggleStatusBar(enabled: boolean) {  
     this.statusBarElement?.remove();
 
-    const statusBar = document.getElementsByClassName("status-bar")[0] as HTMLElement;
+    const statusBar = activeDocument.getElementsByClassName("status-bar")[0] as HTMLElement;
 
     // Guard: if status bar doesn't exist (e.g., iOS), skip DOM manipulation
     if (!statusBar) {
@@ -1202,7 +1183,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
         
         // Shifts up the status bar on phone to not cover the navmenu
         if (Platform.isPhone) {
-          const navBar = document.getElementsByClassName("mobile-navbar")[0] as HTMLElement;
+          const navBar = activeDocument.getElementsByClassName("mobile-navbar")[0] as HTMLElement;
           const height = window.getComputedStyle(navBar).getPropertyValue('height');
           statusBar.style.marginBottom = height;
         }
@@ -1317,7 +1298,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
       alreadyScheduled = true;
       log.debug(`Scheduled a sync run for ${this.settings.syncOnSaveAfterMilliseconds} milliseconds later`);
 
-      setTimeout(async () => {
+      window.setTimeout(async () => {
         log.debug("Sync on save ran");
         await this.syncRun("auto");  
         alreadyScheduled = false;
@@ -1346,7 +1327,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
           alreadyScheduled = true;
           log.debug(`Scheduled a sync run for ${this.settings.syncOnSaveAfterMilliseconds} milliseconds later`);
 
-          setTimeout(async () => {
+          window.setTimeout(async () => {
             log.debug("Sync on save ran");
             await this.syncRun("auto");  
             alreadyScheduled = false;
@@ -1372,7 +1353,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
     const client = this.getRemoteClient(this);
     const remoteRsp = await client.listFromRemote();
 
-    const passwordCheckResult = await isPasswordOk(
+    const _passwordCheckResult = await isPasswordOk(
       remoteRsp.Contents,
       this.settings.password
     );
@@ -1468,7 +1449,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
         // no need to await
         this.app.vault.adapter.write(ignoreFile, contentText);
       }
-    } catch (error) {
+    } catch (_error) {
       // just skip
     }
   }
