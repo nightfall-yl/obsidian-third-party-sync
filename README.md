@@ -1,114 +1,137 @@
 # Obsidian Third-party Sync
 
-**Obsidian Third-party Sync** 是 [Remotely Save](https://github.com/remotely-save/remotely-save) 的非官方分叉插件，专注于安全性更新和功能增强。**与 Remotely Save 不兼容**，使用前请务必备份数据。详见[从 Remotely Save 迁移](#从-remotely-save-迁移)。
+**Obsidian Third-party Sync** is an unofficial fork of [Remotely Save](https://github.com/remotely-save/remotely-save), **focused on security upgrades**. It retains all core features from the original while rebuilding the encryption implementation and simplifying the codebase. **It is NOT backwards compatible with Remotely Save** — backup your vault before switching.
 
-如果你觉得有用，欢迎在 GitHub 上给个项目 Star：[![GitHub Repo stars](https://img.shields.io/github/stars/nightfall-yl/obsidian-third-party-sync?style=social)](https://github.com/nightfall-yl/obsidian-third-party-sync)
+If you find it useful, please give it a star: [![GitHub Repo stars](https://img.shields.io/github/stars/nightfall-yl/obsidian-third-party-sync?style=social)](https://github.com/nightfall-yl/obsidian-third-party-sync)
 
-欢迎提交 Pull Request！
+Pull requests are welcome!
 
-## 免责声明
+## Disclaimer
 
-- **这不是 Obsidian 官方提供的 [同步服务](https://obsidian.md/sync)。**
-- **⚠️ 使用本插件前，请务必备份你的 Vault。**
+- **This is NOT the [official sync service](https://obsidian.md/sync) provided by Obsidian.**
+- **⚠️ ALWAYS backup your vault before using this plugin.**
 
-## 与 Remotely Save 的主要区别
+## Why Fork from Remotely Save?
 
-### 安全更新
-- 加密升级为 [AES-GCM](https://github.com/nightfall-yl/obsidian-third-party-sync/commit/d9ad76e774b0b1cee2b36316058df926f4bfb2bf)，更安全，且解密时会验证密文完整性，防止 [padding oracle 攻击](https://cryptopals.com/sets/3/challenges/17)。
-- Salt 从 8 字节升级为 16 字节。
-- IV 不再从用户密码派生。
+### Security Upgrades (Core Improvements)
 
-## 功能特性
+| Item | Remotely Save | This Plugin |
+|:-----|:--------------|:------------|
+| **Cipher algorithm** | AES-CBC or AES-CTR (RClone) | **AES-256-GCM** |
+| **Integrity check** | None (CBC vulnerable to padding oracle attacks) | **Built-in GCM AuthTag verification** |
+| **Initialization Vector (IV)** | Derived from password (same IV for all files under same password) | **Randomly generated per file** |
+| **Salt length** | 8 bytes (2^64 possibilities) | **16 bytes** (2^128 possibilities) |
+| **Encryption dependencies** | `crypto-browserify` + `@fyears/rclone-crypt` + Web Worker | **Pure browser-native `window.crypto.subtle` API** |
 
-- **支持的存储服务**：Amazon S3（及兼容服务：腾讯云 COS、阿里云 OSS、Backblaze B2、MinIO 等）、WebDAV（坚果云、Nextcloud、OwnCloud、Seafile、rclone 等）、OneDrive 个人版。详见[服务连接性文档](./docs/services_connectable_or_not.md)。
-- **Obsidian 移动端支持**，Vault 可跨桌面和移动端同步。
-- **端到端加密**（[详见](./docs/encryption.md)）：设置密码后，文件在上传前本地加密，采用 AES-256-GCM + RClone Crypt 格式。
-- **自动同步**：支持定时同步、启动时同步、保存时同步、远端变化检测后同步。
-- **同步方向**：双向同步 / 增量推送 / 增量拉取 / 带删除的增量模式。
-- **变更比例保护**：防止意外的大规模文件修改或删除。
-- **同步书签及配置文件夹**（可选）。
-- **状态栏显示**同步进度与最后同步时间。
-- **调试模式**：导出同步计划、导出终端日志。
-- **URI 导入/导出设置**（OneDrive OAuth 信息除外）。
-- **[最小侵入设计](./docs/minimal_intrusive_design.md)**。
-- **完全开源**（[Apache-2.0](./LICENSE)）。
-- **[同步算法](./docs/sync_algorithm.md)**。
+> See [commit d9ad76e](https://github.com/nightfall-yl/obsidian-third-party-sync/commit/d9ad76e774b0b1cee2b36316058df926f4bfb2bf) for encryption changes. Read [encryption docs](./docs/encryption.md) for details.
 
-## 限制与注意事项
+### Architecture Simplification
 
-- **不同步元数据时，删除同步依赖时间戳判断**，建议配合增量推送/拉取模式使用。
-- **无冲突解决算法**，文件以修改时间判断，修改时间较新者胜出。
-- **云存储会产生费用**：所有操作（上传、下载、列举文件、调用 API）均可能计费。
-- **部分限制来自浏览器环境**，详见[技术文档](./docs/browser_env.md)。
-- **请保护 `data.json` 文件**：包含敏感信息，不要分享给他人，建议加入 `.gitignore`。
+Compared to the original, this fork makes the following simplifications:
 
+- **Storage services**: Reduced from 13 to 3 mainstream services (S3 / WebDAV / OneDrive). Removed Dropbox, Google Drive, Box, Azure Blob, pCloud, Yandex Disk, Koofr, Webdis, etc.
+- **Encryption schemes**: Merged from 2 (OpenSSL + RClone) into 1 (**AES-256-GCM**)
 
+### All Retained Core Features
 
-## 安装
+- 5 sync directions (bidirectional / incremental push / incremental pull / push+delete / pull+delete)
+- Modification ratio protection (prevents accidental mass changes)
+- Large file skip, conflict handling (keep newer or larger version), empty folder cleanup
+- Auto sync: scheduled interval, startup, on-save, remote-change detection
+- End-to-end encryption, mobile support, status bar progress display, debug mode
+- URI import/export settings, bookmark & config directory sync
+- Minimal intrusive design
 
-**方式一**：在 Obsidian 社区插件市场中搜索 `Obsidian Third-party Sync` 安装。
+## Features
 
-**方式二**：使用 [Obsidian42 - BRAT](https://github.com/TfTHacker/obsidian42-brat)，添加仓库 `nightfall-yl/obsidian-third-party-sync`。
+- **Supported services**: Amazon S3 (and compatible: Tencent COS, Alibaba OSS, Backblaze B2, MinIO, etc.), WebDAV (Jianguoyun/Nutstore, Nextcloud, OwnCloud, Seafile, rclone, etc.), OneDrive personal. See [service compatibility docs](./docs/services_connectable_or_not.md).
+- **End-to-end encryption** ([details](./docs/encryption.md)): files are encrypted locally before upload using **AES-256-GCM via browser-native Web Crypto API**, output format compatible with RClone Crypt's base64url filename encoding.
+- **Auto sync**: scheduled interval, startup, on-save, and remote-change detection.
+- **Sync Direction**: bidirectional / incremental push (backup mode) / incremental pull / with-delete variants.
+- **Modification Ratio Protection**: aborts sync if the ratio of modified/deleted files exceeds threshold, preventing accidental data loss.
+- **Conflict handling**: configurable to keep newer or larger version on conflicts.
+- **Large file skip**: skip files exceeding a configured size threshold.
+- **Sync bookmarks and config dir** (optional).
+- **Status bar**: progress and last sync time display.
+- **Debug mode**: export sync plans, export console logs.
+- **URI import/export** for settings (excluding OneDrive OAuth info).
+- **[Minimal intrusive design](./docs/minimal_intrusive_design.md).**
+- **Fully open source** ([Apache-2.0](./LICENSE)).
+- **[Sync algorithm](./docs/sync_algorithm.md).**
 
-**方式三**：手动下载最新 Release 的 `main.js`、`manifest.json`、`styles.css`，放入 Vault 的 `.obsidian/plugins/obsidian-third-party-sync/` 目录。
+## Limitations & Notes
 
-## 构建
+- **Without metadata sync, deletion sync relies on timestamp comparison.** Recommended to use with Incremental Push/Pull modes.
+- **No smart conflict resolution algorithm** (original Pro feature removed). Files are compared by modification time; the newer wins.
+- **Cloud services cost money.** All operations (upload, download, file listing, API calls) may incur charges.
+- **Some limitations come from browser environment**, see [technical docs](./docs/browser_env.md).
+- **Protect your `data.json` file** — it contains sensitive info (S3 keys, WebDAV passwords, etc.). Do not share with others; recommended to add to `.gitignore`.
+
+## Installation
+
+**Option 1**: Search `Obsidian Third-party Sync` in Obsidian's community plugin marketplace.
+
+**Option 2**: Use [Obsidian42 - BRAT](https://github.com/TfTHacker/obsidian42-brat), add repo `nightfall-yl/obsidian-third-party-sync`.
+
+**Option 3**: Manually download `main.js`, `manifest.json`, `styles.css` from the latest release and place them in your vault's `.obsidian/plugins/obsidian-third-party-sync/` directory.
+
+## Building
 
 ```bash
 git clone https://github.com/nightfall-yl/obsidian-third-party-sync
 cd obsidian-third-party-sync
 npm install
 
-# 开发构建（监听文件变化自动重编译）
+# Development build (watch mode)
 npm run dev
 
-# 生产构建（esbuild）
+# Production build (esbuild)
 npm run build
 ```
 
-部署到插件目录：
+Deploy to plugin directory:
 ```bash
 cp main.js styles.css manifest.json /your/path/to/vault/.obsidian/plugins/obsidian-third-party-sync
 ```
 
-## 使用
+## Usage
 
 ### S3
 
-- 准备 S3 信息：Endpoint、Region、Access Key ID、Secret Access Key、Bucket 名称。
-- 在插件设置中填入信息，设置加密密码（如需要）。
-- 点击左侧栏图标手动同步，或在设置中开启自动同步。
+- Prepare S3 info: Endpoint, Region, Access Key ID, Secret Access Key, Bucket name.
+- Fill in settings and set encryption password (if needed).
+- Click ribbon icon to manually sync, or enable auto sync in settings.
 
 ### WebDAV
 
-- 坚果云、Nextcloud、OwnCloud、Seafile、rclone 等均支持。
-- 部分服务需要安装 `WebAppPassword` 等插件配合。详见 [WebDAV 配置文档](./docs/apache_cors_configure.md)。
+- Works with Jianguoyun/Nutstore, Nextcloud, OwnCloud, Seafile, rclone, etc.
+- Some services require plugins like `WebAppPassword`. See [WebDAV config docs](./docs/apache_cors_configure.md).
 
-### OneDrive（个人版）
+### OneDrive (Personal)
 
-- 仅支持个人版，不支持企业版。
-- 授权后插件在 `/Apps/obsidian-third-party-sync/` 下读写文件。
-- 支持端到端加密（Vault 名称本身不加密）。
+- Personal accounts only — OneDrive for Business is not supported.
+- Plugin reads/writes under `/Apps/obsidian-third-party-sync/` after authorization.
+- E2E encryption supported (vault name itself is not encrypted).
 
-## 自动同步
+## Auto Sync
 
-- 支持定时自动同步、启动时自动同步、保存时自动同步、远端变化检测后自动同步。
-- 自动同步模式下出错会静默失败。
-- Obsidian 关闭后无法自动同步（浏览器插件的技术限制）。
+- Supports scheduled interval, startup, on-save, and remote-change detection auto sync.
+- Errors silently fail in auto sync mode.
+- Cannot run while Obsidian is closed (browser plugin technical limitation).
 
-## 隐藏文件
+## Hidden Files
 
-- 默认以 `.` 或 `_` 开头的文件和文件夹不同步。
-- 可在设置中开启同步 `_` 文件夹和 `.obsidian` 配置文件夹。
+- Files/folders starting with `.` or `_` are excluded from sync by default.
+- Enable sync for `_` folders and `.obsidian` config directory in settings.
 
-## 调试
+## Debugging
 
-详见[调试文档](./docs/how_to_debug/README.md)。
+See [debugging docs](./docs/how_to_debug/README.md).
 
-## 鸣谢
+## Credits
 
-- 感谢 @fyears 的原始项目 [Remotely Save](https://github.com/remotely-save/remotely-save) 。
+- Thanks to @fyears for the original [Remotely Save](https://github.com/remotely-save/remotely-save) project.
 
-## 问题反馈
+## Feedback
 
-欢迎在 [GitHub Issues](https://github.com/nightfall-yl/obsidian-third-party-sync/issues) 反馈问题。Pull Request 同样欢迎！
+Open an issue on [GitHub Issues](https://github.com/nightfall-yl/obsidian-third-party-sync/issues). Pull requests are welcome!
