@@ -302,7 +302,7 @@ export const clearAllPrevSyncRecordsByVault = async (
   const keys = (await db.prevSyncRecordsTbl.keys()).filter((x) =>
     x.startsWith(`${vaultRandomID}\t`)
   );
-  const ps = [] as Promise<void>[];
+  const ps: Promise<any>[] = [];
   for (const key of keys) {
     ps.push(db.prevSyncRecordsTbl.removeItem(key));
   }
@@ -317,7 +317,7 @@ export const savePrevSyncRecordsByVault = async (
   // Clear old records first
   await clearAllPrevSyncRecordsByVault(db, vaultRandomID);
   // Save new records
-  const ps = [] as Promise<void>[];
+  const ps: Promise<any>[] = [];
   for (const record of records) {
     ps.push(
       db.prevSyncRecordsTbl.setItem(`${vaultRandomID}\t${record.key}`, record)
@@ -640,7 +640,7 @@ export const clearExpiredSyncPlanRecords = async (db: InternalDBs) => {
     });
   }
 
-  const ps = [] as Promise<void>[];
+  const ps: Promise<any>[] = [];
   keysToRemove.forEach((element) => {
     ps.push(db.syncPlansTbl.removeItem(element));
   });
@@ -728,7 +728,7 @@ export const clearExpiredLoggerOutputRecords = async (db: InternalDBs) => {
     });
   }
 
-  const ps = [] as Promise<void>[];
+  const ps: Promise<any>[] = [];
   keysToRemove.forEach((element) => {
     ps.push(db.loggerOutputTbl.removeItem(element));
   });

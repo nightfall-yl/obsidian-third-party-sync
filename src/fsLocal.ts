@@ -1,9 +1,11 @@
 import { Vault, TFile, TFolder } from "obsidian";
+import type { App } from "obsidian";
 import type { Entity } from "./baseTypes";
 import { FakeFs } from "./fsAll";
 
 export class FakeFsLocal extends FakeFs {
   vault: Vault;
+  app?: App;
   syncConfigDir: boolean;
   syncBookmarks: boolean;
   configDir: string;
@@ -15,10 +17,12 @@ export class FakeFsLocal extends FakeFs {
     syncConfigDir: boolean,
     syncBookmarks: boolean,
     configDir: string,
-    pluginId: string
+    pluginId: string,
+    app?: App
   ) {
     super();
     this.vault = vault;
+    this.app = app;
     this.syncConfigDir = syncConfigDir;
     this.syncBookmarks = syncBookmarks;
     this.configDir = configDir;
@@ -207,7 +211,11 @@ export class FakeFsLocal extends FakeFs {
     } else {
       const file = this.vault.getFileByPath(key);
       if (file) {
-        await this.vault.delete(file, true);
+        if (this.app) {
+          await this.app.fileManager.trashFile(file);
+        } else {
+          await this.vault.delete(file);
+        }
       }
     }
   }

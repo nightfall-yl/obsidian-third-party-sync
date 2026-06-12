@@ -27,7 +27,10 @@ import {
   InternalDBs,
   insertLoggerOutputByVault,
   clearExpiredLoggerOutputRecords,
-  clearExpiredSyncPlanRecords, FileFolderHistoryRecord,
+  clearExpiredSyncPlanRecords,
+  FileFolderHistoryRecord,
+  insertDeleteRecordByVault,
+  insertRenameRecordByVault,
 } from "./localdb";
 import { RemoteClient } from "./remote";
 import {
@@ -39,7 +42,8 @@ import {
 import { DEFAULT_S3_CONFIG } from "./remoteForS3";
 import { DEFAULT_WEBDAV_CONFIG } from "./remoteForWebdav";
 import { ThirdPartySyncSettingTab } from "./settings";
-import { SyncStatusType, isPasswordOk, getRemoteStates, getSyncPlanV3, doActualSyncV3 } from "./sync";
+import { SyncStatusType, isPasswordOk, getRemoteStates, getSyncPlanV3, doActualSyncV3, getSyncPlan, doActualSync } from "./sync";
+import { DeletionOnRemote, MetadataOnRemote, deserializeMetadataOnRemote } from "./metadataOnRemote";
 import { messyConfigToNormal, normalConfigToMessy } from "./configPersist";
 import { ObsConfigDirFileType, listFilesInObsFolder } from "./obsFolderLister";
 import { I18n } from "./i18n";
@@ -403,10 +407,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
           self,
           this.settings.skipSizeLargerThan,
           ss,
-          t,
-          async () => {
-            await self.saveSettings();
-          }
+          this.settings.password !== ""
         ).open();
       },
       undefined,
@@ -1187,7 +1188,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
 
     // Remove any third-party sync classes
     statusBar.removeClass("third-party-sync-show-status-bar");
-    statusBar.style.marginBottom = "0px";
+    statusBar.addClass("tp-statusbar-reset-margin");
 
     Array.from(statusBar.children).forEach((element) => {
       element.removeClass("third-party-sync-hidden");

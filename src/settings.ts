@@ -732,8 +732,8 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       onedriveSettings.push(setting);
       onedriveRevokeAuthSetting = setting;
       if (!isOneDriveAuthenticated) setting.settingEl.addClass("tp-sync-revoke-hidden");
-      setting.settingEl.style.borderTop = "none";
-      setting.settingEl.style.boxShadow = "none";
+      setting.settingEl.addClass("tp-no-border-top");
+      setting.settingEl.addClass("tp-no-box-shadow");
       return setting.setName(t("settings_onedrive_revoke"))
         .setDesc(
           t("settings_onedrive_revoke_desc", {
@@ -757,8 +757,8 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       onedriveSettings.push(setting);
       onedriveAuthSetting = setting;
       if (isOneDriveAuthenticated) setting.settingEl.addClass("tp-sync-auth-hidden");
-      setting.settingEl.style.borderTop = "none";
-      setting.settingEl.style.boxShadow = "none";
+      setting.settingEl.addClass("tp-no-border-top");
+      setting.settingEl.addClass("tp-no-box-shadow");
       return setting.setName(t("settings_onedrive_auth"))
         .setDesc(t("settings_onedrive_auth_desc"))
         .addButton(async (button) => {
@@ -1277,7 +1277,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       })
     );
 
-    const statusBarOptions = sgBasic.groupEl.createDiv({ cls: "third-party-sync-hidden" });
+    const statusBarOptions = (sgBasic as any).groupEl.createDiv({ cls: "third-party-sync-hidden" });
 
     statusBarOptions.toggleClass(
       "third-party-sync-hidden",
@@ -1551,7 +1551,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
           .onChange((value) => {
             importUriInput = value;
           });
-        text.inputEl.style.width = "100%";
+        text.inputEl.parentElement?.addClass("tp-full-width-input");
       })
       .addButton((button) => {
         button.setButtonText(t("settings_import_button"));
@@ -1666,7 +1666,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
     );
 
     // Container for debug options (hidden when debug is disabled)
-    const debugOptionsDiv = sgDebug.groupEl.createEl("div", {
+    const debugOptionsDiv = (sgDebug as any).groupEl.createEl("div", {
       cls: "remotely-sync-debug-options"
     });
 

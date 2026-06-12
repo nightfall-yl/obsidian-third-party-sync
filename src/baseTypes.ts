@@ -231,19 +231,3 @@ export interface SyncPlanType {
   remoteType: SUPPORTED_SERVICES_TYPE;
   mixedStates: Record<string, FileOrFolderMixedState>;
 }
-
-export interface DeletionOnRemote {
-  key: string;
-  deltime: number;
-}
-
-export interface MetadataOnRemote {
-  version: string;
-  lastSyncTime: number;
-  files: {
-    [key: string]: {
-      mtime: number;
-      size?: number;
-    };
-  };
-}

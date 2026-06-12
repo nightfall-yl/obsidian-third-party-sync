@@ -41,12 +41,15 @@ import {
 import { RemoteClient } from "./remote";
 import {
   DeletionOnRemote,
+  MetadataOnRemote,
   DEFAULT_FILE_NAME_FOR_METADATAONREMOTE,
   DEFAULT_FILE_NAME_FOR_METADATAONREMOTE2,
   LEGACY_FILE_NAME_FOR_METADATAONREMOTE,
   LEGACY_FILE_NAME_FOR_METADATAONREMOTE2,
   FILE_NAME_FOR_BOOKMARK_FILE,
   FILE_NAME_FOR_DATA_JSON,
+  serializeMetadataOnRemote,
+  deserializeMetadataOnRemote,
 } from "./metadataOnRemote";
 import {isInsideObsFolder, isInsideTrashFolder, ObsConfigDirFileType} from "./obsFolderLister";
 

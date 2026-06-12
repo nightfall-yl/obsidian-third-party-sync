@@ -7,11 +7,11 @@
     "allowJs": true,
     "noImplicitAny": true,
     "moduleResolution": "node",
-    // "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "importHelpers": true,
     "isolatedModules": true,
+    "skipLibCheck": true,
     "lib": [
       "dom",
       "es5",

@@ -14,11 +14,10 @@ import { log } from "./moreOnLog";
 import type {
   FileStat,
   WebDAVClient,
-  RequestOptionsWithState,
   Response,
   ResponseDataDetailed,
-} from "webdav/web";
-import { getPatcher } from "webdav/web";
+} from "webdav";
+import { getPatcher } from "webdav";
 
 const WEBDAV_503_RETRY_DELAYS_MS = [300, 700, 1300];
 
@@ -128,7 +127,7 @@ if (VALID_REQURL) {
   getPatcher().patch(
     "request",
     async (
-      options: RequestOptionsWithState
+      options: any
     ): Promise<Response | ResponseDataDetailed<any>> => {
       const transformedHeaders = { ...options.headers };
       delete transformedHeaders["host"];
@@ -180,8 +179,8 @@ if (VALID_REQURL) {
     }
   );
 }
-import { AuthType, BufferLike, createClient } from "webdav/web";
-export type { WebDAVClient } from "webdav/web";
+import { AuthType, BufferLike, createClient } from "webdav";
+export type { WebDAVClient } from "webdav";
 
 export const DEFAULT_WEBDAV_CONFIG = {
   address: "",
@@ -307,7 +306,7 @@ export class WrappedWebdavClient {
     if (this.webdavConfig.depth === "auto_unknown") {
       let testPassed = false;
       try {
-        const res = await webdavCallWith503Retry(
+        const res = await webdavCallWith503Retry<any>(
           "customRequest(PROPFIND infinity)",
           () =>
             this.client.customRequest(`/${this.remoteBaseDir}/`, {
@@ -316,7 +315,7 @@ export class WrappedWebdavClient {
                 Depth: "infinity",
               },
               responseType: "text",
-            })
+            } as any)
         );
         if (res.status === 403) {
           throw Error("not support Infinity, get 403");
@@ -339,7 +338,7 @@ export class WrappedWebdavClient {
                   Depth: "1",
                 },
                 responseType: "text",
-              })
+              } as any)
           );
           testPassed = true;
           this.webdavConfig.depth = "auto_1";

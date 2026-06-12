@@ -5,33 +5,33 @@
 
 /* Service detail heading: align with native SettingGroup headings */
 .setting-group > .setting-item-heading {
-  padding: 12px 16px 0 !important;
+  padding: 12px 16px 0;
 }
 .setting-group > .setting-item-heading > .setting-item-name {
-  font-size: var(--font-ui-medium) !important;
-  font-weight: var(--bold-weight) !important;
+  font-size: var(--font-ui-medium);
+  font-weight: var(--bold-weight);
 }
 
 /* Fix extra line: remove all separator lines in service detail group */
 .service-detail-group > .setting-item-heading {
-  border-bottom: none !important;
-  box-shadow: none !important;
+  border-bottom: none;
+  box-shadow: none;
 }
 .service-detail-group > .setting-item-heading::after {
-  display: none !important;
+  display: none;
 }
 .service-detail-group > .setting-item {
-  border-top: none !important;
-  border-top-width: 0 !important;
-  box-shadow: none !important;
+  border-top: none;
+  border-top-width: 0;
+  box-shadow: none;
 }
 .service-detail-group > .setting-item::before,
 .service-detail-group > .setting-item::after {
-  display: none !important;
+  display: none;
 }
 .setting-item.tp-sync-revoke-hidden,
 .setting-item.tp-sync-auth-hidden {
-  display: none !important;
+  display: none;
 }
 
 /* set the styles */
@@ -66,32 +66,50 @@
   margin: 2px 0;
 }
 .s3-hide {
-  display: none !important;
+  display: none;
 }
 
 .onedrive-disclaimer {
   font-weight: bold;
 }
 .onedrive-hide {
-  display: none !important;
+  display: none;
 }
 
 .webdav-disclaimer {
   font-weight: bold;
 }
 .webdav-hide {
-  display: none !important;
+  display: none;
 }
 
 
 
-/* !important isn't great practice but it needs to overwrite other css classes */
+/* Use higher specificity to overwrite other css classes */
 .third-party-sync-hidden {
-  display: none !important; 
+  display: none;
 }
 
 .third-party-sync-show-status-bar {
-  display: flex !important;
+  display: flex;
+}
+
+/* Remove border/shadow for service settings */
+.tp-no-border-top {
+  border-top: none !important;
+}
+.tp-no-box-shadow {
+  box-shadow: none !important;
+}
+
+/* Full width input */
+.tp-full-width-input > input {
+  width: 100%;
+}
+
+/* Status bar margin reset */
+.tp-statusbar-reset-margin {
+  margin-bottom: 0px;
 }
 
 /* OneDrive OAuth Modal Styles */
@@ -146,7 +164,7 @@
   text-align: right;
 }
 .oauth-submit-btn {
-  padding: 8px 24px !important;
+  padding: 8px 24px;
 }
 .oauth-button-row {
   margin-top: 10px;
