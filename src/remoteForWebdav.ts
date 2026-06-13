@@ -4,7 +4,7 @@ import { Queue } from "@fyears/tsqueue";
 import { getReasonPhrase } from "http-status-codes";
 import { RemoteItem, VALID_REQURL, WebdavConfig } from "./baseTypes";
 import { decryptArrayBuffer, encryptArrayBuffer } from "./encrypt";
-import { bufferToArrayBuffer, getPathFolder, mkdirpInVault } from "./misc";
+import { bufferToArrayBuffer, mkdirpInVault } from "./misc";
 
 import { log } from "./moreOnLog";
 
@@ -19,7 +19,7 @@ import { getPatcher } from "webdav";
 const WEBDAV_503_RETRY_DELAYS_MS = [300, 700, 1300];
 
 const sleep = (ms: number) =>
-  new Promise<void>((resolve) => setTimeout(resolve, ms));
+  new Promise<void>((resolve) => window.setTimeout(resolve, ms));
 
 const isStatus503Error = (error: unknown) => {
   if (error === undefined || error === null) {
@@ -169,7 +169,7 @@ if (VALID_REQURL) {
         };
       } else {
         throw Error(
-          `do not know how to deal with responseType = ${options.responseType}`
+          `do not know how to deal with responseType = ${JSON.stringify(options.responseType)}`
         );
       }
       return r2;
@@ -244,11 +244,11 @@ export class WrappedWebdavClient {
   remoteBaseDir: string;
   client: WebDAVClient;
   vaultFolderExists: boolean;
-  saveUpdatedConfigFunc: () => Promise<any>;
+  saveUpdatedConfigFunc: () => Promise<unknown>;
   constructor(
     webdavConfig: WebdavConfig,
     remoteBaseDir: string,
-    saveUpdatedConfigFunc: () => Promise<any>
+    saveUpdatedConfigFunc: () => Promise<unknown>
   ) {
     this.webdavConfig = webdavConfig;
     this.remoteBaseDir = remoteBaseDir;
@@ -321,12 +321,12 @@ export class WrappedWebdavClient {
           this.webdavConfig.depth = "auto_infinity";
           this.webdavConfig.manualRecursive = false;
         }
-      } catch (error) {
+      } catch (_error) {
         testPassed = false;
       }
       if (!testPassed) {
         try {
-          const res = await webdavCallWith503Retry(
+          const _res = await webdavCallWith503Retry(
             "customRequest(PROPFIND depth=1)",
             () =>
               this.client.customRequest(`/${this.remoteBaseDir}/`, {
@@ -340,7 +340,7 @@ export class WrappedWebdavClient {
           testPassed = true;
           this.webdavConfig.depth = "auto_1";
           this.webdavConfig.manualRecursive = true;
-        } catch (error) {
+        } catch (_error) {
           testPassed = false;
         }
       }
@@ -358,7 +358,7 @@ export class WrappedWebdavClient {
 export const getWebdavClient = (
   webdavConfig: WebdavConfig,
   remoteBaseDir: string,
-  saveUpdatedConfigFunc: () => Promise<any>
+  saveUpdatedConfigFunc: () => Promise<unknown>
 ) => {
   return new WrappedWebdavClient(
     webdavConfig,
@@ -634,7 +634,7 @@ export const deleteFromRemote = async (
     await webdavCallWith503Retry("deleteFile", () =>
       client.client.deleteFile(remoteFileName)
     );
-  } catch (err) {
+  } catch (_err) {
     console.error("some error while deleting");
   }
 };
@@ -668,10 +668,10 @@ export const checkConnectivity = async (
       return false;
     }
     return true;
-  } catch (err) {
+  } catch (err: unknown) {
     log.debug(err);
     if (callbackFunc !== undefined) {
-      callbackFunc(err);
+      callbackFunc(err instanceof Error ? err.message : JSON.stringify(err) ?? "unknown error");
     }
     return false;
   }

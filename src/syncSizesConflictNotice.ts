@@ -1,9 +1,7 @@
-import { App, Modal, Notice, PluginSettingTab, Setting } from "obsidian";
+import { App, Modal, Notice, activeDocument } from "obsidian";
 import type RemotelySavePlugin from "./main"; // unavoidable
 import type { TransItemType } from "./i18n";
 import type { FileOrFolderMixedState } from "./baseTypes";
-
-import { log } from "./moreOnLog";
 
 export class SizesConflictModal extends Modal {
   readonly plugin: RemotelySavePlugin;
@@ -54,13 +52,20 @@ export class SizesConflictModal extends Modal {
           try {
             await navigator.clipboard.writeText(info);
           } catch {
-            const textarea = document.createElement("textarea");
-          textarea.value = info;
-          textarea.className = "tp-clipboard-fallback";
-            document.body.appendChild(textarea);
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+            const textarea = activeDocument.createElement("textarea");
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+            textarea.value = info;
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+            textarea.className = "tp-clipboard-fallback";
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+            activeDocument.body.appendChild(textarea);
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
             textarea.select();
-            document.execCommand("copy");
-            document.body.removeChild(textarea);
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+            activeDocument.execCommand("copy");
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+            activeDocument.body.removeChild(textarea);
           }
           new Notice(t("modal_sizesconflict_copynotice"));
         };

@@ -1,4 +1,4 @@
-import { TAbstractFile, TFolder, TFile, Vault } from "obsidian";
+import { Vault } from "obsidian";
 
 import type { SyncPlanType } from "./sync";
 import {
@@ -14,11 +14,9 @@ import {
   FileOrFolderMixedState,
 } from "./baseTypes";
 
-import { log } from "./moreOnLog";
-
 const turnSyncPlanToTable = (record: string) => {
   const syncPlan: SyncPlanType = JSON.parse(record) as SyncPlanType;
-  const { ts, tsFmt, remoteType, mixedStates } = syncPlan;
+  const { ts, tsFmt, remoteType } = syncPlan;
 
   type allowedHeadersType = keyof FileOrFolderMixedState;
   const headers: allowedHeadersType[] = [
@@ -44,10 +42,9 @@ const turnSyncPlanToTable = (record: string) => {
     `ts: ${ts}${tsFmt !== undefined ? " / " + tsFmt : ""}`,
     `remoteType: ${remoteType}`,
     `| ${headers.join(" | ")} |`,
-    `| ${headers.map((x) => "---").join(" | ")} |`,
+    `| ${headers.map((_x) => "---").join(" | ")} |`,
   ];
-  for (const [k1, v1] of Object.entries(syncPlan.mixedStates)) {
-    const k = k1;
+  for (const [, v1] of Object.entries(syncPlan.mixedStates)) {
     const v = v1;
     const singleLine = [];
     for (const h of headers) {
@@ -63,13 +60,14 @@ const turnSyncPlanToTable = (record: string) => {
         h === "deltimeRemote"
       ) {
         const fmt = v[(h + "Fmt") as allowedHeadersType] as string;
-        const s = `${field}${fmt !== undefined ? " / " + fmt : ""}`;
+        const fieldStr = typeof field === "object" ? JSON.stringify(field) : String(field);
+        const s = `${fieldStr}${fmt !== undefined ? " / " + fmt : ""}`;
         singleLine.push(s);
       } else {
-        singleLine.push(field);
+        singleLine.push(typeof field === "object" ? JSON.stringify(field) : String(field));
       }
     }
-    lines.push(`| ${singleLine.join(" | ")} |`);
+    lines.push(`| ${singleLine.map(String).join(" | ")} |`);
   }
 
   return lines.join("\n");
@@ -95,7 +93,7 @@ export const exportVaultSyncPlansToFiles = async (
       md =
         "Sync plans found:\n\n" + records.map(turnSyncPlanToTable).join("\n\n");
     } else {
-      const _: never = toFormat;
+      const _unused: never = toFormat;
     }
   }
   const ts = Date.now();

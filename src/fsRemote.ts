@@ -61,7 +61,7 @@ export class FakeFsRemote extends FakeFs {
     };
   }
 
-  async mkdir(key: string, mtime?: number, ctime?: number): Promise<Entity> {
+  async mkdir(key: string, mtime?: number, _ctime?: number): Promise<Entity> {
     // For most remote services, creating a folder is done by uploading a file with a trailing slash
     // or by creating the parent directories when uploading a file
     // This is a simplified implementation
@@ -84,7 +84,7 @@ export class FakeFsRemote extends FakeFs {
     key: string,
     content: ArrayBuffer,
     mtime: number,
-    ctime: number
+    _ctime: number
   ): Promise<Entity> {
     const noVault = null as unknown as Parameters<RemoteClient["uploadToRemote"]>[1];
     const remoteObjMeta = await this.client.uploadToRemote(
@@ -148,7 +148,7 @@ export class FakeFsRemote extends FakeFs {
   async getUserDisplayName(): Promise<string> {
     try {
       return await this.client.getUser();
-    } catch (error) {
+    } catch (_error) {
       return "Unknown User";
     }
   }

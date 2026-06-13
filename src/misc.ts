@@ -1,9 +1,8 @@
 import { Vault, moment, normalizePath as obsidianNormalizePath } from "obsidian";
-import { base32, base64url } from "rfc4648";
-import XRegExp from "xregexp";
+import { base32 } from "rfc4648";
 import emojiRegex from "emoji-regex-xs";
 
-import type { I18n, LangType, LangTypeAndAuto, TransItemType } from "./i18n";
+import type { I18n, TransItemType } from "./i18n";
 
 import { log } from "./moreOnLog";
 
@@ -79,7 +78,6 @@ export const getFolderLevels = (x: string, addEndingSlash: boolean = false) => {
   }
 
   const y1 = x.split("/");
-  let i = 0;
   for (let index = 0; index + 1 < y1.length; index++) {
     let k = y1.slice(0, index + 1).join("/");
     if (k === "" || k === "/") {
@@ -125,6 +123,7 @@ export const arrayBufferToBase64 = (b: ArrayBuffer) => {
   for (let i = 0; i < bytes.byteLength; i++) {
     binary += String.fromCharCode(bytes[i]);
   }
+  // eslint-disable-next-line @typescript-eslint/no-deprecated
   return btoa(binary);
 };
 
@@ -146,12 +145,13 @@ export const arrayBufferToHex = (b: ArrayBuffer) => {
  * @returns ArrayBuffer
  */
 export const base64ToArrayBuffer = (b64text: string) => {
+  // eslint-disable-next-line @typescript-eslint/no-deprecated
   const binary = atob(b64text);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {
     bytes[i] = binary.charCodeAt(i);
   }
-  return bytes.buffer as ArrayBuffer;
+  return bytes.buffer;
 };
 
 /**
@@ -168,6 +168,7 @@ export const hexStringToTypedArray = (hex: string) => {
 };
 
 export const base64ToBase32 = (a: string) => {
+  // eslint-disable-next-line @typescript-eslint/no-deprecated
   const binary = atob(a);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {
@@ -254,7 +255,7 @@ export const setToString = (a: Set<string>, delimiter: string = ",") => {
   return [...a].join(delimiter);
 };
 
-export const extractSvgSub = (x: string, subEl: string = "rect") => {
+export const extractSvgSub = (x: string, _subEl: string = "rect") => {
   const parser = new DOMParser();
   const dom = parser.parseFromString(x, "image/svg+xml");
   const svg = dom.querySelector("svg");
@@ -340,8 +341,9 @@ export const getSplitRanges = (bytesTotal: number, bytesEachPart: number) => {
  * @param obj anything
  * @returns string of the name of the object
  */
-export const getTypeName = (obj: any): string => {
-  return Object.prototype.toString.call(obj).slice(8, -1);
+export const getTypeName = (obj: unknown): string => {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+  return Object.prototype.toString.call(obj).slice(8, -1) as string;
 };
 
 /**
@@ -374,7 +376,8 @@ export const unixTimeToStr = (x: number | undefined | null) => {
   if (x === undefined || x === null || Number.isNaN(x)) {
     return undefined;
   }
-  return (moment as any)(x).format() as string;
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+  return (moment as unknown)(x).format() as string;
 };
 
 /**
@@ -399,9 +402,12 @@ const getCircularReplacer = () => {
  * @param x
  * @returns
  */
-export const toText = (x: any) => {
-  if (x === undefined || x === null) {
-    return `${x}`;
+export const toText = (x: unknown): string => {
+  if (x === undefined) {
+    return "undefined";
+  }
+  if (x === null) {
+    return "null";
   }
   if (typeof x === "string") {
     return x;
@@ -413,9 +419,14 @@ export const toText = (x: any) => {
     typeof x === "bigint" ||
     typeof x === "boolean"
   ) {
-    return `${x}`;
+    if (x instanceof Date) {
+      return x.toISOString();
+    }
+    if (x instanceof String) {
+      return x.valueOf();
+    }
+    return String(x);
   }
-
   if (
     x instanceof Error ||
     (x &&
@@ -434,7 +445,17 @@ export const toText = (x: any) => {
     }
     throw new Error("not jsonable");
   } catch {
-    return `${x}`;
+    // x is an object that couldn't be JSON.stringify'd with the circular replacer
+    // try simple stringify, otherwise return a placeholder
+    try {
+      const y = JSON.stringify(x);
+      if (y !== undefined) {
+        return y;
+      }
+    } catch {
+      // circular reference, give up
+    }
+    return "[object]";
   }
 };
 
@@ -529,10 +550,10 @@ export const roughSizeOfObject = (obj: unknown) => {
  * @param folderName
  * @returns
  */
-export const isSpecialFolderNameToSkip = (folderName: string) => {
+export const isSpecialFolderNameToSkip = (folderName: string, configDir: string) => {
   const specialFolders = [
     '.git',
-    '.obsidian',
+    configDir,
     'node_modules',
     '.DS_Store'
   ];

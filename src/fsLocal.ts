@@ -124,7 +124,7 @@ export class FakeFsLocal extends FakeFs {
     }
   }
 
-  async mkdir(key: string, mtime?: number, ctime?: number): Promise<Entity> {
+  async mkdir(key: string, mtime?: number, _ctime?: number): Promise<Entity> {
     const folderPath = key.slice(0, -1);
     await this.vault.createFolder(folderPath);
 
@@ -146,7 +146,7 @@ export class FakeFsLocal extends FakeFs {
     key: string,
     content: ArrayBuffer,
     mtime: number,
-    ctime: number
+    _ctime: number
   ): Promise<Entity> {
     const file = this.vault.getAbstractFileByPath(key);
     if (file instanceof TFile) {
@@ -216,7 +216,7 @@ export class FakeFsLocal extends FakeFs {
     }
   }
 
-  async checkConnect(callbackFunc?: (err?: string) => void): Promise<boolean> {
+  async checkConnect(_callbackFunc?: (err?: string) => void): Promise<boolean> {
     // Local file system is always available
     return true;
   }

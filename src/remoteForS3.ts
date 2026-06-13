@@ -12,7 +12,7 @@ import {
   S3ClientConfig,
 } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
-import { HttpHandler, HttpRequest, HttpResponse } from "@aws-sdk/protocol-http";
+import { HttpRequest, HttpResponse } from "@aws-sdk/protocol-http";
 import {
   FetchHttpHandler,
   FetchHttpHandlerOptions,
@@ -24,6 +24,7 @@ import { HttpHandlerOptions } from "@aws-sdk/types";
 
 import * as mime from "mime-types";
 import { Vault, requestUrl, RequestUrlParam } from "obsidian";
+// eslint-disable-next-line import/no-nodejs-modules
 import { Readable } from "stream";
 import AggregateError from "aggregate-error";
 import {
@@ -133,6 +134,7 @@ class ObsHttpHandler extends FetchHttpHandler {
           }),
         };
       })(),
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
       requestTimeout(this.requestTimeoutInMs),
     ];
 
@@ -149,11 +151,11 @@ class ObsHttpHandler extends FetchHttpHandler {
     }
     return Promise.race(raceOfPromises) as Promise<{ response: HttpResponse }>;
   }
-  updateHttpClientConfig(key: never, value: never): void {
+  updateHttpClientConfig(_key: never, _value: never): void {
     // Implement this method if necessary
   }
 
-  httpHandlerConfigs(): {} {
+  httpHandlerConfigs(): Record<string, never> {
     // Implement this method if necessary
     return {};
   }
@@ -192,7 +194,7 @@ const fromS3ObjectToRemoteItem = (x: S3ObjectType): RemoteItem => {
     size: x.Size,
     remoteType: "s3",
     etag: x.ETag,
-  } as RemoteItem;
+  };
 };
 
 const fromS3HeadObjectToRemoteItem = (
@@ -237,7 +239,7 @@ export const getS3Client = (s3Config: S3Config) => {
   s3Client = new S3Client(s3ClientConfig);
 
   s3Client.middlewareStack.add(
-    (next, context) => (args) => {
+    (next, _context) => (args) => {
       (args.request as Record<string, unknown>).headers["cache-control"] = "no-cache";
       return next(args);
     },
@@ -465,7 +467,7 @@ const getObjectBodyToArrayBuffer = async (
   } else if (b instanceof Blob) {
     return await b.arrayBuffer();
   } else {
-    throw TypeError(`The type of ${b} is not one of the supported types`);
+    throw TypeError(`The type of ${String(b)} is not one of the supported types`);
   }
 };
 
@@ -560,14 +562,14 @@ export const deleteFromRemote = async (
 
   if (fileOrFolderPath.endsWith("/") && password === "") {
     const x = await listFromRemote(s3Client, s3Config, fileOrFolderPath);
-    x.Contents.forEach(async (element) => {
+    for (const element of x.Contents) {
       await s3Client.send(
         new DeleteObjectCommand({
           Bucket: s3Config.s3BucketName,
           Key: element.key,
         })
       );
-    });
+    }
   } else if (fileOrFolderPath.endsWith("/") && password !== "") {
     // TODO
   } else {

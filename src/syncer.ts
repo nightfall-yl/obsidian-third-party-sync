@@ -1,27 +1,12 @@
-import AggregateError from "aggregate-error";
 import PQueue from "p-queue";
 import type { Entity, MixedEntity, ThirdPartySyncPluginSettings, SyncTriggerSourceType, ConflictActionType } from "./baseTypes";
-import { copyFile, copyFileOrFolder, copyFolder } from "./copyLogic";
 import type { FakeFs } from "./fsAll";
 import type { FakeFsEncrypt } from "./fsEncrypt";
-import { 
-  DEFAULT_FILE_NAME_FOR_METADATAONREMOTE, 
-  DEFAULT_FILE_NAME_FOR_METADATAONREMOTE2,
-  MetadataOnRemote,
-  serializeMetadataOnRemote,
-  deserializeMetadataOnRemote
+import {
+  DEFAULT_FILE_NAME_FOR_METADATAONREMOTE,
+  DEFAULT_FILE_NAME_FOR_METADATAONREMOTE2
 } from "./metadataOnRemote";
-import { 
-  atWhichLevel, 
-  getParentFolder, 
-  isHiddenPath,
-  isSpecialFolderNameToSkip,
-  unixTimeToStr
-} from "./misc";
 import type { InternalDBs } from "./localdb";
-import { 
-  insertSyncPlanRecordByVault
-} from "./localdb";
 
 export const syncer = async (
   fsLocal: FakeFs,
@@ -91,7 +76,7 @@ export const syncer = async (
 
     // Step 6: Execute sync plan
     await notifyFunc(triggerSource, 7);
-    const { realTotalCount, realModifyDeleteCount, allFilesCount } = await executeSyncPlan(
+    const { realModifyDeleteCount, allFilesCount } = await executeSyncPlan(
       syncPlan,
       fsLocal,
       fsEncrypt,
@@ -141,19 +126,19 @@ const generateSyncPlan = async (
   localEntityList: Entity[],
   prevSyncEntityList: Entity[],
   remoteEntityList: Entity[],
-  syncConfigDir: boolean,
-  syncBookmarks: boolean,
-  configDir: string,
-  syncUnderscoreItems: boolean,
-  ignorePaths: string[],
-  onlyAllowPaths: string[],
-  fsEncrypt: FakeFsEncrypt,
-  serviceType: string,
-  skipSizeLargerThan: number,
-  conflictAction: ConflictActionType,
-  syncDirection: string,
-  triggerSource: SyncTriggerSourceType,
-  configDirPath: string
+  _syncConfigDir: boolean,
+  _syncBookmarks: boolean,
+  _configDir: string,
+  _syncUnderscoreItems: boolean,
+  _ignorePaths: string[],
+  _onlyAllowPaths: string[],
+  _fsEncrypt: FakeFsEncrypt,
+  _serviceType: string,
+  _skipSizeLargerThan: number,
+  _conflictAction: ConflictActionType,
+  _syncDirection: string,
+  _triggerSource: SyncTriggerSourceType,
+  _configDirPath: string
 ): Promise<Record<string, MixedEntity>> => {
   // This is a simplified implementation
   // In a real implementation, you would generate a proper sync plan
@@ -238,7 +223,7 @@ const executeSyncPlan = async (
       realModifyDeleteCount++;
     }
 
-    queue.add(async () => {
+    void queue.add(async () => {
       await callbackSyncProcess(triggerSource, realTotalCount, realTotalCount, key, "syncing");
       // In a real implementation, you would sync the item here
     });

@@ -4,9 +4,8 @@ import type {
   UploadSession,
   User,
 } from "@microsoft/microsoft-graph-types";
-import { request, requestUrl, RequestUrlParam, requireApiVersion, Vault } from "obsidian";
+import { requestUrl, RequestUrlParam, Vault } from "obsidian";
 import {
-  VALID_REQURL,
   COMMAND_CALLBACK_ONEDRIVE,
   DEFAULT_CONTENT_TYPE,
   OAUTH2_FORCE_EXPIRE_MILLISECONDS,
@@ -51,6 +50,7 @@ async function generateCodeVerifier(): Promise<string> {
     throw new Error('Crypto API not available');
   }
   crypto.getRandomValues(arrayBuffer);
+  // eslint-disable-next-line @typescript-eslint/no-deprecated
   return btoa(String.fromCharCode(...arrayBuffer))
     .replace(/=/g, '')
     .replace(/\+/g, '-')
@@ -65,6 +65,7 @@ async function generateCodeChallenge(verifier: string): Promise<string> {
     throw new Error('Crypto subtle API not available');
   }
   const digest = await crypto.subtle.digest('SHA-256', data);
+  // eslint-disable-next-line @typescript-eslint/no-deprecated
   return btoa(String.fromCharCode(...new Uint8Array(digest)))
     .replace(/=/g, '')
     .replace(/\+/g, '-')
@@ -161,19 +162,21 @@ export const sendAuthReq = async (
       return {
         ...rspFailed,
         error_description: errorMsg,
-      } as AccessCodeResponseFailedType;
+      };
     } else {
-      return rsp as AccessCodeResponseSuccessfulType;
+      return rsp;
     }
   } catch (err: unknown) {
     log.debug("OneDrive auth request failed:", err);
     const error = err as { response?: { data?: string | Record<string, unknown> }; message?: string };
     // 尝试解析响应体获取更详细的错误信息
     if (error.response && error.response.data) {
-      const errorData = typeof error.response.data === 'string'
-        ? JSON.parse(error.response.data)
+      const errorData: Record<string, unknown> = typeof error.response.data === 'string'
+        ? JSON.parse(error.response.data) as Record<string, unknown>
         : error.response.data;
-      throw Error(`Azure API 错误: ${errorData.error_description || errorData.error || JSON.stringify(errorData)}`);
+      const desc = typeof errorData.error_description === "string" ? errorData.error_description : "";
+      const errCode = typeof errorData.error === "string" ? errorData.error : "";
+      throw Error(`Azure API 错误: ${desc || errCode || JSON.stringify(errorData)}`);
     }
     
     throw Error(`网络请求失败: ${err.message || err}`);
@@ -261,23 +264,6 @@ const getOnedrivePath = (fileOrFolderPath: string, remoteBaseDir: string) => {
   return key;
 };
 
-const getNormPath = (fileOrFolderPath: string, remoteBaseDir: string) => {
-  const prefix = `/drive/special/approot:/${remoteBaseDir}`;
-
-  if (
-    !(fileOrFolderPath === prefix || fileOrFolderPath.startsWith(`${prefix}/`))
-  ) {
-    throw Error(
-      `"${fileOrFolderPath}" doesn't starts with "${prefix}/" or equals to "${prefix}"`
-    );
-  }
-
-  if (fileOrFolderPath === prefix) {
-    return "/";
-  }
-  return fileOrFolderPath.slice(`${prefix}/`.length);
-};
-
 const constructFromDriveItemToRemoteItemError = (x: DriveItem) => {
   return `parentPath="${x.parentReference.path}", selfName="${x.name}"`;
 };
@@ -301,11 +287,11 @@ const fromDriveItemToRemoteItem = (
   // pure english: /drive/root:/Apps/third-party-sync/${remoteBaseDir}
   // or localized, e.g.: /drive/root:/应用/third-party-sync/${remoteBaseDir}
   const FIRST_COMMON_PREFIX_REGEX =
-    /^\/drive\/root:\/[^\/]+\/Remotely (Sync|Secure|Save)\//g;
+    /^\/drive\/root:\/[^/]+\/Remotely (Sync|Secure|Save)\//g;
   // or the root is absolute path /Livefolders,
   // e.g.: /Livefolders/应用/third-party-sync/${remoteBaseDir}
   const SECOND_COMMON_PREFIX_REGEX =
-    /^\/Livefolders\/[^\/]+\/Remotely (Sync|Secure|Save)\//g;
+    /^\/Livefolders\/[^/]+\/Remotely (Sync|Secure|Save)\//g;
 
   // another possibile prefix
   const THIRD_COMMON_PREFIX_RAW = `/drive/items/`;
@@ -399,7 +385,7 @@ class MyAuthProvider implements AuthenticationProvider {
       if ((r as Record<string, unknown>).error !== undefined) {
         const r2 = r as AccessCodeResponseFailedType;
         throw Error(
-          `Error while refreshing accessToken: ${r2.error}, ${r2.error_codes}: ${r2.error_description}`
+          `Error while refreshing accessToken: ${r2.error}, ${String(r2.error_codes)}: ${r2.error_description}`
         );
       }
       const r2 = r as AccessCodeResponseSuccessfulType;
@@ -599,7 +585,7 @@ export class WrappedOnedriveClient {
 export const getOnedriveClient = (
   onedriveConfig: OnedriveConfig,
   remoteBaseDir: string,
-  saveUpdatedConfigFunc: () => Promise<any>
+  saveUpdatedConfigFunc: () => Promise<unknown>
 ) => {
   return new WrappedOnedriveClient(
     onedriveConfig,
@@ -633,7 +619,7 @@ export const listFromRemote = async (
 
   while (NEXT_LINK_KEY in res) {
     res = await client.getJson(res[NEXT_LINK_KEY] as string);
-    driveItems.push(...structuredClone(res.value as unknown as DriveItem[]));
+    driveItems.push(...structuredClone(res.value as DriveItem[]));
   }
 
   // lastly we should have delta link?

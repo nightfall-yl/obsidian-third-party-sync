@@ -6,10 +6,11 @@ import {
   setIcon,
   FileSystemAdapter,
   Platform, TAbstractFile, Vault, EventRef,
+  activeDocument,
 } from "obsidian";
 
 import type {
-  FileOrFolderMixedState, RemoteItem,
+  FileOrFolderMixedState,
   ThirdPartySyncPluginSettings,
   SyncTriggerSourceType,
   SyncPlanType,
@@ -47,7 +48,7 @@ import { DeletionOnRemote, MetadataOnRemote, deserializeMetadataOnRemote } from 
 import { messyConfigToNormal, normalConfigToMessy } from "./configPersist";
 import { ObsConfigDirFileType, listFilesInObsFolder } from "./obsFolderLister";
 import { I18n } from "./i18n";
-import type { LangType, LangTypeAndAuto, TransItemType } from "./i18n";
+import type { LangTypeAndAuto, TransItemType } from "./i18n";
 import { SyncAlgoV2Modal } from "./syncAlgoV2Notice";
 import { applyPresetRulesInplace } from "./presetRules";
 
@@ -58,13 +59,7 @@ import {
   exportVaultSyncPlansToFiles,
 } from "./debugMode";
 import { SizesConflictModal } from "./syncSizesConflictNotice";
-import {mkdirpInVault, getLastSynced} from "./misc";
-
-// File system abstraction layers
-import { FakeFsLocal } from "./fsLocal";
-import { FakeFsRemote } from "./fsRemote";
-import { FakeFsEncrypt } from "./fsEncrypt";
-import { syncer } from "./syncer";
+import {getLastSynced} from "./misc";
 
 const DEFAULT_SETTINGS: ThirdPartySyncPluginSettings = {
   s3: DEFAULT_S3_CONFIG,
@@ -224,12 +219,12 @@ export default class ThirdPartySyncPlugin extends Plugin {
     };
 
     // Ribbon function - updates ribbon icon
-    const ribboonFunc = async (s: SyncTriggerSourceType, step: number) => {
+    const _ribboonFunc = async (_s: SyncTriggerSourceType, _step: number) => {
       // Handled by setSyncIcon
     };
 
     // Sync process callback
-    const callbackSyncProcess = async (s: SyncTriggerSourceType, realCounter: number, realTotalCount: number, pathName: string, decision: string) => {
+    const _callbackSyncProcess = async (_s: SyncTriggerSourceType, realCounter: number, realTotalCount: number, pathName: string, _decision: string) => {
       if (this.settings.enableStatusBarInfo) {
         this.setCurrSyncMsg(realCounter, realTotalCount, pathName);
       }
@@ -256,22 +251,21 @@ export default class ThirdPartySyncPlugin extends Plugin {
       return;
     }
 
-    let everythingOk = true;
+    let _everythingOk = true;
     try {
       this.setSyncIcon(true, triggerSource);
 
       // Step 0 for dry mode
       if (triggerSource === "dry") {
-        notifyFunc(triggerSource, 0);
+        void notifyFunc(triggerSource, 0);
       }
 
       // Step 1 - start
-      notifyFunc(triggerSource, 1);
-      statusBarFunc(triggerSource, 1, true);
+      void notifyFunc(triggerSource, 1);
+      void statusBarFunc(triggerSource, 1, true);
 
       // Step 2 - prepare for sync
-      const self = this;
-      const client = this.getRemoteClient(self);
+      const client = this.getRemoteClient(this);
 
       // Step 3 - list remote files
       await notifyFunc(triggerSource, 2);
@@ -279,7 +273,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
 
       // Step 4 - check password
       await notifyFunc(triggerSource, 3);
-      const passwordCheckResult = await isPasswordOk(
+      const _passwordCheckResult = await isPasswordOk(
         remoteRsp.Contents,
         this.settings.password
       );
@@ -336,12 +330,12 @@ export default class ThirdPartySyncPlugin extends Plugin {
       this.updateSyncStatus("idle");
 
       // Step 8 (finish)
-      notifyFunc(triggerSource, 8);
-      statusBarFunc(triggerSource, 8, true);
+      void notifyFunc(triggerSource, 8);
+      void statusBarFunc(triggerSource, 8, true);
 
       this.setSyncIcon(false);
     } catch (error) {
-      everythingOk = false;
+      _everythingOk = false;
       const msg = t("syncrun_abort", {
         manifestID: this.manifest.id,
         theDate: `${Date.now()}`,
@@ -415,7 +409,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
       (errorMsg: string) => {
         const parts = errorMsg.split("|");
         if (parts[0] === "syncrun_abort_protectmodifypercentage") {
-          const [_, threshold, realCount, allCount, percent] = parts;
+          const [_prefix, threshold, realCount, allCount, percent] = parts;
           const msg = t("syncrun_abort_protectmodifypercentage", {
             protectModifyPercentage: parseInt(threshold),
             realModifyDeleteCount: parseInt(realCount),
@@ -425,6 +419,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
           new Notice(msg, 0);
         }
       }
+      , this.app.vault.configDir
     );
   }
 
@@ -466,7 +461,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
         // Parse error message: format is "syncrun_abort_protectmodifypercentage|threshold|realCount|allCount|percent"
         const parts = errorMsg.split("|");
         if (parts[0] === "syncrun_abort_protectmodifypercentage") {
-          const [_, threshold, realCount, allCount, percent] = parts;
+          const [_prefix, threshold, realCount, allCount, percent] = parts;
           const msg = t("syncrun_abort_protectmodifypercentage", {
             protectModifyPercentage: parseInt(threshold),
             realModifyDeleteCount: parseInt(realCount),
@@ -684,7 +679,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
       await this.getVaultRandomIDFromOldConfigFile();
 
     // no need to await this
-    this.tryToAddIgnoreFile();
+    void this.tryToAddIgnoreFile();
 
     const vaultBasePath = this.getVaultBasePath();
 
@@ -694,7 +689,8 @@ export default class ThirdPartySyncPlugin extends Plugin {
         vaultRandomIDFromOldConfigFile
       );
     } catch (err: unknown) {
-      new Notice(err instanceof Error ? err.message : String(err), 10 * 1000);
+      const errMsg = err instanceof Error ? err.message : JSON.stringify(err);
+      new Notice(errMsg, 10 * 1000);
       throw err;
     }
 
@@ -749,7 +745,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
             ...(copied?.onedrive ?? {}),
           },
         };
-        this.saveSettings();
+        void this.saveSettings();
         new Notice(
           t("protocol_saveqr", {
             manifestName: this.manifest.name,
@@ -799,15 +795,14 @@ export default class ThirdPartySyncPlugin extends Plugin {
 
             const rsp2 = rsp as Record<string, unknown>;
             if (rsp2.error !== undefined) {
-              const errorMsg = rsp2.error_description || JSON.stringify(rsp);
+              const errorMsg = typeof rsp2.error_description === "string" ? rsp2.error_description : JSON.stringify(rsp);
               throw Error(`Azure API 错误: ${errorMsg}`);
             }
 
-            const self = this;
             await setConfigBySuccessfullAuthInplaceOnedrive(
               this.settings.onedrive,
               rsp as AccessCodeResponseSuccessfulType,
-              () => self.saveSettings()
+              async () => await this.saveSettings()
             );
 
             const client = new RemoteClient(
@@ -816,17 +811,17 @@ export default class ThirdPartySyncPlugin extends Plugin {
               undefined,
               this.settings.onedrive,
               this.app.vault.getName(),
-              () => self.saveSettings()
+              async () => await this.saveSettings()
             );
             this.settings.onedrive.username = await client.getUser();
-            await self.saveSettings();
+            await this.saveSettings();
 
             this.oauth2Info.verifier = ""; // reset it
             this.oauth2Info.helperModal?.close(); // close it
             this.oauth2Info.helperModal = undefined;
 
             const isAuthed = this.settings.onedrive.username !== "";
-            if (this.oauth2Info.authSetting) {
+            if (this.oauth2Info.authSetting !== undefined) {
               this.oauth2Info.authSetting.settingEl.toggleClass("tp-sync-auth-hidden", isAuthed);
             }
             this.oauth2Info.authSetting = undefined;
@@ -836,7 +831,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
                 username: this.settings.onedrive.username,
               })
             );
-            if (this.oauth2Info.revokeAuthSetting) {
+            if (this.oauth2Info.revokeAuthSetting !== undefined) {
               this.oauth2Info.revokeAuthSetting.settingEl.toggleClass("tp-sync-revoke-hidden", !isAuthed);
             }
             this.oauth2Info.revokeAuthSetting = undefined;
@@ -883,8 +878,8 @@ export default class ThirdPartySyncPlugin extends Plugin {
       id: "start-sync",
       name: t("command_startsync"),
       icon: iconNameSyncWait,
-      callback: async () => {
-        this.syncRun("manual");
+      callback: () => {
+        void this.syncRun("manual");
       },
     });
 
@@ -892,8 +887,8 @@ export default class ThirdPartySyncPlugin extends Plugin {
       id: "start-sync-dry-run",
       name: t("command_drynrun"),
       icon: iconNameSyncWait,
-      callback: async () => {
-        this.syncRun("dry");
+      callback: () => {
+        void this.syncRun("dry");
       },
     });
 
@@ -955,7 +950,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
       this.settings.enableStatusBarInfo = Platform.isMobile ? false : true;
     }
 
-    this.saveSettings();
+    void this.saveSettings();
 
     // this.registerDomEvent(document, "click", (evt: MouseEvent) => {
     //   log.info("click", evt);
@@ -968,8 +963,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
       new SyncAlgoV2Modal(this.app, this.i18n, (result) => {
         if (result) {
           this.settings.agreeToUploadExtraMetadata = true;
-          this.saveSettings();
-          // User agreed → now enable all features
+          void this.saveSettings();
           this.enableFeaturesAfterAgreement();
         } else {
           // User disagreed → unload plugin completely
@@ -986,15 +980,15 @@ export default class ThirdPartySyncPlugin extends Plugin {
     this.enableAutoSyncIfSet();
     this.enableInitSyncIfSet();
 
-    this.toggleSyncOnRemote(true);
-    this.toggleSyncOnSave(true);
+    void this.toggleSyncOnRemote(true);
+    void this.toggleSyncOnSave(true);
     this.toggleStatusBar(true);
     this.toggleStatusText(true);
 
     this.updateSyncStatus("idle");
   }
 
-  async onunload() {
+  onunload() {
     this.syncRibbon = undefined;
     if (this.oauth2Info !== undefined) {
       this.oauth2Info.helperModal = undefined;
@@ -1002,8 +996,8 @@ export default class ThirdPartySyncPlugin extends Plugin {
     }
 
     // Disable Features
-    this.toggleSyncOnSave(false);
-    this.toggleSyncOnRemote(false);
+    void this.toggleSyncOnSave(false);
+    void this.toggleSyncOnRemote(false);
     this.toggleStatusText(false);
     this.toggleStatusBar(false);
   }
@@ -1111,13 +1105,17 @@ export default class ThirdPartySyncPlugin extends Plugin {
 
   async getVaultRandomIDFromOldConfigFile() {
     let vaultRandomID = "";
+    // eslint-disable-next-line @typescript-eslint/no-deprecated
     if (this.settings.vaultRandomID !== undefined) {
       // In old version, the vault id is saved in data.json
       // But we want to store it in localForage later
+      // eslint-disable-next-line @typescript-eslint/no-deprecated
       if (this.settings.vaultRandomID !== "") {
         // a real string was assigned before
+        // eslint-disable-next-line @typescript-eslint/no-deprecated
         vaultRandomID = this.settings.vaultRandomID;
       }
+      // eslint-disable-next-line @typescript-eslint/no-deprecated
       delete this.settings.vaultRandomID;
       await this.saveSettings();
     }
@@ -1167,9 +1165,9 @@ export default class ThirdPartySyncPlugin extends Plugin {
 
     // Set up interval
     if (enabled) {
-      this.statusBarIntervalID = window.setInterval(async () => {
+      this.statusBarIntervalID = window.setInterval(() => {
         if (this.syncStatus !== "syncing") {
-          this.updateStatusBar();
+          void this.updateStatusBar();
         }
       }, 30_000);
 
@@ -1180,7 +1178,9 @@ export default class ThirdPartySyncPlugin extends Plugin {
   toggleStatusBar(enabled: boolean) {  
     this.statusBarElement?.remove();
 
-    const statusBarItems = document.getElementsByClassName("status-bar");
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    const statusBarItems = activeDocument.getElementsByClassName("status-bar");
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     const statusBar = statusBarItems.length > 0 ? statusBarItems[0] as HTMLElement : undefined;
 
     // Guard: if status bar doesn't exist (e.g., iOS), skip DOM manipulation
@@ -1203,7 +1203,9 @@ export default class ThirdPartySyncPlugin extends Plugin {
         
         // Shifts up the status bar on phone to not cover the navmenu
         if (Platform.isPhone) {
-          const navBarItems = document.getElementsByClassName("mobile-navbar");
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+          const navBarItems = activeDocument.getElementsByClassName("mobile-navbar");
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
           const navBar = navBarItems.length > 0 ? navBarItems[0] as HTMLElement : undefined;
           if (!navBar) return;
           const height = window.getComputedStyle(navBar).getPropertyValue('height');
@@ -1274,7 +1276,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
 
         if (hasRemoteChanges) {
           log.debug("Sync on Remote ran | Remote changes detected");
-          this.syncRun("auto");
+          void this.syncRun("auto");
           return true;
         }
       } catch (error) {
@@ -1289,7 +1291,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
       new Notice(onLoadResult === true ? this.i18n.t("remote_changes_found") : this.i18n.t("remote_changes_synced"));
     }
 
-    this.syncOnRemoteIntervalID = window.setInterval(syncOnRemote, this.settings.syncOnRemoteChangesAfterMilliseconds);
+    this.syncOnRemoteIntervalID = window.setInterval(() => { void syncOnRemote(); }, this.settings.syncOnRemoteChangesAfterMilliseconds);
   }
 
   async toggleSyncOnSave(enabled: boolean) {
@@ -1320,10 +1322,9 @@ export default class ThirdPartySyncPlugin extends Plugin {
       alreadyScheduled = true;
       log.debug(`Scheduled a sync run for ${this.settings.syncOnSaveAfterMilliseconds} milliseconds later`);
 
-      setTimeout(async () => {
+      window.setTimeout(() => {
         log.debug("Sync on save ran");
-        await this.syncRun("auto");  
-        alreadyScheduled = false;
+        void this.syncRun("auto").finally(() => { alreadyScheduled = false; });
       }, this.settings.syncOnSaveAfterMilliseconds);
     });
 
@@ -1340,7 +1341,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
       for (let i = 0; i < localConfigContents.length; i++) {
         const file = localConfigContents[i];
 
-        if (file.key.includes(".obsidian/plugins/third-party-sync/")) {
+        if (file.key.includes(`${this.app.vault.configDir}/plugins/third-party-sync/`)) {
           continue;
         }
 
@@ -1349,10 +1350,9 @@ export default class ThirdPartySyncPlugin extends Plugin {
           alreadyScheduled = true;
           log.debug(`Scheduled a sync run for ${this.settings.syncOnSaveAfterMilliseconds} milliseconds later`);
 
-          setTimeout(async () => {
+          window.setTimeout(() => {
             log.debug("Sync on save ran");
-            await this.syncRun("auto");  
-            alreadyScheduled = false;
+            void this.syncRun("auto").finally(() => { alreadyScheduled = false; });
           }, this.settings.syncOnSaveAfterMilliseconds);
 
           break;
@@ -1361,7 +1361,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
     }
 
     // Scans every 60 seconds
-    this.vaultScannerIntervalId = window.setInterval(scanVault, 30_000);
+    this.vaultScannerIntervalId = window.setInterval(() => { void scanVault(); }, 30_000);
   }
   
   async getMetadataMtime() {
@@ -1375,7 +1375,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
     const client = this.getRemoteClient(this);
     const remoteRsp = await client.listFromRemote();
 
-    const passwordCheckResult = await isPasswordOk(
+    const _passwordCheckResult2 = await isPasswordOk(
       remoteRsp.Contents,
       this.settings.password
     );
@@ -1422,7 +1422,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
     ) {
       this.app.workspace.onLayoutReady(() => {
         const intervalID = window.setInterval(() => {
-          this.syncRun("auto");
+          void this.syncRun("auto");
         }, this.settings.autoRunEveryMilliseconds);
         this.autoRunIntervalID = intervalID;
         this.registerInterval(intervalID);
@@ -1438,7 +1438,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
     ) {
       this.app.workspace.onLayoutReady(() => {
         window.setTimeout(() => {
-          this.syncRun("autoOnceInit");
+          void this.syncRun("autoOnceInit");
         }, this.settings.initRunAfterMilliseconds);
       });
     }
@@ -1469,9 +1469,9 @@ export default class ThirdPartySyncPlugin extends Plugin {
       if (!ignoreFileExists) {
         // not exists, directly create
         // no need to await
-        this.app.vault.adapter.write(ignoreFile, contentText);
+        void this.app.vault.adapter.write(ignoreFile, contentText);
       }
-    } catch (error) {
+    } catch (_error) {
       // just skip
     }
   }
@@ -1479,7 +1479,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
   addOutputToDBIfSet() {
     if (this.settings.logToDB) {
       applyLogWriterInplace((...msg: unknown[]) => {
-        insertLoggerOutputByVault(this.db, this.vaultRandomID, ...msg);
+        void insertLoggerOutputByVault(this.db, this.vaultRandomID, ...msg);
       });
     }
   }
@@ -1492,14 +1492,14 @@ export default class ThirdPartySyncPlugin extends Plugin {
       // init run
       window.setTimeout(() => {
         if (this.settings.logToDB) {
-          clearExpiredLoggerOutputRecords(this.db);
+          void clearExpiredLoggerOutputRecords(this.db);
         }
       }, initClearOutputToDBHistAfterMilliseconds);
 
       // scheduled run
       const intervalID = window.setInterval(() => {
         if (this.settings.logToDB) {
-          clearExpiredLoggerOutputRecords(this.db);
+          void clearExpiredLoggerOutputRecords(this.db);
         }
       }, autoClearOutputToDBHistAfterMilliseconds);
       this.registerInterval(intervalID);
@@ -1513,12 +1513,12 @@ export default class ThirdPartySyncPlugin extends Plugin {
     this.app.workspace.onLayoutReady(() => {
       // init run
       window.setTimeout(() => {
-        clearExpiredSyncPlanRecords(this.db);
+        void clearExpiredSyncPlanRecords(this.db);
       }, initClearSyncPlanHistAfterMilliseconds);
 
       // scheduled run
       const intervalID = window.setInterval(() => {
-        clearExpiredSyncPlanRecords(this.db);
+        void clearExpiredSyncPlanRecords(this.db);
       }, autoClearSyncPlanHistAfterMilliseconds);
       this.registerInterval(intervalID);
     });

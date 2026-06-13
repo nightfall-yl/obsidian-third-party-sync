@@ -1,4 +1,4 @@
-import { Vault, Stat, ListedFiles } from "obsidian";
+import { Vault, ListedFiles } from "obsidian";
 import { Queue } from "@fyears/tsqueue";
 import { statFix } from "./misc";
 
@@ -98,7 +98,7 @@ export const listFilesInObsFolder = async (
           itself: {
             key: isFolder ? `${fsEntry}/` : fsEntry,
             ...statRes,
-          } as ObsConfigDirFileType,
+          },
           children: children,
         };
       });

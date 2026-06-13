@@ -11,8 +11,6 @@ import { DEFAULT_S3_CONFIG } from "./remoteForS3";
 import { DEFAULT_WEBDAV_CONFIG } from "./remoteForWebdav";
 import { DEFAULT_ONEDRIVE_CONFIG } from "./remoteForOnedrive";
 
-import { log } from "./moreOnLog";
-
 export const exportSettingsUri = (
   settings: ThirdPartySyncPluginSettings,
   currentVaultName: string,
@@ -20,11 +18,13 @@ export const exportSettingsUri = (
 ) => {
   const settings2 = structuredClone(settings);
   delete settings2.onedrive;
+  // eslint-disable-next-line @typescript-eslint/no-deprecated
   delete settings2.vaultRandomID;
   const jsonStr = JSON.stringify(settings2);
 
   // Compress data to fit in URI
   const compressed = pako.deflate(jsonStr);
+  // eslint-disable-next-line @typescript-eslint/no-deprecated
   const base64 = btoa(String.fromCharCode(...compressed));
   const data = encodeURIComponent(base64);
   const vault = encodeURIComponent(currentVaultName);
@@ -49,7 +49,7 @@ export const importQrCodeUri = (
     }
     try {
       return decodeURIComponent(v);
-    } catch (e) {
+    } catch (_e) {
       return v;
     }
   };
@@ -74,15 +74,15 @@ export const importQrCodeUri = (
       serviceType,
       s3: {
         ...DEFAULT_S3_CONFIG,
-        ...(imported["s3"] ?? {}),
+        ...(imported["s3"] as Record<string, unknown> ?? {}),
       },
       webdav: {
         ...DEFAULT_WEBDAV_CONFIG,
-        ...(imported["webdav"] ?? {}),
+        ...(imported["webdav"] as Record<string, unknown> ?? {}),
       },
       onedrive: {
         ...DEFAULT_ONEDRIVE_CONFIG,
-        ...(imported["onedrive"] ?? {}),
+        ...(imported["onedrive"] as Record<string, unknown> ?? {}),
       },
     };
   };
@@ -125,6 +125,7 @@ export const importQrCodeUri = (
     // Decompress if data is compressed
     if (params.compressed === "1" || params.compressed === "true") {
       try {
+        // eslint-disable-next-line @typescript-eslint/no-deprecated
         const binary = atob(dataStr);
         const bytes = new Uint8Array(binary.length);
         for (let i = 0; i < binary.length; i++) {
@@ -140,8 +141,8 @@ export const importQrCodeUri = (
       }
     }
     
-    settings = normalizeImportedSettings(JSON.parse(dataStr));
-  } catch (e) {
+    settings = normalizeImportedSettings(JSON.parse(dataStr) as Record<string, unknown>);
+  } catch (_e) {
     return {
       status: "error",
       message: `errors while parsing settings: ${JSON.stringify(inputParams)}`,

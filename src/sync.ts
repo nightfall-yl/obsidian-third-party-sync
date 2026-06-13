@@ -8,16 +8,15 @@ import {
 import AggregateError from "aggregate-error";
 import PQueue from "p-queue";
 import type {
-  RemoteItem,
   SyncTriggerSourceType,
   SyncDirectionType,
   DecisionType,
   FileOrFolderMixedState,
   SUPPORTED_SERVICES_TYPE,
+  RemoteItem,
 } from "./baseTypes";
 import { API_VER_STAT_FOLDER } from "./baseTypes";
 import {
-  decryptBase32ToString,
   decryptBase64urlToString,
   encryptStringToBase64url,
   getSizeFromOrigToEnc,
@@ -32,7 +31,6 @@ import {
 import {
   isHiddenPath,
   mkdirpInVault,
-  getFolderLevels,
   getParentFolder,
   atWhichLevel,
   unixTimeToStr,
@@ -144,13 +142,13 @@ export const isPasswordOk = async (
   // Has password: try to decrypt first file's key
   const sanityCheckKey = remote[0].key;
   try {
-    const res = await decryptBase64urlToString(sanityCheckKey, password);
+    await decryptBase64urlToString(sanityCheckKey, password);
 
     return {
       ok: true,
       reason: "password_matched",
     } as PasswordCheckType;
-  } catch (error) {
+  } catch (_error) {
     return {
       ok: false,
       reason: "password_not_matched",
@@ -201,12 +199,12 @@ export const getRemoteMetadata = async (
     metadataFiles = metadataFiles.sort((a, b) => b.mtimeRemote - a.mtimeRemote);
 
     const keepByKey = new Set<string>();
-    metadataFiles.forEach(async (file) => {
+    metadataFiles.forEach((file) => {
       if (!keepByKey.has(file.key)) {
         keepByKey.add(file.key);
         return;
       }
-      await client.deleteFromRemote(file.key, password, file.remoteEncryptedKey);
+      void client.deleteFromRemote(file.key, password, file.remoteEncryptedKey);
     });
   }
 
@@ -248,8 +246,8 @@ export const getRemoteStates = async (
     let r: FileOrFolderMixedState = {} as FileOrFolderMixedState;
 
     if (backwardMapping !== undefined) {
-      key = backwardMapping.localKey;
-      const mtimeRemote = backwardMapping.localMtime || entry.lastModified;
+      key = backwardMapping.localKey as string;
+      const mtimeRemote = (backwardMapping.localMtime as number) || entry.lastModified;
 
       // the backwardMapping.localSize is the file BEFORE encryption
       // we want to split two sizes for comparation later
@@ -259,7 +257,7 @@ export const getRemoteStates = async (
         existRemote: true,
         mtimeRemote: mtimeRemote,
         mtimeRemoteFmt: unixTimeToStr(mtimeRemote),
-        sizeRemote: backwardMapping.localSize,
+        sizeRemote: backwardMapping.localSize as number,
         sizeRemoteEnc: password === "" ? undefined : entry.size,
         remoteEncryptedKey: remoteEncryptedKey,
         changeRemoteMtimeUsingMapping: true,
@@ -407,14 +405,14 @@ const ensembleMixedStates = async (
         sizeLocalEnc: password === "" ? undefined : getSizeFromOrigToEnc(0),
       };
     } else {
-      throw Error(`unexpected ${entry}`);
+      throw Error(`unexpected ${JSON.stringify(entry)}`);
     }
 
     if (isSkipItem(key, syncConfigDir, syncUnderscoreItems, syncTrashDir, syncBookmarks, configDir)) {
       continue;
     }
 
-    if (results.hasOwnProperty(key)) {
+    if (Object.prototype.hasOwnProperty.call(results, key)) {
       results[key].key = r.key;
       results[key].existLocal = r.existLocal;
       results[key].mtimeLocal = r.mtimeLocal;
@@ -449,7 +447,7 @@ const ensembleMixedStates = async (
           password === "" ? undefined : getSizeFromOrigToEnc(entry.size),
       };
 
-      if (results.hasOwnProperty(key)) {
+      if (Object.prototype.hasOwnProperty.call(results, key)) {
         results[key].key = r.key;
         results[key].existLocal = r.existLocal;
         results[key].mtimeLocal = r.mtimeLocal;
@@ -475,7 +473,7 @@ const ensembleMixedStates = async (
       continue;
     }
 
-    if (results.hasOwnProperty(key)) {
+    if (Object.prototype.hasOwnProperty.call(results, key)) {
       results[key].key = r.key;
       results[key].deltimeRemote = r.deltimeRemote;
       results[key].deltimeRemoteFmt = r.deltimeRemoteFmt;
@@ -496,7 +494,7 @@ const ensembleMixedStates = async (
     } else if (entry.keyType === "file") {
       // pass
     } else {
-      throw Error(`unexpected ${entry}`);
+      throw Error(`unexpected ${JSON.stringify(entry)}`);
     }
 
     if (isSkipItem(key, syncConfigDir, syncUnderscoreItems, syncTrashDir, syncBookmarks, configDir)) {
@@ -510,7 +508,7 @@ const ensembleMixedStates = async (
         deltimeLocalFmt: unixTimeToStr(entry.actionWhen),
       } as FileOrFolderMixedState;
 
-      if (results.hasOwnProperty(key)) {
+      if (Object.prototype.hasOwnProperty.call(results, key)) {
         results[key].deltimeLocal = r.deltimeLocal;
         results[key].deltimeLocalFmt = r.deltimeLocalFmt;
       } else {
@@ -525,7 +523,7 @@ const ensembleMixedStates = async (
         mtimeLocalFmt: unixTimeToStr(entry.actionWhen),
         changeLocalMtimeUsingMapping: true,
       };
-      if (results.hasOwnProperty(key)) {
+      if (Object.prototype.hasOwnProperty.call(results, key)) {
         let mtimeLocal = Math.max(
           r.mtimeLocal ?? 0,
           results[key].mtimeLocal ?? 0
@@ -550,7 +548,7 @@ const ensembleMixedStates = async (
       }
     } else {
       throw Error(
-        `do not know how to deal with local file history ${entry.key} with ${entry.actionType}`
+        `do not know how to deal with local file history ${entry.key} with ${String(entry.actionType)}`
       );
     }
   }
@@ -932,8 +930,8 @@ const assignOperationToFolderInplace = async (
   origRecord: FileOrFolderMixedState,
   keptFolder: Set<string>,
   vault: Vault,
-  password: string = "",
-  syncDirection: SyncDirectionType = "bidirectional"
+  _password: string = "",
+  _syncDirection: SyncDirectionType = "bidirectional"
 ) => {
   let r = origRecord;
 
@@ -1205,8 +1203,8 @@ const assignOperationToFileInplaceV3 = (
   const existLocal = r.existLocal ?? false;
   const existRemote = r.existRemote ?? false;
   const existPrevSync = r.prevSync !== undefined;
-  const prevSyncMtime = r.prevSync?.mtime ?? 0;
-  const prevSyncSize = r.prevSync?.size ?? 0;
+  const _prevSyncMtime = r.prevSync?.mtime ?? 0;
+  const _prevSyncSize = r.prevSync?.size ?? 0;
 
   const isPullOnlyMode = syncDirection === "incremental_pull_only" || syncDirection === "incremental_pull_and_delete_only";
   const isPushOnlyMode = syncDirection === "incremental_push_only" || syncDirection === "incremental_push_and_delete_only";
@@ -1356,8 +1354,8 @@ const assignOperationToFolderInplaceV3 = async (
   origRecord: FileOrFolderMixedState,
   keptFolder: Set<string>,
   vault: Vault,
-  password: string = "",
-  syncDirection: SyncDirectionType = "bidirectional"
+  _password: string = "",
+  _syncDirection: SyncDirectionType = "bidirectional"
 ) => {
   let r = origRecord;
 
@@ -1369,10 +1367,10 @@ const assignOperationToFolderInplaceV3 = async (
   const existRemote = r.existRemote ?? false;
   const existPrevSync = r.prevSync !== undefined;
 
-  const isPullOnlyMode = syncDirection === "incremental_pull_only" || syncDirection === "incremental_pull_and_delete_only";
-  const isPushOnlyMode = syncDirection === "incremental_push_only" || syncDirection === "incremental_push_and_delete_only";
-  const isPullDeleteMode = syncDirection === "incremental_pull_and_delete_only";
-  const isPushDeleteMode = syncDirection === "incremental_push_and_delete_only";
+  const isPullOnlyMode = _syncDirection === "incremental_pull_only" || _syncDirection === "incremental_pull_and_delete_only";
+  const isPushOnlyMode = _syncDirection === "incremental_push_only" || _syncDirection === "incremental_push_and_delete_only";
+  const isPullDeleteMode = _syncDirection === "incremental_pull_and_delete_only";
+  const isPushDeleteMode = _syncDirection === "incremental_push_and_delete_only";
 
   if (!keptFolder.has(r.key)) {
     // Folder does NOT have any must-be-kept children
@@ -1438,7 +1436,8 @@ export const doActualSyncV3 = async (
   callbackSizesGoWrong?: (items: FileOrFolderMixedState[]) => void,
   callbackSyncProcess?: (index: number, total: number) => Promise<void>,
   protectModifyPercentage?: number,
-  callbackProtectModifyPercentage?: (errorMsg: string) => void
+  callbackProtectModifyPercentage?: (errorMsg: string) => void,
+  configDir: string
 ) => {
   if (sizesGoWrong.length > 0) {
     log.debug(`some sizes are larger than the threshold, abort and show hints`);
@@ -1492,7 +1491,7 @@ export const doActualSyncV3 = async (
         const isDeleteOp = operation === deletionOps;
 
         if (lastSynced == -1) {
-          const skipKeys = [".obsidian/app.json", ".obsidian/appearance.json", ".obsidian/core-plugins-migration.json", ".obsidian/core-plugins.json", ".obsidian/graph.json", ".obsidian/workspace.json"];
+          const skipKeys = [`${configDir}/app.json`, `${configDir}/appearance.json`, `${configDir}/core-plugins-migration.json`, `${configDir}/core-plugins.json`, `${configDir}/graph.json`, `${configDir}/workspace.json`];
           if (val.existRemote && skipKeys.includes(key)) {
             log.debug("downloading from remote for first sync: ", key);
             val.decision = "downloadRemoteToLocal";
@@ -1523,7 +1522,7 @@ export const doActualSyncV3 = async (
         });
 
         syncCall.catch((error: unknown) => {
-          const errMsg = error instanceof Error ? error.message : String(error);
+          const errMsg = error instanceof Error ? error.message : JSON.stringify(error);
           const message = `${key}: ${errMsg}`;
           potentialErrors.push(new Error(message));
 
@@ -1863,13 +1862,10 @@ const dispatchOperationToActual = async (
 };
 
 const splitThreeSteps = (syncPlan: SyncPlanType, sortedKeys: string[]) => {
-  const mixedStates = syncPlan.mixedStates;
-  const totalCount = sortedKeys.length || 0;
-
   const folderCreationOps: FileOrFolderMixedState[][] = [];
   const deletionOps: FileOrFolderMixedState[][] = [];
   const uploadDownloads: FileOrFolderMixedState[][] = [];
-  let realTotalCount = 0;
+  let _realTotalCount = 0;
   // Only count items that involve actual file transfer (upload/download)
   let fileSyncCount = 0;
 
@@ -1879,7 +1875,7 @@ const splitThreeSteps = (syncPlan: SyncPlanType, sortedKeys: string[]) => {
 
   for (let i = 0; i < sortedKeys.length; ++i) {
     const key = sortedKeys[i];
-    const val: FileOrFolderMixedState = Object.assign({}, mixedStates[key]); // copy to avoid issue
+    const val: FileOrFolderMixedState = Object.assign({}, syncPlan.mixedStates[key]); // copy to avoid issue
 
     // Count all files (not folders) for percentage calculation
     if (!key.endsWith("/")) {
@@ -1905,7 +1901,7 @@ const splitThreeSteps = (syncPlan: SyncPlanType, sortedKeys: string[]) => {
       } else {
         folderCreationOps[level - 1].push(val);
       }
-      realTotalCount += 1;
+      _realTotalCount += 1;
     } else if (
       val.decision === "uploadLocalDelHistToRemoteFolder" ||
       val.decision === "keepRemoteDelHistFolder" ||
@@ -1921,7 +1917,7 @@ const splitThreeSteps = (syncPlan: SyncPlanType, sortedKeys: string[]) => {
       } else {
         deletionOps[level - 1].push(val);
       }
-      realTotalCount += 1;
+      _realTotalCount += 1;
       // Count file deletions
       if (!key.endsWith("/")) {
         realModifyDeleteCount += 1;
@@ -1935,7 +1931,7 @@ const splitThreeSteps = (syncPlan: SyncPlanType, sortedKeys: string[]) => {
       } else {
         uploadDownloads[0].push(val); // only one level needed here
       }
-      realTotalCount += 1;
+      _realTotalCount += 1;
       fileSyncCount += 1;
       // Count modifications
       if (!key.endsWith("/")) {
@@ -1960,11 +1956,6 @@ const splitThreeSteps = (syncPlan: SyncPlanType, sortedKeys: string[]) => {
     realModifyDeleteCount: realModifyDeleteCount,
   };
 };
-
-// Items worth reporting status for don't include skipped items or keepRemoteDelHist (one upload operation for all)
-function isCountableSyncItem(item: FileOrFolderMixedState) {
-  return item.decision != "keepRemoteDelHist" && !item.decision.contains("skip");
-}
 
 async function syncIndividualItem(key: string, deletionOp: boolean, val: FileOrFolderMixedState, vaultRandomID: string, client: RemoteClient, db: InternalDBs, vault: Vault, localDeleteFunc: (key: string) => Promise<void>, password: string) {
   log.debug(`start syncing "${key}" with plan ${JSON.stringify(val)}`);
@@ -2003,7 +1994,8 @@ export const doActualSync = async (
   callbackSizesGoWrong?: (items: FileOrFolderMixedState[]) => void,
   callbackSyncProcess?: (index: number, total: number) => Promise<void>,
   protectModifyPercentage?: number,
-  callbackProtectModifyPercentage?: (errorMsg: string) => void
+  callbackProtectModifyPercentage?: (errorMsg: string) => void,
+  configDir: string
 ) => {
   if (sizesGoWrong.length > 0) {
     log.debug(`some sizes are larger than the threshold, abort and show hints`);
@@ -2056,7 +2048,7 @@ export const doActualSync = async (
         const isDeleteOp = operation === deletionOps;
 
         if (lastSynced == -1) {
-          const skipKeys = [".obsidian/app.json", ".obsidian/appearance.json", ".obsidian/core-plugins-migration.json", ".obsidian/core-plugins.json", ".obsidian/graph.json", ".obsidian/workspace.json"];
+          const skipKeys = [`${configDir}/app.json`, `${configDir}/appearance.json`, `${configDir}/core-plugins-migration.json`, `${configDir}/core-plugins.json`, `${configDir}/graph.json`, `${configDir}/workspace.json`];
           if (val.existRemote && skipKeys.includes(key)) {
             log.debug("downloading from remote for first sync: ", key);
             val.decision = "downloadRemoteToLocal";
@@ -2087,7 +2079,7 @@ export const doActualSync = async (
         });
 
         syncCall.catch((error: unknown) => {
-          const errMsg = error instanceof Error ? error.message : String(error);
+          const errMsg = error instanceof Error ? error.message : JSON.stringify(error);
           const message = `${key}: ${errMsg}`;
           potentialErrors.push(new Error(message));
 

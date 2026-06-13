@@ -1,7 +1,6 @@
 import { deepEqual } from "fast-equals";
 import { base64url } from "rfc4648";
 import { reverseString } from "./misc";
-import { log } from "./moreOnLog";
 
 const DEFAULT_README_FOR_METADATAONREMOTE =
   "Do NOT edit or delete the file manually. This file is for the plugin third-party-sync to store some necessary meta data on the remote services. Its content is slightly obfuscated.";
@@ -55,7 +54,7 @@ export const serializeMetadataOnRemote = (x: MetadataOnRemote) => {
   const y = x;
 
   if (y["version"] === undefined) {
-    y["version"] === DEFAULT_VERSION_FOR_METADATAONREMOTE;
+    y["version"] = DEFAULT_VERSION_FOR_METADATAONREMOTE;
   }
   if (y["generatedWhen"] === undefined) {
     y["generatedWhen"] = Date.now();
@@ -89,7 +88,7 @@ export const deserializeMetadataOnRemote = (x: string | ArrayBuffer) => {
   let y2: Record<string, unknown>;
   try {
     y2 = JSON.parse(y1) as Record<string, unknown>;
-  } catch (e) {
+  } catch (_e) {
     throw new Error(
       `invalid remote meta data file with first few chars: ${y1.slice(0, 5)}`
     );
@@ -109,16 +108,16 @@ export const deserializeMetadataOnRemote = (x: string | ArrayBuffer) => {
         loose: true,
       })
     );
-  } catch (e) {
+  } catch (_e) {
     throw new Error('invalid remote meta data file (invalid "d" field)!');
   }
 
   let y4: MetadataOnRemote;
   try {
     y4 = JSON.parse(y3) as MetadataOnRemote;
-  } catch (e) {
+  } catch (_e) {
     throw new Error(
-      `invalid remote meta data file with \"d\" field with first few chars: ${y3.slice(
+      `invalid remote meta data file with "d" field with first few chars: ${y3.slice(
         0,
         5
       )}`

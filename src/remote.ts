@@ -9,8 +9,6 @@ import * as onedrive from "./remoteForOnedrive";
 import * as s3 from "./remoteForS3";
 import * as webdav from "./remoteForWebdav";
 
-import { log } from "./moreOnLog";
-
 export class RemoteClient {
   readonly serviceType: SUPPORTED_SERVICES_TYPE;
   readonly s3Config?: S3Config;
@@ -59,7 +57,7 @@ export class RemoteClient {
         saveUpdatedConfigFunc
       );
     } else {
-      throw Error(`not supported service type ${this.serviceType}`);
+      throw Error(`not supported service type ${String(this.serviceType)}`);
     }
   }
 
@@ -109,7 +107,7 @@ export class RemoteClient {
         rawContent
       );
     } else {
-      throw Error(`not supported service type ${this.serviceType}`);
+      throw Error(`not supported service type ${String(this.serviceType)}`);
     }
   };
 
@@ -125,7 +123,7 @@ export class RemoteClient {
     } else if (this.serviceType === "onedrive") {
       return await onedrive.listFromRemote(this.onedriveClient, prefix);
     } else {
-      throw Error(`not supported service type ${this.serviceType}`);
+      throw Error(`not supported service type ${String(this.serviceType)}`);
     }
   };
 
@@ -169,7 +167,7 @@ export class RemoteClient {
         skipSaving
       );
     } else {
-      throw Error(`not supported service type ${this.serviceType}`);
+      throw Error(`not supported service type ${String(this.serviceType)}`);
     }
   };
 
@@ -201,7 +199,7 @@ export class RemoteClient {
         remoteEncryptedKey
       );
     } else {
-      throw Error(`not supported service type ${this.serviceType}`);
+      throw Error(`not supported service type ${String(this.serviceType)}`);
     }
   };
 
@@ -220,7 +218,7 @@ export class RemoteClient {
         callbackFunc
       );
     } else {
-      throw Error(`not supported service type ${this.serviceType}`);
+      throw Error(`not supported service type ${String(this.serviceType)}`);
     }
   };
 
@@ -228,7 +226,7 @@ export class RemoteClient {
     if (this.serviceType === "onedrive") {
       return await onedrive.getUserDisplayName(this.onedriveClient);
     } else {
-      throw Error(`not supported service type ${this.serviceType}`);
+      throw Error(`not supported service type ${String(this.serviceType)}`);
     }
   };
 

@@ -9,7 +9,7 @@ import { statFix, toText, unixTimeToStr } from "./misc";
 
 import { log } from "./moreOnLog";
 
-const DB_VERSION_NUMBER_IN_HISTORY = [20211114, 20220108, 20220326, 20250430];
+const _DB_VERSION_NUMBER_IN_HISTORY = [20211114, 20220108, 20220326, 20250430];
 export const DEFAULT_DB_VERSION_NUMBER: number = 20250430;
 export const DEFAULT_DB_NAME = "remotelysavedb";
 export const DEFAULT_TBL_VERSION = "schemaversion";
@@ -79,7 +79,7 @@ const migrateDBsFrom20211114To20220108 = async (
   db: InternalDBs,
   vaultRandomID: string
 ) => {
-  const oldVer = 20211114;
+  const _oldVer = 20211114;
   const newVer = 20220108;
 
   const allPromisesToWait: Promise<void>[] = [];
@@ -151,18 +151,18 @@ const migrateDBsFrom20211114To20220108 = async (
  */
 const migrateDBsFrom20220108To20220326 = async (
   db: InternalDBs,
-  vaultRandomID: string
+  _vaultRandomID: string
 ) => {
-  const oldVer = 20220108;
+  const _oldVer = 20220108;
   const newVer = 20220326;
   await db.versionTbl.setItem("version", newVer);
 };
 
 const migrateDBsFrom20220326To20250430 = async (
   db: InternalDBs,
-  vaultRandomID: string
+  _vaultRandomID: string
 ) => {
-  const oldVer = 20220326;
+  const _oldVer = 20220326;
   const newVer = 20250430;
   // New table prevSyncRecordsTbl is created on demand in prepareDBs
   await db.versionTbl.setItem("version", newVer);
@@ -244,7 +244,7 @@ export const prepareDBs = async (
       name: DEFAULT_DB_NAME,
       storeName: DEFAULT_TBL_PREV_SYNC_RECORDS,
     }),
-  } as InternalDBs;
+  };
 
   // try to get vaultRandomID firstly
   let vaultRandomID = "";
@@ -302,7 +302,7 @@ export const clearAllPrevSyncRecordsByVault = async (
   const keys = (await db.prevSyncRecordsTbl.keys()).filter((x) =>
     x.startsWith(`${vaultRandomID}\t`)
   );
-  const ps: Promise<any>[] = [];
+  const ps: Promise<unknown>[] = [];
   for (const key of keys) {
     ps.push(db.prevSyncRecordsTbl.removeItem(key));
   }
@@ -317,7 +317,7 @@ export const savePrevSyncRecordsByVault = async (
   // Clear old records first
   await clearAllPrevSyncRecordsByVault(db, vaultRandomID);
   // Save new records
-  const ps: Promise<any>[] = [];
+  const ps: Promise<unknown>[] = [];
   for (const record of records) {
     ps.push(
       db.prevSyncRecordsTbl.setItem(`${vaultRandomID}\t${record.key}`, record)
@@ -331,7 +331,7 @@ export const loadPrevSyncRecordsByVault = async (
   vaultRandomID: string
 ) => {
   const records = [] as PrevSyncRecord[];
-  await db.prevSyncRecordsTbl.iterate((value, key, iterationNumber) => {
+  await db.prevSyncRecordsTbl.iterate((value, key, _iterationNumber) => {
     if (key.startsWith(`${vaultRandomID}\t`)) {
       records.push(value as PrevSyncRecord);
     }
@@ -352,7 +352,7 @@ export const loadFileHistoryTableByVault = async (
   vaultRandomID: string
 ) => {
   const records = [] as FileFolderHistoryRecord[];
-  await db.fileHistoryTbl.iterate((value, key, iterationNumber) => {
+  await db.fileHistoryTbl.iterate((value, key, _iterationNumber) => {
     if (key.startsWith(`${vaultRandomID}\t`)) {
       records.push(value as FileFolderHistoryRecord);
     }
@@ -591,7 +591,7 @@ export const readAllSyncPlanRecordTextsByVault = async (
   vaultRandomID: string
 ) => {
   const records = [] as SyncPlanRecord[];
-  await db.syncPlansTbl.iterate((value, key, iterationNumber) => {
+  await db.syncPlansTbl.iterate((value, key, _iterationNumber) => {
     if (key.startsWith(`${vaultRandomID}\t`)) {
       records.push(value as SyncPlanRecord);
     }
@@ -640,7 +640,7 @@ export const clearExpiredSyncPlanRecords = async (db: InternalDBs) => {
     });
   }
 
-  const ps: Promise<any>[] = [];
+  const ps: Promise<unknown>[] = [];
   keysToRemove.forEach((element) => {
     ps.push(db.syncPlansTbl.removeItem(element));
   });
@@ -652,7 +652,7 @@ export const readAllLogRecordTextsByVault = async (
   vaultRandomID: string
 ) => {
   const records = [] as { ts: number; r: string }[];
-  await db.loggerOutputTbl.iterate((value, key, iterationNumber) => {
+  await db.loggerOutputTbl.iterate((value, key, _iterationNumber) => {
     if (key.startsWith(`${vaultRandomID}\t`)) {
       const item = {
         ts: parseInt(key.split("\t")[1]),
@@ -675,7 +675,7 @@ export const readAllLogRecordTextsByVault = async (
 export const insertLoggerOutputByVault = async (
   db: InternalDBs,
   vaultRandomID: string,
-  ...msg: any[]
+  ...msg: unknown[]
 ) => {
   const ts = Date.now();
   const tsFmt = unixTimeToStr(ts);
@@ -683,8 +683,8 @@ export const insertLoggerOutputByVault = async (
 
   try {
     const val = [`[${tsFmt}]`, ...msg.map((x) => toText(x))].join(" ");
-    db.loggerOutputTbl.setItem(key, val);
-  } catch (err) {
+    void db.loggerOutputTbl.setItem(key, val);
+  } catch (_err) {
     // give up, and let it pass
   }
 };
