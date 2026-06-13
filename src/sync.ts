@@ -1874,6 +1874,7 @@ const splitThreeSteps = (syncPlan: SyncPlanType, sortedKeys: string[]): {
   // For protectModifyPercentage calculation
   let allFilesCount = 0; // Total number of files in the sync plan (excluding folders)
   let realModifyDeleteCount = 0; // Files that will be modified or deleted
+  let fileSyncCount = 0; // Actual file sync operations (upload/download)
 
   for (let i = 0; i < sortedKeys.length; ++i) {
     const key = sortedKeys[i];
