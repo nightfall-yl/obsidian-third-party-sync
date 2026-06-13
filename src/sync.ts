@@ -148,7 +148,7 @@ export const isPasswordOk = async (
       ok: true,
       reason: "password_matched",
     } as PasswordCheckType;
-  } catch (_error) {
+  } catch {
     return {
       ok: false,
       reason: "password_not_matched",
@@ -1931,7 +1931,6 @@ const splitThreeSteps = (syncPlan: SyncPlanType, sortedKeys: string[]) => {
       } else {
         uploadDownloads[0].push(val); // only one level needed here
       }
-      _realTotalCount += 1;
       fileSyncCount += 1;
       // Count modifications
       if (!key.endsWith("/")) {

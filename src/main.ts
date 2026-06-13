@@ -218,18 +218,6 @@ export default class ThirdPartySyncPlugin extends Plugin {
       }
     };
 
-    // Ribbon function - updates ribbon icon
-    const _ribboonFunc = async (_s: SyncTriggerSourceType, _step: number) => {
-      // Handled by setSyncIcon
-    };
-
-    // Sync process callback
-    const _callbackSyncProcess = async (_s: SyncTriggerSourceType, realCounter: number, realTotalCount: number, pathName: string, _decision: string) => {
-      if (this.settings.enableStatusBarInfo) {
-        this.setCurrSyncMsg(realCounter, realTotalCount, pathName);
-      }
-    };
-
     // Make sure two syncs can't run at the same time
     if (this.syncStatus !== "idle") {
       if (triggerSource == "manual") {
@@ -335,7 +323,6 @@ export default class ThirdPartySyncPlugin extends Plugin {
 
       this.setSyncIcon(false);
     } catch (error) {
-      _everythingOk = false;
       const msg = t("syncrun_abort", {
         manifestID: this.manifest.id,
         theDate: `${Date.now()}`,
@@ -409,7 +396,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
       (errorMsg: string) => {
         const parts = errorMsg.split("|");
         if (parts[0] === "syncrun_abort_protectmodifypercentage") {
-          const [_prefix, threshold, realCount, allCount, percent] = parts;
+          const [, threshold, realCount, allCount, percent] = parts;
           const msg = t("syncrun_abort_protectmodifypercentage", {
             protectModifyPercentage: parseInt(threshold),
             realModifyDeleteCount: parseInt(realCount),
@@ -461,7 +448,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
         // Parse error message: format is "syncrun_abort_protectmodifypercentage|threshold|realCount|allCount|percent"
         const parts = errorMsg.split("|");
         if (parts[0] === "syncrun_abort_protectmodifypercentage") {
-          const [_prefix, threshold, realCount, allCount, percent] = parts;
+          const [, threshold, realCount, allCount, percent] = parts;
           const msg = t("syncrun_abort_protectmodifypercentage", {
             protectModifyPercentage: parseInt(threshold),
             realModifyDeleteCount: parseInt(realCount),
@@ -1468,7 +1455,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
         // no need to await
         void this.app.vault.adapter.write(ignoreFile, contentText);
       }
-    } catch (_error) {
+    } catch {
       // just skip
     }
   }

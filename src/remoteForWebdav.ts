@@ -321,12 +321,12 @@ export class WrappedWebdavClient {
           this.webdavConfig.depth = "auto_infinity";
           this.webdavConfig.manualRecursive = false;
         }
-      } catch (_error) {
+      } catch {
         testPassed = false;
       }
       if (!testPassed) {
         try {
-          const _res = await webdavCallWith503Retry(
+          await webdavCallWith503Retry(
             "customRequest(PROPFIND depth=1)",
             () =>
               this.client.customRequest(`/${this.remoteBaseDir}/`, {
@@ -340,7 +340,7 @@ export class WrappedWebdavClient {
           testPassed = true;
           this.webdavConfig.depth = "auto_1";
           this.webdavConfig.manualRecursive = true;
-        } catch (_error) {
+        } catch {
           testPassed = false;
         }
       }
@@ -634,7 +634,7 @@ export const deleteFromRemote = async (
     await webdavCallWith503Retry("deleteFile", () =>
       client.client.deleteFile(remoteFileName)
     );
-  } catch (_err) {
+  } catch {
     console.error("some error while deleting");
   }
 };

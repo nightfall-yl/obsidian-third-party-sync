@@ -92,8 +92,6 @@ export const exportVaultSyncPlansToFiles = async (
     } else if (toFormat === "table") {
       md =
         "Sync plans found:\n\n" + records.map(turnSyncPlanToTable).join("\n\n");
-    } else {
-      const _unused: never = toFormat;
     }
   }
   const ts = Date.now();

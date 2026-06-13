@@ -88,7 +88,7 @@ export const deserializeMetadataOnRemote = (x: string | ArrayBuffer) => {
   let y2: Record<string, unknown>;
   try {
     y2 = JSON.parse(y1) as Record<string, unknown>;
-  } catch (_e) {
+  } catch {
     throw new Error(
       `invalid remote meta data file with first few chars: ${y1.slice(0, 5)}`
     );
@@ -108,14 +108,14 @@ export const deserializeMetadataOnRemote = (x: string | ArrayBuffer) => {
         loose: true,
       })
     );
-  } catch (_e) {
+  } catch {
     throw new Error('invalid remote meta data file (invalid "d" field)!');
   }
 
   let y4: MetadataOnRemote;
   try {
     y4 = JSON.parse(y3) as MetadataOnRemote;
-  } catch (_e) {
+  } catch {
     throw new Error(
       `invalid remote meta data file with "d" field with first few chars: ${y3.slice(
         0,

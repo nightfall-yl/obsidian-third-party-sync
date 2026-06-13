@@ -9,7 +9,6 @@ import { statFix, toText, unixTimeToStr } from "./misc";
 
 import { log } from "./moreOnLog";
 
-const _DB_VERSION_NUMBER_IN_HISTORY = [20211114, 20220108, 20220326, 20250430];
 export const DEFAULT_DB_VERSION_NUMBER: number = 20250430;
 export const DEFAULT_DB_NAME = "remotelysavedb";
 export const DEFAULT_TBL_VERSION = "schemaversion";
@@ -153,7 +152,6 @@ const migrateDBsFrom20220108To20220326 = async (
   db: InternalDBs,
   _vaultRandomID: string
 ) => {
-  const _oldVer = 20220108;
   const newVer = 20220326;
   await db.versionTbl.setItem("version", newVer);
 };
@@ -684,7 +682,7 @@ export const insertLoggerOutputByVault = async (
   try {
     const val = [`[${tsFmt}]`, ...msg.map((x) => toText(x))].join(" ");
     void db.loggerOutputTbl.setItem(key, val);
-  } catch (_err) {
+  } catch {
     // give up, and let it pass
   }
 };

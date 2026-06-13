@@ -48,7 +48,7 @@ export const importQrCodeUri = (
     }
     try {
       return decodeURIComponent(v);
-    } catch (_e) {
+    } catch {
       return v;
     }
   };

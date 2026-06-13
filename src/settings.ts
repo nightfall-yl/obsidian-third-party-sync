@@ -1655,7 +1655,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
               try {
                 const sp = new URLSearchParams(maybeQuery);
                 return normalizeParams(sp);
-              } catch (_e2) {
+              } catch {
                 return undefined;
               }
             }
