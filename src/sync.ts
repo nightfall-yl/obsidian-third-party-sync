@@ -1859,7 +1859,14 @@ const dispatchOperationToActual = async (
   }
 };
 
-const splitThreeSteps = (syncPlan: SyncPlanType, sortedKeys: string[]) => {
+const splitThreeSteps = (syncPlan: SyncPlanType, sortedKeys: string[]): {
+  folderCreationOps: FileOrFolderMixedState[][];
+  deletionOps: FileOrFolderMixedState[][];
+  uploadDownloads: FileOrFolderMixedState[][];
+  realTotalCount: number;
+  allFilesCount: number;
+  realModifyDeleteCount: number;
+} => {
   const folderCreationOps: FileOrFolderMixedState[][] = [];
   const deletionOps: FileOrFolderMixedState[][] = [];
   const uploadDownloads: FileOrFolderMixedState[][] = [];
