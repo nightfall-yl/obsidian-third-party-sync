@@ -475,7 +475,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
     const sgServiceDetail = new SettingGroup(containerEl);
     sgServiceDetail.addClass("service-detail-group");
 
-    const serviceHeadingFrag: DocumentFragment = (document as Document).createDocumentFragment();
+    const serviceHeadingFrag: DocumentFragment = document.createDocumentFragment();
     const serviceHeadingName = document.createElement("div");
     serviceHeadingName.textContent = serviceHeadings[this.plugin.settings.serviceType];
     serviceHeadingName.className = "setting-item-name";
@@ -1431,7 +1431,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       return setting
         .setName(t("setting_syncdirection"))
         .setDesc(((desc: string) => {
-          const frag: DocumentFragment = (document as Document).createDocumentFragment();
+          const frag: DocumentFragment = document.createDocumentFragment();
           const parts = desc.split("\n");
           parts.forEach((part, i) => {
             if (i > 0) frag.appendChild(document.createElement("br"));

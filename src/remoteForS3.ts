@@ -345,7 +345,7 @@ export const uploadToRemote = async (
       queueSize: s3Config.partsConcurrency, // concurrency
       partSize: bytesIn5MB, // minimal 5MB by default
       leavePartsOnError: false,
-      params: uploadParams as Record<string, unknown>,
+      params: uploadParams,
     });
 
     try {

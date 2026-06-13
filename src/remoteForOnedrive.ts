@@ -170,8 +170,8 @@ export const sendAuthReq = async (
     const error = err as { response?: { data?: string | Record<string, unknown> }; message?: string };
     // 尝试解析响应体获取更详细的错误信息
     if (error.response && error.response.data) {
-      const errorData = typeof error.response.data === 'string' 
-        ? JSON.parse(error.response.data as string) 
+      const errorData = typeof error.response.data === 'string'
+        ? JSON.parse(error.response.data)
         : error.response.data;
       throw Error(`Azure API 错误: ${errorData.error_description || errorData.error || JSON.stringify(errorData)}`);
     }
@@ -443,7 +443,7 @@ export class WrappedOnedriveClient {
 
     // check vault folder
     if (!this.vaultFolderExists) {
-      const k = await this.getJson("/drive/special/approot/children") as Record<string, unknown>;
+      const k = await this.getJson("/drive/special/approot/children");
       this.vaultFolderExists =
         (k.value as DriveItem[]).filter((x) => x.name === this.remoteBaseDir)
           .length > 0;
@@ -628,11 +628,11 @@ export const listFromRemote = async (
 
   let res = await client.getJson(
     `/drive/special/approot:/${client.remoteBaseDir}:/delta`
-  ) as Record<string, unknown>;
+  );
   let driveItems = (res.value as DriveItem[]);
 
   while (NEXT_LINK_KEY in res) {
-    res = await client.getJson(res[NEXT_LINK_KEY] as string) as Record<string, unknown>;
+    res = await client.getJson(res[NEXT_LINK_KEY] as string);
     driveItems.push(...structuredClone(res.value as unknown as DriveItem[]));
   }
 

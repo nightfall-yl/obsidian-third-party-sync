@@ -51,13 +51,13 @@ export class FakeFsEncrypt extends FakeFs {
     if (this.isPasswordEmpty()) {
       for (const innerEntity of innerWalkResult) {
         res.push(this._copyEntityAndCopyKeyEncSizeEnc(innerEntity));
-        this.cacheMapOrigToEnc[innerEntity.key!] = innerEntity.key!;
+        this.cacheMapOrigToEnc[innerEntity.key ?? ""] = innerEntity.key ?? "";
       }
       this.hasCacheMap = true;
       return res;
     } else {
       for (const innerEntity of innerWalkResult) {
-        const key = await this._decryptName(innerEntity.key!);
+        const key = await this._decryptName(innerEntity.key ?? "");
         const size = key.endsWith("/") ? 0 : undefined;
         res.push({
           path: key,
@@ -74,7 +74,7 @@ export class FakeFsEncrypt extends FakeFs {
           synthesizedFolder: innerEntity.synthesizedFolder,
         });
 
-        this.cacheMapOrigToEnc[key] = innerEntity.key!;
+        this.cacheMapOrigToEnc[key] = innerEntity.key ?? "";
       }
       this.hasCacheMap = true;
       return res;
@@ -103,7 +103,7 @@ export class FakeFsEncrypt extends FakeFs {
         mtimeCli: innerEntity.mtimeCli,
         mtimeSvr: innerEntity.mtimeSvr,
         size: undefined,
-        sizeEnc: innerEntity.size!,
+        sizeEnc: innerEntity.size ?? 0,
         sizeRaw: innerEntity.sizeRaw,
         hash: undefined,
         synthesizedFolder: innerEntity.synthesizedFolder,
@@ -150,11 +150,11 @@ export class FakeFsEncrypt extends FakeFs {
         type: 'folder',
         key: key,
         keyRaw: innerEntity.keyRaw,
-        keyEnc: innerEntity.key!,
+        keyEnc: innerEntity.key ?? "",
         mtimeCli: innerEntity.mtimeCli,
         mtimeSvr: innerEntity.mtimeSvr,
         size: 0,
-        sizeEnc: innerEntity.size!,
+        sizeEnc: innerEntity.size ?? 0,
         sizeRaw: innerEntity.sizeRaw,
         hash: undefined,
         synthesizedFolder: innerEntity.synthesizedFolder,

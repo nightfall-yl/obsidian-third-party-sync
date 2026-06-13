@@ -29,10 +29,10 @@ export const messyConfigToNormal = (
         base64url.parse(reverseString(x["d"]), {
           out: Uint8Array,
           loose: true,
-        }) as Uint8Array
+        })
       )
     ) as ThirdPartySyncPluginSettings;
-    return y as ThirdPartySyncPluginSettings;
+    return y;
   } else {
     return x;
   }

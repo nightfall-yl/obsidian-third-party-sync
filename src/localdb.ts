@@ -89,9 +89,9 @@ const migrateDBsFrom20211114To20220108 = async (
     if (key.startsWith(vaultRandomID)) {
       continue;
     }
-    const value = (await db.fileHistoryTbl.getItem(
+    const value = await db.fileHistoryTbl.getItem(
       key
-    )) as FileFolderHistoryRecord;
+    );
     if (value === null || value === undefined) {
       continue;
     }
@@ -108,9 +108,9 @@ const migrateDBsFrom20211114To20220108 = async (
     if (key.startsWith(vaultRandomID)) {
       continue;
     }
-    const value = (await db.syncMappingTbl.getItem(
+    const value = await db.syncMappingTbl.getItem(
       key
-    )) as SyncMetaMappingRecord;
+    );
     if (value === null || value === undefined) {
       continue;
     }

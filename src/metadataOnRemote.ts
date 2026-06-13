@@ -107,7 +107,7 @@ export const deserializeMetadataOnRemote = (x: string | ArrayBuffer) => {
       base64url.parse(reverseString(y2["d"] as string), {
         out: Uint8Array,
         loose: true,
-      }) as Uint8Array
+      })
     );
   } catch (e) {
     throw new Error('invalid remote meta data file (invalid "d" field)!');

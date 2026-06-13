@@ -167,7 +167,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
           case 4:
           case 5:
           case 6:
-            getNotice(s, t(`syncrun_step${step}` as TransItemType, {
+            getNotice(s, t(`syncrun_step${step}`, {
               current: `${step}`, maxSteps: "8"
             }));
             break;
@@ -1180,7 +1180,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
   toggleStatusBar(enabled: boolean) {  
     this.statusBarElement?.remove();
 
-    const statusBarItems = (document as Document).getElementsByClassName("status-bar");
+    const statusBarItems = document.getElementsByClassName("status-bar");
     const statusBar = statusBarItems.length > 0 ? statusBarItems[0] as HTMLElement : undefined;
 
     // Guard: if status bar doesn't exist (e.g., iOS), skip DOM manipulation
@@ -1203,7 +1203,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
         
         // Shifts up the status bar on phone to not cover the navmenu
         if (Platform.isPhone) {
-          const navBarItems = (document as Document).getElementsByClassName("mobile-navbar");
+          const navBarItems = document.getElementsByClassName("mobile-navbar");
           const navBar = navBarItems.length > 0 ? navBarItems[0] as HTMLElement : undefined;
           if (!navBar) return;
           const height = window.getComputedStyle(navBar).getPropertyValue('height');
