@@ -1203,8 +1203,6 @@ const assignOperationToFileInplaceV3 = (
   const existLocal = r.existLocal ?? false;
   const existRemote = r.existRemote ?? false;
   const existPrevSync = r.prevSync !== undefined;
-  const _prevSyncMtime = r.prevSync?.mtime ?? 0;
-  const _prevSyncSize = r.prevSync?.size ?? 0;
 
   const isPullOnlyMode = syncDirection === "incremental_pull_only" || syncDirection === "incremental_pull_and_delete_only";
   const isPushOnlyMode = syncDirection === "incremental_push_only" || syncDirection === "incremental_push_and_delete_only";
@@ -1865,9 +1863,6 @@ const splitThreeSteps = (syncPlan: SyncPlanType, sortedKeys: string[]) => {
   const folderCreationOps: FileOrFolderMixedState[][] = [];
   const deletionOps: FileOrFolderMixedState[][] = [];
   const uploadDownloads: FileOrFolderMixedState[][] = [];
-  let _realTotalCount = 0;
-  // Only count items that involve actual file transfer (upload/download)
-  let fileSyncCount = 0;
 
   // For protectModifyPercentage calculation
   let allFilesCount = 0; // Total number of files in the sync plan (excluding folders)
@@ -1901,7 +1896,6 @@ const splitThreeSteps = (syncPlan: SyncPlanType, sortedKeys: string[]) => {
       } else {
         folderCreationOps[level - 1].push(val);
       }
-      _realTotalCount += 1;
     } else if (
       val.decision === "uploadLocalDelHistToRemoteFolder" ||
       val.decision === "keepRemoteDelHistFolder" ||
@@ -1917,7 +1911,6 @@ const splitThreeSteps = (syncPlan: SyncPlanType, sortedKeys: string[]) => {
       } else {
         deletionOps[level - 1].push(val);
       }
-      _realTotalCount += 1;
       // Count file deletions
       if (!key.endsWith("/")) {
         realModifyDeleteCount += 1;

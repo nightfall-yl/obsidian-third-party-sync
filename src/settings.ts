@@ -1642,7 +1642,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
             try {
               const u = new URL(raw);
               return normalizeParams(u.searchParams);
-            } catch (_e) {
+            } catch {
               // fallback below
             }
 

@@ -140,7 +140,7 @@ export const importQrCodeUri = (
     }
     
     settings = normalizeImportedSettings(JSON.parse(dataStr) as Record<string, unknown>);
-  } catch (_e) {
+  } catch {
     return {
       status: "error",
       message: `errors while parsing settings: ${JSON.stringify(inputParams)}`,

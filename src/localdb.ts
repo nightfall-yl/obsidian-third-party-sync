@@ -78,7 +78,6 @@ const migrateDBsFrom20211114To20220108 = async (
   db: InternalDBs,
   vaultRandomID: string
 ) => {
-  const _oldVer = 20211114;
   const newVer = 20220108;
 
   const allPromisesToWait: Promise<void>[] = [];
@@ -160,7 +159,6 @@ const migrateDBsFrom20220326To20250430 = async (
   db: InternalDBs,
   _vaultRandomID: string
 ) => {
-  const _oldVer = 20220326;
   const newVer = 20250430;
   // New table prevSyncRecordsTbl is created on demand in prepareDBs
   await db.versionTbl.setItem("version", newVer);

@@ -239,7 +239,6 @@ export default class ThirdPartySyncPlugin extends Plugin {
       return;
     }
 
-    let _everythingOk = true;
     try {
       this.setSyncIcon(true, triggerSource);
 
@@ -261,7 +260,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
 
       // Step 4 - check password
       await notifyFunc(triggerSource, 3);
-      const _passwordCheckResult = await isPasswordOk(
+      await isPasswordOk(
         remoteRsp.Contents,
         this.settings.password
       );
@@ -1359,7 +1358,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
     const client = this.getRemoteClient(this);
     const remoteRsp = await client.listFromRemote();
 
-    const _passwordCheckResult2 = await isPasswordOk(
+    await isPasswordOk(
       remoteRsp.Contents,
       this.settings.password
     );
