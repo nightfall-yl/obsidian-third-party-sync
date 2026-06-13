@@ -95,11 +95,17 @@
 }
 
 /* Remove border/shadow for service settings */
-.tp-no-border-top {
-  border-top: none !important;
+.setting-item.tp-no-border-top {
+  border-top: none;
 }
-.tp-no-box-shadow {
-  box-shadow: none !important;
+.setting-item.tp-no-box-shadow {
+  box-shadow: none;
+}
+
+/* Clipboard fallback helper */
+.tp-clipboard-fallback {
+  position: fixed;
+  opacity: 0;
 }
 
 /* Full width input */

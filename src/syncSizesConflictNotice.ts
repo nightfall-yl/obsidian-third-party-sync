@@ -55,9 +55,8 @@ export class SizesConflictModal extends Modal {
             await navigator.clipboard.writeText(info);
           } catch {
             const textarea = document.createElement("textarea");
-            textarea.value = info;
-            textarea.style.position = "fixed";
-            textarea.style.opacity = "0";
+          textarea.value = info;
+          textarea.className = "tp-clipboard-fallback";
             document.body.appendChild(textarea);
             textarea.select();
             document.execCommand("copy");
