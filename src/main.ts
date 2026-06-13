@@ -1172,10 +1172,11 @@ export default class ThirdPartySyncPlugin extends Plugin {
   }
 
   toggleStatusBar(enabled: boolean) {  
+    if (!activeDocument) return;
     this.statusBarElement?.remove();
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, obsidianmd/no-unsupported-api -- activeDocument type not fully resolved by ESLint
-    const statusBarItems = (activeDocument ?? document).getElementsByClassName("status-bar");
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- activeDocument type not fully resolved by ESLint
+    const statusBarItems = activeDocument.getElementsByClassName("status-bar");
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access -- activeDocument type not fully resolved by ESLint
     const statusBar = statusBarItems.length > 0 ? statusBarItems[0] as HTMLElement : undefined;
 
