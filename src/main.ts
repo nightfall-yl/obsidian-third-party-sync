@@ -1199,8 +1199,8 @@ export default class ThirdPartySyncPlugin extends Plugin {
         
         // Shifts up the status bar on phone to not cover the navmenu
         if (Platform.isPhone) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, obsidianmd/no-unsupported-api -- activeDocument type not fully resolved by ESLint
-          const navBarItems = (activeDocument ?? document).getElementsByClassName("mobile-navbar");
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- activeDocument type not fully resolved by ESLint
+          const navBarItems = activeDocument.getElementsByClassName("mobile-navbar");
           // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access -- activeDocument type not fully resolved by ESLint
           const navBar = navBarItems.length > 0 ? navBarItems[0] as HTMLElement : undefined;
           if (!navBar) return;
