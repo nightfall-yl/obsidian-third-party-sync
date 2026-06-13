@@ -5,8 +5,9 @@ import {
   PluginSettingTab,
   Setting,
   SettingGroup,
+  Platform,
+  requireApiVersion,
   setIcon,
-  activeDocument,
 } from "obsidian";
 import type { TextComponent } from "obsidian";
 import {
@@ -20,6 +21,7 @@ import {
   WebdavAuthType,
   WebdavDepthType,
   DeleteToWhereType,
+  ConflictActionType,
 } from "./baseTypes";
 import {
   exportVaultSyncPlansToFiles,
@@ -56,6 +58,22 @@ import {
 import {encryptStringToBase64url} from "./encrypt";
 import {DEFAULT_FILE_NAME_FOR_METADATAONREMOTE, DEFAULT_FILE_NAME_FOR_METADATAONREMOTE2} from "./metadataOnRemote";
 import {getRemoteMetadata, uploadExtraMeta} from "./sync";
+
+async function copyToClipboard(text: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    // clipboard API may not be available on mobile
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand("copy");
+    document.body.removeChild(textarea);
+  }
+}
 
 class PasswordModal extends Modal {
   plugin: ThirdPartySyncPlugin;
@@ -258,19 +276,16 @@ export class OnedriveAuthModal extends Modal {
         });
       });
 
-    contentEl.createDiv().createEl(
-      "button",
-      {
-        text: t("modal_onedriveauth_copybutton"),
-        cls: "mod-cta",
-      },
-      (el) => {
-        el.onclick = async () => {
-          await navigator.clipboard.writeText(authUrl);
-          new Notice(t("modal_onedriveauth_copynotice"));
-        };
-      }
-    );
+    const copyBtnDiv = document.createElement("div");
+    contentEl.appendChild(copyBtnDiv);
+    const copyBtn = document.createElement("button");
+    copyBtn.textContent = t("modal_onedriveauth_copybutton");
+    copyBtn.className = "mod-cta";
+    copyBtn.onclick = async () => {
+      await copyToClipboard(authUrl);
+      new Notice(t("modal_onedriveauth_copynotice"));
+    };
+    copyBtnDiv.appendChild(copyBtn);
 
     contentEl.createEl("p").createEl("a", {
       href: authUrl,
@@ -461,16 +476,25 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
     const sgServiceDetail = new SettingGroup(containerEl);
     sgServiceDetail.addClass("service-detail-group");
 
-    const serviceHeadingFrag = activeDocument.createDocumentFragment();
-    const _serviceHeadingName = serviceHeadingFrag.createEl("div", { text: serviceHeadings[this.plugin.settings.serviceType], cls: "setting-item-name" });
+    const serviceHeadingFrag: DocumentFragment = (document as Document).createDocumentFragment();
+    const serviceHeadingName = document.createElement("div");
+    serviceHeadingName.textContent = serviceHeadings[this.plugin.settings.serviceType];
+    serviceHeadingName.className = "setting-item-name";
+    serviceHeadingFrag.appendChild(serviceHeadingName);
 
-    const s3DescEl = serviceHeadingFrag.createDiv({ cls: "settings-long-desc s3-hide" });
-    const onedriveDescEl = serviceHeadingFrag.createDiv({ cls: "settings-long-desc onedrive-hide" });
-    const webdavDescEl = serviceHeadingFrag.createDiv({ cls: "settings-long-desc webdav-hide" });
+    const s3DescEl = document.createElement("div");
+    s3DescEl.className = "settings-long-desc s3-hide";
+    serviceHeadingFrag.appendChild(s3DescEl);
+    const onedriveDescEl = document.createElement("div");
+    onedriveDescEl.className = "settings-long-desc onedrive-hide";
+    serviceHeadingFrag.appendChild(onedriveDescEl);
+    const webdavDescEl = document.createElement("div");
+    webdavDescEl.className = "settings-long-desc webdav-hide";
+    serviceHeadingFrag.appendChild(webdavDescEl);
 
-    s3DescEl.toggleClass("s3-hide", this.plugin.settings.serviceType !== "s3");
-    onedriveDescEl.toggleClass("onedrive-hide", this.plugin.settings.serviceType !== "onedrive");
-    webdavDescEl.toggleClass("webdav-hide", this.plugin.settings.serviceType !== "webdav");
+    s3DescEl.classList.toggle("s3-hide", this.plugin.settings.serviceType !== "s3");
+    onedriveDescEl.classList.toggle("onedrive-hide", this.plugin.settings.serviceType !== "onedrive");
+    webdavDescEl.classList.toggle("webdav-hide", this.plugin.settings.serviceType !== "webdav");
 
     sgServiceDetail.setHeading(serviceHeadingFrag);
 
@@ -487,39 +511,52 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       t("settings_s3_disclaimer1"),
       t("settings_s3_disclaimer2"),
     ]) {
-      s3DescEl.createEl("p", {
-        text: c,
-        cls: "s3-disclaimer",
-      });
+      const p = document.createElement("p");
+      p.textContent = c;
+      p.className = "s3-disclaimer";
+      s3DescEl.appendChild(p);
     }
 
     if (!VALID_REQURL) {
-      s3DescEl.createEl("p", {
-        text: t("settings_s3_cors"),
-      });
+      const p = document.createElement("p");
+      p.textContent = t("settings_s3_cors");
+      s3DescEl.appendChild(p);
     }
 
-    s3DescEl.createEl("p", {
-      text: t("settings_s3_prod"),
-    });
+    {
+      const p = document.createElement("p");
+      p.textContent = t("settings_s3_prod");
+      s3DescEl.appendChild(p);
+    }
 
-    const s3LinksUl = s3DescEl.createEl("ul");
+    const s3LinksUl = document.createElement("ul");
+    s3DescEl.appendChild(s3LinksUl);
 
-    s3LinksUl.createEl("li").createEl("a", {
-      href: "https://docs.aws.amazon.com/general/latest/gr/s3.html",
-      text: t("settings_s3_prod1"),
-    });
+    {
+      const li = document.createElement("li");
+      const a = document.createElement("a");
+      a.href = "https://docs.aws.amazon.com/general/latest/gr/s3.html";
+      a.textContent = t("settings_s3_prod1");
+      li.appendChild(a);
+      s3LinksUl.appendChild(li);
+    }
 
-    s3LinksUl.createEl("li").createEl("a", {
-      href: "https://docs.aws.amazon.com/sdk-for-javascript/v3/developer-guide/getting-your-credentials.html",
-      text: t("settings_s3_prod2"),
-    });
+    {
+      const li = document.createElement("li");
+      const a = document.createElement("a");
+      a.href = "https://docs.aws.amazon.com/sdk-for-javascript/v3/developer-guide/getting-your-credentials.html";
+      a.textContent = t("settings_s3_prod2");
+      li.appendChild(a);
+      s3LinksUl.appendChild(li);
+    }
 
     if (!VALID_REQURL) {
-      s3LinksUl.createEl("li").createEl("a", {
-        href: "https://docs.aws.amazon.com/AmazonS3/latest/userguide/enabling-cors-examples.html",
-        text: t("settings_s3_prod3"),
-      });
+      const li = document.createElement("li");
+      const a = document.createElement("a");
+      a.href = "https://docs.aws.amazon.com/AmazonS3/latest/userguide/enabling-cors-examples.html";
+      a.textContent = t("settings_s3_prod3");
+      li.appendChild(a);
+      s3LinksUl.appendChild(li);
     }
 
     sgServiceDetail.addSetting((setting) => {
@@ -703,24 +740,28 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       t("settings_onedrive_disclaimer1"),
       t("settings_onedrive_disclaimer2"),
     ]) {
-      onedriveDescEl.createEl("p", {
-        text: c,
-        cls: "onedrive-disclaimer",
-      });
+      const p = document.createElement("p");
+      p.textContent = c;
+      p.className = "onedrive-disclaimer";
+      onedriveDescEl.appendChild(p);
     }
 
-    onedriveDescEl.createEl("p", {
-      text: t("settings_onedrive_folder", {
+    {
+      const p = document.createElement("p");
+      p.textContent = t("settings_onedrive_folder", {
         pluginID: this.plugin.manifest.id,
         remoteBaseDir:
           this.plugin.settings.onedrive.remoteBaseDir ||
           this.app.vault.getName(),
-      }),
-    });
+      });
+      onedriveDescEl.appendChild(p);
+    }
 
-    onedriveDescEl.createEl("p", {
-      text: t("settings_onedrive_nobiz"),
-    });
+    {
+      const p = document.createElement("p");
+      p.textContent = t("settings_onedrive_nobiz");
+      onedriveDescEl.appendChild(p);
+    }
 
     const isOneDriveAuthenticated = this.plugin.settings.onedrive.username !== "";
 
@@ -810,14 +851,13 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
           button.setButtonText(t("settings_checkonnectivity_button"));
           button.onClick(async () => {
             new Notice(t("settings_checkonnectivity_checking"));
-            const self = this;
             const client = new RemoteClient(
               "onedrive",
               undefined,
               undefined,
               this.plugin.settings.onedrive,
               this.app.vault.getName(),
-              () => self.plugin.saveSettings()
+              () => this.plugin.saveSettings()
             );
 
             const errors = { msg: "" };
@@ -838,27 +878,31 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
     // below for webdav
     //////////////////////////////////////////////////
 
-    webdavDescEl.createEl("p", {
-      text: t("settings_webdav_disclaimer1"),
-      cls: "webdav-disclaimer",
-    });
-
-    if (!VALID_REQURL) {
-      webdavDescEl.createEl("p", {
-        text: t("settings_webdav_cors_os"),
-      });
-
-      webdavDescEl.createEl("p", {
-        text: t("settings_webdav_cors"),
-      });
+    {
+      const p = document.createElement("p");
+      p.textContent = t("settings_webdav_disclaimer1");
+      p.className = "webdav-disclaimer";
+      webdavDescEl.appendChild(p);
     }
 
-    webdavDescEl.createEl("p", {
-      text: t("settings_webdav_folder", {
+    if (!VALID_REQURL) {
+      const p1 = document.createElement("p");
+      p1.textContent = t("settings_webdav_cors_os");
+      webdavDescEl.appendChild(p1);
+
+      const p2 = document.createElement("p");
+      p2.textContent = t("settings_webdav_cors");
+      webdavDescEl.appendChild(p2);
+    }
+
+    {
+      const p = document.createElement("p");
+      p.textContent = t("settings_webdav_folder", {
         remoteBaseDir:
           this.plugin.settings.webdav.remoteBaseDir || this.app.vault.getName(),
-      }),
-    });
+      });
+      webdavDescEl.appendChild(p);
+    }
 
     sgServiceDetail.addSetting((setting) => {
       webdavSettings.push(setting);
@@ -1274,7 +1318,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       })
     );
 
-    const statusBarOptions: HTMLElement = (sgBasic as SettingGroup)["groupEl"].createDiv({ cls: "third-party-sync-hidden" });
+    const statusBarOptions = (sgBasic as { groupEl: HTMLElement }).groupEl.createDiv({ cls: "third-party-sync-hidden" });
 
     statusBarOptions.toggleClass(
       "third-party-sync-hidden",
@@ -1376,7 +1420,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
         dropdown
           .setValue(this.plugin.settings.conflictAction ?? "keep_newer")
           .onChange(async (val) => {
-            this.plugin.settings.conflictAction = val;
+            this.plugin.settings.conflictAction = val as ConflictActionType;
             await this.plugin.saveSettings();
           });
       })
@@ -1388,11 +1432,11 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       return setting
         .setName(t("setting_syncdirection"))
         .setDesc(((desc: string) => {
-          const frag = activeDocument.createDocumentFragment();
+          const frag: DocumentFragment = (document as Document).createDocumentFragment();
           const parts = desc.split("\n");
           parts.forEach((part, i) => {
-            if (i > 0) frag.appendChild(activeDocument.createElement("br"));
-            frag.appendChild(activeDocument.createTextNode(part));
+            if (i > 0) frag.appendChild(document.createElement("br"));
+            frag.appendChild(document.createTextNode(part));
           });
           return frag;
         })(t("setting_syncdirection_desc")))
@@ -1517,7 +1561,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
             this.app.vault.getName(),
             this.plugin.manifest.version
           );
-          await navigator.clipboard.writeText(uri);
+          await copyToClipboard(uri);
           new Notice(t("modal_export_button_notice"));
         });
       })
@@ -1527,13 +1571,13 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
           const settingsOnlyWebdav = structuredClone(this.plugin.settings);
           delete settingsOnlyWebdav.onedrive;
           delete settingsOnlyWebdav.s3;
-          delete (settingsOnlyWebdav as Record<string, unknown>)["vaultRandomID"];
+          delete settingsOnlyWebdav.vaultRandomID;
           const uri = exportSettingsUri(
             settingsOnlyWebdav,
             this.app.vault.getName(),
             this.plugin.manifest.version
           );
-          await navigator.clipboard.writeText(uri);
+          await copyToClipboard(uri);
           new Notice(t("modal_export_button_notice"));
         });
       })
@@ -1563,7 +1607,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
             const normalizeParams = (sp: URLSearchParams) => {
               const params = {} as UriParams;
               sp.forEach((v, k) => {
-                params[k as keyof UriParams] = v;
+                (params as any)[k] = v;
               });
               return params;
             };
@@ -1571,7 +1615,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
             try {
               const u = new URL(raw);
               return normalizeParams(u.searchParams);
-            } catch (_e) {
+            } catch (e) {
               // fallback below
             }
 
@@ -1584,7 +1628,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
               try {
                 const sp = new URLSearchParams(maybeQuery);
                 return normalizeParams(sp);
-              } catch (_e) {
+              } catch (e) {
                 return undefined;
               }
             }
@@ -1663,17 +1707,17 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
     );
 
     // Container for debug options (hidden when debug is disabled)
-    const debugOptionsDiv: HTMLElement = (sgDebug as SettingGroup)["groupEl"].createEl("div", {
+    const debugOptionsDiv = (sgDebug as { groupEl: HTMLElement }).groupEl.createEl("div", {
       cls: "remotely-sync-debug-options"
     });
 
     // Update visibility and re-render options
     this.update = () => {
       const enabled = !!this.plugin.settings.debugEnabled;
-      (debugOptionsDiv as HTMLElement).style.display = enabled ? "block" : "none";
+      debugOptionsDiv.style.display = enabled ? "block" : "none";
       
       // Re-render debug options
-      debugOptionsDiv.empty();
+      debugOptionsDiv.innerHTML = "";
       
       if (enabled) {
         new Setting(debugOptionsDiv)
@@ -1684,7 +1728,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
         button.onClick(async () => {
           const c = messyConfigToNormal(await this.plugin.loadData());
           new Notice(t("settings_outputsettingsconsole_notice"));
-          console.log(c);
+          log.debug("output settings to console:", c);
         });
       });
 

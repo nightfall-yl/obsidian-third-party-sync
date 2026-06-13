@@ -17,6 +17,7 @@ import type {
 } from "./baseTypes";
 import { API_VER_STAT_FOLDER } from "./baseTypes";
 import {
+  decryptBase32ToString,
   decryptBase64urlToString,
   encryptStringToBase64url,
   getSizeFromOrigToEnc,
@@ -143,13 +144,13 @@ export const isPasswordOk = async (
   // Has password: try to decrypt first file's key
   const sanityCheckKey = remote[0].key;
   try {
-    const _res = await decryptBase64urlToString(sanityCheckKey, password);
+    const res = await decryptBase64urlToString(sanityCheckKey, password);
 
     return {
       ok: true,
       reason: "password_matched",
     } as PasswordCheckType;
-  } catch (_error) {
+  } catch (error) {
     return {
       ok: false,
       reason: "password_not_matched",
@@ -244,7 +245,7 @@ export const getRemoteStates = async (
       vaultRandomID
     );
 
-    let r = {} as FileOrFolderMixedState;
+    let r: FileOrFolderMixedState = {} as FileOrFolderMixedState;
 
     if (backwardMapping !== undefined) {
       key = backwardMapping.localKey;
@@ -378,7 +379,7 @@ const ensembleMixedStates = async (
   }
 
   for (const entry of local) {
-    let r = {} as FileOrFolderMixedState;
+    let r: FileOrFolderMixedState = {} as FileOrFolderMixedState;
     let key = entry.path;
 
     if (entry.path === "/") {
@@ -413,7 +414,7 @@ const ensembleMixedStates = async (
       continue;
     }
 
-    if (Object.prototype.hasOwnProperty.call(results, key)) {
+    if (results.hasOwnProperty(key)) {
       results[key].key = r.key;
       results[key].existLocal = r.existLocal;
       results[key].mtimeLocal = r.mtimeLocal;
@@ -448,7 +449,7 @@ const ensembleMixedStates = async (
           password === "" ? undefined : getSizeFromOrigToEnc(entry.size),
       };
 
-      if (Object.prototype.hasOwnProperty.call(results, key)) {
+      if (results.hasOwnProperty(key)) {
         results[key].key = r.key;
         results[key].existLocal = r.existLocal;
         results[key].mtimeLocal = r.mtimeLocal;
@@ -474,7 +475,7 @@ const ensembleMixedStates = async (
       continue;
     }
 
-    if (Object.prototype.hasOwnProperty.call(results, key)) {
+    if (results.hasOwnProperty(key)) {
       results[key].key = r.key;
       results[key].deltimeRemote = r.deltimeRemote;
       results[key].deltimeRemoteFmt = r.deltimeRemoteFmt;
@@ -509,7 +510,7 @@ const ensembleMixedStates = async (
         deltimeLocalFmt: unixTimeToStr(entry.actionWhen),
       } as FileOrFolderMixedState;
 
-      if (Object.prototype.hasOwnProperty.call(results, key)) {
+      if (results.hasOwnProperty(key)) {
         results[key].deltimeLocal = r.deltimeLocal;
         results[key].deltimeLocalFmt = r.deltimeLocalFmt;
       } else {
@@ -524,7 +525,7 @@ const ensembleMixedStates = async (
         mtimeLocalFmt: unixTimeToStr(entry.actionWhen),
         changeLocalMtimeUsingMapping: true,
       };
-      if (Object.prototype.hasOwnProperty.call(results, key)) {
+      if (results.hasOwnProperty(key)) {
         let mtimeLocal = Math.max(
           r.mtimeLocal ?? 0,
           results[key].mtimeLocal ?? 0
@@ -1521,8 +1522,9 @@ export const doActualSyncV3 = async (
           return result;
         });
 
-        syncCall.catch((error) => {
-          const message = `${key}: ${error.message}`;
+        syncCall.catch((error: unknown) => {
+          const errMsg = error instanceof Error ? error.message : String(error);
+          const message = `${key}: ${errMsg}`;
           potentialErrors.push(new Error(message));
 
           if (potentialErrors.length >= 3) {
@@ -1933,7 +1935,7 @@ const splitThreeSteps = (syncPlan: SyncPlanType, sortedKeys: string[]) => {
       } else {
         uploadDownloads[0].push(val); // only one level needed here
       }
-      _realTotalCount += 1;
+      realTotalCount += 1;
       fileSyncCount += 1;
       // Count modifications
       if (!key.endsWith("/")) {
@@ -1960,7 +1962,7 @@ const splitThreeSteps = (syncPlan: SyncPlanType, sortedKeys: string[]) => {
 };
 
 // Items worth reporting status for don't include skipped items or keepRemoteDelHist (one upload operation for all)
-function _isCountableSyncItem(item: FileOrFolderMixedState) {
+function isCountableSyncItem(item: FileOrFolderMixedState) {
   return item.decision != "keepRemoteDelHist" && !item.decision.contains("skip");
 }
 
@@ -2084,8 +2086,9 @@ export const doActualSync = async (
           return result;
         });
 
-        syncCall.catch((error) => {
-          const message = `${key}: ${error.message}`;
+        syncCall.catch((error: unknown) => {
+          const errMsg = error instanceof Error ? error.message : String(error);
+          const message = `${key}: ${errMsg}`;
           potentialErrors.push(new Error(message));
 
           if (potentialErrors.length >= 3) {

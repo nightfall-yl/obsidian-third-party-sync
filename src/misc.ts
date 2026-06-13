@@ -1,8 +1,9 @@
-import { Vault, moment } from "obsidian";
-import { base32 } from "rfc4648";
+import { Vault, moment, normalizePath as obsidianNormalizePath } from "obsidian";
+import { base32, base64url } from "rfc4648";
+import XRegExp from "xregexp";
 import emojiRegex from "emoji-regex-xs";
 
-import type { I18n, TransItemType } from "./i18n";
+import type { I18n, LangType, LangTypeAndAuto, TransItemType } from "./i18n";
 
 import { log } from "./moreOnLog";
 
@@ -21,7 +22,7 @@ export const isHiddenPath = (
   if (!(dot || underscore)) {
     throw Error("parameter error for isHiddenPath");
   }
-  const k = normalizePath(item); // TODO: only unix path now
+  const k = obsidianNormalizePath(item);
   const k2 = k.split("/"); // TODO: only unix path now
   // log.info(k2)
   for (const singlePart of k2) {
@@ -42,33 +43,6 @@ export const isHiddenPath = (
  * Normalizes a path
  * @param path
  */
-export const normalizePath = (
-  path: string
-) => {
-  if (!(path)) {
-    throw Error("missing path for normalizePath")
-  }
-  // Replace backslashes with forward slashes
-  path = path.replace(/\\/g, '/');
-
-  // Remove duplicate slashes (e.g., '//' -> '/')
-  path = path.replace(/\/\/+/g, '/');
-
-  // Resolve '../' and './' in the path
-  const parts = path.split('/');
-  const result = [];
-  for (const part of parts) {
-    if (part === '..') {
-      result.pop();
-    } else if (part !== '.' && part !== '') {
-      result.push(part);
-    }
-  }
-
-  // Join parts back together with '/' as the separator
-  return result.join('/');
-}
-
 export const dirname = (path: string) => {
   // Normalize the path to use forward slashes
   path = path.replace(/\\/g, '/');
@@ -105,7 +79,7 @@ export const getFolderLevels = (x: string, addEndingSlash: boolean = false) => {
   }
 
   const y1 = x.split("/");
-  let _i = 0;
+  let i = 0;
   for (let index = 0; index + 1 < y1.length; index++) {
     let k = y1.slice(0, index + 1).join("/");
     if (k === "" || k === "/") {
@@ -135,7 +109,7 @@ export const mkdirpInVault = async (thePath: string, vault: Vault) => {
  * @returns ArrayBuffer
  */
 export const bufferToArrayBuffer = (
-  b: Buffer | Uint8Array | ArrayBufferView
+  b: Uint8Array | ArrayBufferView
 ) => {
   return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
 };
@@ -172,7 +146,12 @@ export const arrayBufferToHex = (b: ArrayBuffer) => {
  * @returns ArrayBuffer
  */
 export const base64ToArrayBuffer = (b64text: string) => {
-  return (new Uint8Array(Buffer.from(b64text, "base64"))).buffer as ArrayBuffer;
+  const binary = atob(b64text);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes.buffer as ArrayBuffer;
 };
 
 /**
@@ -189,7 +168,11 @@ export const hexStringToTypedArray = (hex: string) => {
 };
 
 export const base64ToBase32 = (a: string) => {
-  const bytes = new Uint8Array(Buffer.from(a, "base64"));
+  const binary = atob(a);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
   return base32.stringify(bytes);
 };
 
@@ -272,7 +255,7 @@ export const setToString = (a: Set<string>, delimiter: string = ",") => {
 };
 
 export const extractSvgSub = (x: string, subEl: string = "rect") => {
-  const DOMParser = (typeof window !== 'undefined' && window.DOMParser);
+  const DOMParser = (typeof window !== 'undefined' && window.DOMParser) || (typeof globalThis !== 'undefined' && globalThis.DOMParser);
   if (!DOMParser) {
     throw new Error('DOMParser not available');
   }
@@ -283,7 +266,7 @@ export const extractSvgSub = (x: string, subEl: string = "rect") => {
     throw new Error('SVG element not found');
   }
   svg.setAttribute("viewbox", "0 0 10 10");
-  return svg.innerHTML;
+  return new XMLSerializer().serializeToString(svg);
 };
 
 /**
@@ -361,8 +344,8 @@ export const getSplitRanges = (bytesTotal: number, bytesEachPart: number) => {
  * @param obj anything
  * @returns string of the name of the object
  */
-export const getTypeName = (obj: unknown): string => {
-  return (Object.prototype.toString.call(obj) as string).slice(8, -1);
+export const getTypeName = (obj: any): string => {
+  return Object.prototype.toString.call(obj).slice(8, -1);
 };
 
 /**
@@ -395,8 +378,7 @@ export const unixTimeToStr = (x: number | undefined | null) => {
   if (x === undefined || x === null || Number.isNaN(x)) {
     return undefined;
   }
-  const momentFn = moment as unknown as (x: unknown) => { format: () => string };
-  return momentFn(x).format();
+  return (moment as any)(x).format() as string;
 };
 
 /**
@@ -438,16 +420,15 @@ export const toText = (x: any) => {
     return `${x}`;
   }
 
-  const e = x as { stack?: unknown; message?: unknown };
   if (
     x instanceof Error ||
-    (e &&
-      e.stack &&
-      e.message &&
-      typeof e.stack === "string" &&
-      typeof e.message === "string")
+    (x &&
+      x.stack &&
+      x.message &&
+      typeof x.stack === "string" &&
+      typeof x.message === "string")
   ) {
-    return `ERROR! MESSAGE: ${e.message}, STACK: ${e.stack}`;
+    return `ERROR! MESSAGE: ${x.message}, STACK: ${x.stack}`;
   }
 
   try {

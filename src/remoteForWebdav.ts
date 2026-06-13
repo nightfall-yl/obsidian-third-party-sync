@@ -19,7 +19,7 @@ import { getPatcher } from "webdav";
 const WEBDAV_503_RETRY_DELAYS_MS = [300, 700, 1300];
 
 const sleep = (ms: number) =>
-  new Promise<void>((resolve) => window.setTimeout(resolve, ms));
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 const isStatus503Error = (error: unknown) => {
   if (error === undefined || error === null) {
@@ -321,12 +321,12 @@ export class WrappedWebdavClient {
           this.webdavConfig.depth = "auto_infinity";
           this.webdavConfig.manualRecursive = false;
         }
-      } catch (_error) {
+      } catch (error) {
         testPassed = false;
       }
       if (!testPassed) {
         try {
-          const _res = await webdavCallWith503Retry(
+          const res = await webdavCallWith503Retry(
             "customRequest(PROPFIND depth=1)",
             () =>
               this.client.customRequest(`/${this.remoteBaseDir}/`, {
@@ -340,7 +340,7 @@ export class WrappedWebdavClient {
           testPassed = true;
           this.webdavConfig.depth = "auto_1";
           this.webdavConfig.manualRecursive = true;
-        } catch (_error) {
+        } catch (error) {
           testPassed = false;
         }
       }
@@ -564,8 +564,9 @@ const downloadFromRemoteRaw = async (
   )) as BufferLike;
   if (buff instanceof ArrayBuffer) {
     return buff;
+  } else if (buff instanceof Uint8Array) {
+    return bufferToArrayBuffer(buff);
   }
-  return bufferToArrayBuffer(buff as unknown as Uint8Array);
   throw Error(`unexpected file content result with type ${typeof buff}`);
 };
 
@@ -633,7 +634,7 @@ export const deleteFromRemote = async (
     await webdavCallWith503Retry("deleteFile", () =>
       client.client.deleteFile(remoteFileName)
     );
-  } catch (_err) {
+  } catch (err) {
     console.error("some error while deleting");
   }
 };

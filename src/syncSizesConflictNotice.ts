@@ -1,7 +1,9 @@
-import { App, Modal, Notice } from "obsidian";
+import { App, Modal, Notice, PluginSettingTab, Setting } from "obsidian";
 import type RemotelySavePlugin from "./main"; // unavoidable
 import type { TransItemType } from "./i18n";
 import type { FileOrFolderMixedState } from "./baseTypes";
+
+import { log } from "./moreOnLog";
 
 export class SizesConflictModal extends Modal {
   readonly plugin: RemotelySavePlugin;
@@ -49,7 +51,18 @@ export class SizesConflictModal extends Modal {
       },
       (el) => {
         el.onclick = async () => {
-          await navigator.clipboard.writeText(info);
+          try {
+            await navigator.clipboard.writeText(info);
+          } catch {
+            const textarea = document.createElement("textarea");
+            textarea.value = info;
+            textarea.style.position = "fixed";
+            textarea.style.opacity = "0";
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand("copy");
+            document.body.removeChild(textarea);
+          }
           new Notice(t("modal_sizesconflict_copynotice"));
         };
       }

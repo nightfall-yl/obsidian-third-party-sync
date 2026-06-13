@@ -206,20 +206,12 @@ export class FakeFsLocal extends FakeFs {
     if (key.endsWith("/")) {
       const folder = this.vault.getAbstractFileByPath(key.slice(0, -1));
       if (folder instanceof TFolder) {
-        if (this.app) {
-          await this.app.fileManager.trashFile(folder);
-        } else {
-          await this.vault.delete(folder, true);
-        }
+        await this.app.fileManager.trashFile(folder);
       }
     } else {
       const file = this.vault.getAbstractFileByPath(key);
       if (file instanceof TFile) {
-        if (this.app) {
-          await this.app.fileManager.trashFile(file);
-        } else {
-          await this.vault.delete(file);
-        }
+        await this.app.fileManager.trashFile(file);
       }
     }
   }

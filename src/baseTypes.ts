@@ -4,7 +4,7 @@
  */
 
 import { Platform, requireApiVersion } from "obsidian";
-import type { LangTypeAndAuto } from "./i18n";
+import type { LangType, LangTypeAndAuto } from "./i18n";
 
 export const DEFAULT_CONTENT_TYPE = "application/octet-stream";
 
@@ -84,7 +84,7 @@ export interface ThirdPartySyncPluginSettings {
   protectModifyPercentage?: number;
   ignorePaths?: string[];
   onlyAllowPaths?: string[];
-  conflictAction?: string;
+  conflictAction?: ConflictActionType;
   deleteToWhere?: DeleteToWhereType;
 
   /**
@@ -185,6 +185,7 @@ export const DEFAULT_LOG_HISTORY_FILE_PREFIX = "log_hist_exported_on_";
 export type SyncTriggerSourceType = "manual" | "auto" | "dry" | "autoOnceInit";
 
 export type DeleteToWhereType = "system_trash" | "obsidian_trash";
+export type ConflictActionType = "keep_newer" | "keep_larger";
 
 export type SyncDirectionType =
   | "bidirectional"

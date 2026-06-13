@@ -141,14 +141,14 @@ export class FakeFsRemote extends FakeFs {
     await this.client.deleteFromRemote(key, "", "");
   }
 
-  async checkConnect(callbackFunc?: any): Promise<boolean> {
+  async checkConnect(callbackFunc?: (err?: unknown) => void): Promise<boolean> {
     return await this.client.checkConnectivity(callbackFunc);
   }
 
   async getUserDisplayName(): Promise<string> {
     try {
       return await this.client.getUser();
-    } catch (_error) {
+    } catch (error) {
       return "Unknown User";
     }
   }

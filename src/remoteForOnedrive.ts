@@ -4,8 +4,9 @@ import type {
   UploadSession,
   User,
 } from "@microsoft/microsoft-graph-types";
-import { requestUrl, RequestUrlParam, Vault } from "obsidian";
+import { request, requestUrl, RequestUrlParam, requireApiVersion, Vault } from "obsidian";
 import {
+  VALID_REQURL,
   COMMAND_CALLBACK_ONEDRIVE,
   DEFAULT_CONTENT_TYPE,
   OAUTH2_FORCE_EXPIRE_MILLISECONDS,
@@ -50,7 +51,7 @@ async function generateCodeVerifier(): Promise<string> {
     throw new Error('Crypto API not available');
   }
   crypto.getRandomValues(arrayBuffer);
-  return Buffer.from(arrayBuffer).toString("base64")
+  return btoa(String.fromCharCode(...arrayBuffer))
     .replace(/=/g, '')
     .replace(/\+/g, '-')
     .replace(/\//g, '_');
@@ -64,7 +65,7 @@ async function generateCodeChallenge(verifier: string): Promise<string> {
     throw new Error('Crypto subtle API not available');
   }
   const digest = await crypto.subtle.digest('SHA-256', data);
-  return Buffer.from(digest).toString("base64")
+  return btoa(String.fromCharCode(...new Uint8Array(digest)))
     .replace(/=/g, '')
     .replace(/\+/g, '-')
     .replace(/\//g, '_');
@@ -124,20 +125,11 @@ export const sendAuthReq = async (
   authority: string,
   authCode: string,
   verifier: string
-) => {
+): Promise<AccessCodeResponseSuccessfulType | AccessCodeResponseFailedType> => {
   try {
     // 从 authority URL 提取 tenant
     const authorityUrl = new URL(authority);
     const tenant = authorityUrl.pathname.replace(/^\//, "") || "common";
-
-    console.log("OneDrive token exchange:", {
-      url: `${authority.replace(/\/$/, "")}/oauth2/v2.0/token`,
-      tenant,
-      client_id: clientID,
-      redirect_uri: REDIRECT_URI,
-      has_code: !!authCode,
-      has_verifier: !!verifier,
-    });
 
     const requestPromise = requestUrl({
       url: `${authority.replace(/\/$/, "")}/oauth2/v2.0/token`,
@@ -160,31 +152,28 @@ export const sendAuthReq = async (
       }, ONEDRIVE_AUTH_TIMEOUT_MS);
     });
 
-    const rsp = await Promise.race([requestPromise, timeoutPromise]);
+    const rsp = await Promise.race([requestPromise, timeoutPromise]) as AccessCodeResponseSuccessfulType | AccessCodeResponseFailedType;
 
-    console.log("OneDrive token response:", rsp);
-
-    const resp = rsp as { error?: unknown; error_description?: unknown };
-    if (resp.error !== undefined) {
-      console.error("OneDrive auth error:", rsp);
-      const errorMsg = resp.error_description || resp.error || "未知错误";
+    if (rsp.error !== undefined) {
+      const rspFailed = rsp as AccessCodeResponseFailedType;
+      log.debug("OneDrive auth error:", rspFailed);
+      const errorMsg = rspFailed.error_description || rspFailed.error || "未知错误";
       return {
-        ...rsp as AccessCodeResponseFailedType,
+        ...rspFailed,
         error_description: errorMsg,
       } as AccessCodeResponseFailedType;
     } else {
       return rsp as AccessCodeResponseSuccessfulType;
     }
   } catch (err: unknown) {
-    console.error("OneDrive auth request failed:", err);
+    log.debug("OneDrive auth request failed:", err);
     const error = err as { response?: { data?: string | Record<string, unknown> }; message?: string };
     // 尝试解析响应体获取更详细的错误信息
     if (error.response && error.response.data) {
       const errorData = typeof error.response.data === 'string' 
         ? JSON.parse(error.response.data as string) 
         : error.response.data;
-      const ed = errorData as { error_description?: unknown; error?: unknown };
-      throw Error(`Azure API 错误: ${ed.error_description || ed.error || JSON.stringify(errorData)}`);
+      throw Error(`Azure API 错误: ${errorData.error_description || errorData.error || JSON.stringify(errorData)}`);
     }
     
     throw Error(`网络请求失败: ${err.message || err}`);
@@ -195,7 +184,7 @@ export const sendRefreshTokenReq = async (
   clientID: string,
   authority: string,
   refreshToken: string
-) => {
+): Promise<AccessCodeResponseSuccessfulType | AccessCodeResponseFailedType> => {
   // also use Obsidian request to bypass CORS issue.
   const body = new URLSearchParams({
     tenant: "consumers",
@@ -230,7 +219,7 @@ export const sendRefreshTokenReq = async (
 export const setConfigBySuccessfullAuthInplace = async (
   config: OnedriveConfig,
   authRes: AccessCodeResponseSuccessfulType,
-  saveUpdatedConfigFunc: () => Promise<any> | undefined
+  saveUpdatedConfigFunc: () => Promise<void> | undefined
 ) => {
   config.accessToken = authRes.access_token;
   config.accessTokenExpiresAtTime =
@@ -312,11 +301,11 @@ const fromDriveItemToRemoteItem = (
   // pure english: /drive/root:/Apps/third-party-sync/${remoteBaseDir}
   // or localized, e.g.: /drive/root:/应用/third-party-sync/${remoteBaseDir}
   const FIRST_COMMON_PREFIX_REGEX =
-    /^\/drive\/root:\/[^/]+\/Remotely (Sync|Secure|Save)\//g;
+    /^\/drive\/root:\/[^\/]+\/Remotely (Sync|Secure|Save)\//g;
   // or the root is absolute path /Livefolders,
   // e.g.: /Livefolders/应用/third-party-sync/${remoteBaseDir}
   const SECOND_COMMON_PREFIX_REGEX =
-    /^\/Livefolders\/[^/]+\/Remotely (Sync|Secure|Save)\//g;
+    /^\/Livefolders\/[^\/]+\/Remotely (Sync|Secure|Save)\//g;
 
   // another possibile prefix
   const THIRD_COMMON_PREFIX_RAW = `/drive/items/`;
@@ -503,7 +492,7 @@ export class WrappedOnedriveClient {
     return (await requestUrl(requestParams).json) as Record<string, unknown>;
   };
 
-  postJson = async (pathFragOrig: string, payload: any) => {
+  postJson = async (pathFragOrig: string, payload: Record<string, unknown>) => {
     const theUrl = this.buildUrl(pathFragOrig);
     log.debug(`postJson, theUrl=${theUrl}`);
     const accessToken = await this.authGetter.getAccessToken();
@@ -522,7 +511,7 @@ export class WrappedOnedriveClient {
     return (await requestUrl(requestParams).json) as Record<string, unknown>;
   };
 
-  patchJson = async (pathFragOrig: string, payload: any) => {
+  patchJson = async (pathFragOrig: string, payload: Record<string, unknown>) => {
     const theUrl = this.buildUrl(pathFragOrig);
     const accessToken = await this.authGetter.getAccessToken();
     const headers = {
@@ -917,7 +906,7 @@ export const deleteFromRemote = async (
 
 export const checkConnectivity = async (
   client: WrappedOnedriveClient,
-  callbackFunc?: any
+  callbackFunc?: (err?: unknown) => void
 ) => {
   try {
     const k = await getUserDisplayName(client);

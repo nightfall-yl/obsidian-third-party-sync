@@ -1,4 +1,4 @@
-import { Vault, ListedFiles } from "obsidian";
+import { Vault, Stat, ListedFiles } from "obsidian";
 import { Queue } from "@fyears/tsqueue";
 import { statFix } from "./misc";
 

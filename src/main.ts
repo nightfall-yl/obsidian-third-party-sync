@@ -6,11 +6,10 @@ import {
   setIcon,
   FileSystemAdapter,
   Platform, TAbstractFile, Vault, EventRef,
-  activeDocument,
 } from "obsidian";
 
 import type {
-  FileOrFolderMixedState,
+  FileOrFolderMixedState, RemoteItem,
   ThirdPartySyncPluginSettings,
   SyncTriggerSourceType,
   SyncPlanType,
@@ -48,7 +47,7 @@ import { DeletionOnRemote, MetadataOnRemote, deserializeMetadataOnRemote } from 
 import { messyConfigToNormal, normalConfigToMessy } from "./configPersist";
 import { ObsConfigDirFileType, listFilesInObsFolder } from "./obsFolderLister";
 import { I18n } from "./i18n";
-import type { LangTypeAndAuto, TransItemType } from "./i18n";
+import type { LangType, LangTypeAndAuto, TransItemType } from "./i18n";
 import { SyncAlgoV2Modal } from "./syncAlgoV2Notice";
 import { applyPresetRulesInplace } from "./presetRules";
 
@@ -59,7 +58,13 @@ import {
   exportVaultSyncPlansToFiles,
 } from "./debugMode";
 import { SizesConflictModal } from "./syncSizesConflictNotice";
-import { getLastSynced} from "./misc";
+import {mkdirpInVault, getLastSynced} from "./misc";
+
+// File system abstraction layers
+import { FakeFsLocal } from "./fsLocal";
+import { FakeFsRemote } from "./fsRemote";
+import { FakeFsEncrypt } from "./fsEncrypt";
+import { syncer } from "./syncer";
 
 const DEFAULT_SETTINGS: ThirdPartySyncPluginSettings = {
   s3: DEFAULT_S3_CONFIG,
@@ -218,6 +223,18 @@ export default class ThirdPartySyncPlugin extends Plugin {
       }
     };
 
+    // Ribbon function - updates ribbon icon
+    const ribboonFunc = async (s: SyncTriggerSourceType, step: number) => {
+      // Handled by setSyncIcon
+    };
+
+    // Sync process callback
+    const callbackSyncProcess = async (s: SyncTriggerSourceType, realCounter: number, realTotalCount: number, pathName: string, decision: string) => {
+      if (this.settings.enableStatusBarInfo) {
+        this.setCurrSyncMsg(realCounter, realTotalCount, pathName);
+      }
+    };
+
     // Make sure two syncs can't run at the same time
     if (this.syncStatus !== "idle") {
       if (triggerSource == "manual") {
@@ -239,7 +256,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
       return;
     }
 
-    let _everythingOk = true;
+    let everythingOk = true;
     try {
       this.setSyncIcon(true, triggerSource);
 
@@ -253,7 +270,8 @@ export default class ThirdPartySyncPlugin extends Plugin {
       statusBarFunc(triggerSource, 1, true);
 
       // Step 2 - prepare for sync
-      const client = this.getRemoteClient(this);
+      const self = this;
+      const client = this.getRemoteClient(self);
 
       // Step 3 - list remote files
       await notifyFunc(triggerSource, 2);
@@ -261,7 +279,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
 
       // Step 4 - check password
       await notifyFunc(triggerSource, 3);
-      const _passwordCheckResult = await isPasswordOk(
+      const passwordCheckResult = await isPasswordOk(
         remoteRsp.Contents,
         this.settings.password
       );
@@ -397,7 +415,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
       (errorMsg: string) => {
         const parts = errorMsg.split("|");
         if (parts[0] === "syncrun_abort_protectmodifypercentage") {
-          const [_kind, threshold, realCount, allCount, percent] = parts;
+          const [_, threshold, realCount, allCount, percent] = parts;
           const msg = t("syncrun_abort_protectmodifypercentage", {
             protectModifyPercentage: parseInt(threshold),
             realModifyDeleteCount: parseInt(realCount),
@@ -675,8 +693,8 @@ export default class ThirdPartySyncPlugin extends Plugin {
         vaultBasePath,
         vaultRandomIDFromOldConfigFile
       );
-    } catch (err) {
-      new Notice(err.message, 10 * 1000);
+    } catch (err: unknown) {
+      new Notice(err instanceof Error ? err.message : String(err), 10 * 1000);
       throw err;
     }
 
@@ -785,10 +803,11 @@ export default class ThirdPartySyncPlugin extends Plugin {
               throw Error(`Azure API 错误: ${errorMsg}`);
             }
 
+            const self = this;
             await setConfigBySuccessfullAuthInplaceOnedrive(
               this.settings.onedrive,
               rsp as AccessCodeResponseSuccessfulType,
-              () => this.saveSettings()
+              () => self.saveSettings()
             );
 
             const client = new RemoteClient(
@@ -797,17 +816,17 @@ export default class ThirdPartySyncPlugin extends Plugin {
               undefined,
               this.settings.onedrive,
               this.app.vault.getName(),
-              () => this.saveSettings()
+              () => self.saveSettings()
             );
             this.settings.onedrive.username = await client.getUser();
-            await this.saveSettings();
+            await self.saveSettings();
 
             this.oauth2Info.verifier = ""; // reset it
             this.oauth2Info.helperModal?.close(); // close it
             this.oauth2Info.helperModal = undefined;
 
             const isAuthed = this.settings.onedrive.username !== "";
-            if (this.oauth2Info.authSetting !== undefined) {
+            if (this.oauth2Info.authSetting) {
               this.oauth2Info.authSetting.settingEl.toggleClass("tp-sync-auth-hidden", isAuthed);
             }
             this.oauth2Info.authSetting = undefined;
@@ -834,7 +853,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
             );
           }
         } catch (err: unknown) {
-          console.error("OneDrive auth protocol handler error:", err);
+          log.debug("OneDrive auth protocol handler error:", err);
           const error = err as { message?: string };
           // 关闭 helper modal 并显示错误
           if (this.oauth2Info.helperModal) {
@@ -975,7 +994,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
     this.updateSyncStatus("idle");
   }
 
-  onunload() {
+  async onunload() {
     this.syncRibbon = undefined;
     if (this.oauth2Info !== undefined) {
       this.oauth2Info.helperModal = undefined;
@@ -994,12 +1013,12 @@ export default class ThirdPartySyncPlugin extends Plugin {
     try {
       rawData = await this.loadData() as Record<string, unknown> | null;
     } catch (e) {
-      console.warn("Failed to load settings, using defaults:", e);
+      log.warn("Failed to load settings, using defaults:", e);
       rawData = null;
     }
 
     if (!rawData || typeof rawData !== 'object') {
-      console.log("No existing settings found, using default configuration");
+      log.debug("No existing settings found, using default configuration");
       rawData = {};
     }
 
@@ -1092,14 +1111,14 @@ export default class ThirdPartySyncPlugin extends Plugin {
 
   async getVaultRandomIDFromOldConfigFile() {
     let vaultRandomID = "";
-    if (this.settings["vaultRandomID"] !== undefined) {
+    if (this.settings.vaultRandomID !== undefined) {
       // In old version, the vault id is saved in data.json
       // But we want to store it in localForage later
-      if (this.settings["vaultRandomID"] !== "") {
+      if (this.settings.vaultRandomID !== "") {
         // a real string was assigned before
-        vaultRandomID = this.settings["vaultRandomID"];
+        vaultRandomID = this.settings.vaultRandomID;
       }
-      delete this.settings["vaultRandomID"];
+      delete this.settings.vaultRandomID;
       await this.saveSettings();
     }
     return vaultRandomID;
@@ -1161,7 +1180,8 @@ export default class ThirdPartySyncPlugin extends Plugin {
   toggleStatusBar(enabled: boolean) {  
     this.statusBarElement?.remove();
 
-    const statusBar = activeDocument.getElementsByClassName("status-bar")[0] as HTMLElement;
+    const statusBarItems = (document as Document).getElementsByClassName("status-bar");
+    const statusBar = statusBarItems.length > 0 ? statusBarItems[0] as HTMLElement : undefined;
 
     // Guard: if status bar doesn't exist (e.g., iOS), skip DOM manipulation
     if (!statusBar) {
@@ -1183,7 +1203,9 @@ export default class ThirdPartySyncPlugin extends Plugin {
         
         // Shifts up the status bar on phone to not cover the navmenu
         if (Platform.isPhone) {
-          const navBar = activeDocument.getElementsByClassName("mobile-navbar")[0] as HTMLElement;
+          const navBarItems = (document as Document).getElementsByClassName("mobile-navbar");
+          const navBar = navBarItems.length > 0 ? navBarItems[0] as HTMLElement : undefined;
+          if (!navBar) return;
           const height = window.getComputedStyle(navBar).getPropertyValue('height');
           statusBar.style.marginBottom = height;
         }
@@ -1298,7 +1320,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
       alreadyScheduled = true;
       log.debug(`Scheduled a sync run for ${this.settings.syncOnSaveAfterMilliseconds} milliseconds later`);
 
-      window.setTimeout(async () => {
+      setTimeout(async () => {
         log.debug("Sync on save ran");
         await this.syncRun("auto");  
         alreadyScheduled = false;
@@ -1327,7 +1349,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
           alreadyScheduled = true;
           log.debug(`Scheduled a sync run for ${this.settings.syncOnSaveAfterMilliseconds} milliseconds later`);
 
-          window.setTimeout(async () => {
+          setTimeout(async () => {
             log.debug("Sync on save ran");
             await this.syncRun("auto");  
             alreadyScheduled = false;
@@ -1353,7 +1375,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
     const client = this.getRemoteClient(this);
     const remoteRsp = await client.listFromRemote();
 
-    const _passwordCheckResult = await isPasswordOk(
+    const passwordCheckResult = await isPasswordOk(
       remoteRsp.Contents,
       this.settings.password
     );
@@ -1449,14 +1471,14 @@ export default class ThirdPartySyncPlugin extends Plugin {
         // no need to await
         this.app.vault.adapter.write(ignoreFile, contentText);
       }
-    } catch (_error) {
+    } catch (error) {
       // just skip
     }
   }
 
   addOutputToDBIfSet() {
     if (this.settings.logToDB) {
-      applyLogWriterInplace((...msg: any[]) => {
+      applyLogWriterInplace((...msg: unknown[]) => {
         insertLoggerOutputByVault(this.db, this.vaultRandomID, ...msg);
       });
     }
