@@ -23,9 +23,19 @@ import { buildQueryString } from "@aws-sdk/querystring-builder";
 import { HttpHandlerOptions } from "@aws-sdk/types";
 
 import * as mime from "mime-types";
-import { Vault, requestUrl, RequestUrlParam } from "obsidian";
-// eslint-disable-next-line import/no-nodejs-modules
-import { Readable } from "stream";
+import { Vault, requestUrl, RequestUrlParam, Platform } from "obsidian";
+
+// Minimal interface for Node.js Readable stream (desktop only)
+// Avoids importing "stream" which triggers import/no-nodejs-modules
+interface NodeReadable {
+  on(event: "data", listener: (chunk: Uint8Array) => void): this;
+  on(event: "error", listener: (err: Error) => void): this;
+  on(event: "end", listener: () => void): this;
+}
+
+const isNodeReadable = (b: unknown): b is NodeReadable => {
+  return Platform.isDesktop && typeof (b as Record<string, unknown>).on === "function";
+};
 import AggregateError from "aggregate-error";
 import {
   DEFAULT_CONTENT_TYPE,
@@ -134,7 +144,7 @@ class ObsHttpHandler extends FetchHttpHandler {
           }),
         };
       })(),
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- third-party library returns any
       requestTimeout(this.requestTimeoutInMs),
     ];
 
@@ -444,12 +454,12 @@ export const listFromRemote = async (
  * @returns Promise<ArrayBuffer>
  */
 const getObjectBodyToArrayBuffer = async (
-  b: Readable | ReadableStream | Blob
+  b: NodeReadable | ReadableStream | Blob
 ) => {
-  if (b instanceof Readable) {
+  if (isNodeReadable(b)) {
     return (await new Promise((resolve, reject) => {
       const chunks: Uint8Array[] = [];
-      b.on("data", (chunk) => chunks.push(chunk as Uint8Array));
+      b.on("data", (chunk) => chunks.push(chunk));
       b.on("error", reject);
       b.on("end", () => {
         const totalLen = chunks.reduce((acc, c) => acc + c.byteLength, 0);

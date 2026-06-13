@@ -112,6 +112,46 @@ export const bufferToArrayBuffer = (
   return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
 };
 
+const BASE64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+/**
+ * Encode a binary string to base64 without using the deprecated btoa().
+ * @param str binary string (each char code 0–255)
+ * @returns base64 string
+ */
+export const encodeBase64 = (str: string): string => {
+  let result = '';
+  for (let i = 0; i < str.length; i += 3) {
+    const a = str.charCodeAt(i);
+    const b = i + 1 < str.length ? str.charCodeAt(i + 1) : 0;
+    const c = i + 2 < str.length ? str.charCodeAt(i + 2) : 0;
+    result += BASE64_CHARS[a >> 2];
+    result += BASE64_CHARS[((a & 3) << 4) | (b >> 4)];
+    result += i + 1 < str.length ? BASE64_CHARS[((b & 15) << 2) | (c >> 6)] : '=';
+    result += i + 2 < str.length ? BASE64_CHARS[c & 63] : '=';
+  }
+  return result;
+};
+
+/**
+ * Decode a base64 string to a binary string without using the deprecated atob().
+ * @param str base64 string
+ * @returns binary string
+ */
+export const decodeBase64 = (str: string): string => {
+  let result = '';
+  for (let i = 0; i < str.length; i += 4) {
+    const a = BASE64_CHARS.indexOf(str[i]);
+    const b = BASE64_CHARS.indexOf(str[i + 1]);
+    const c = BASE64_CHARS.indexOf(str[i + 2]);
+    const d = BASE64_CHARS.indexOf(str[i + 3]);
+    result += String.fromCharCode((a << 2) | (b >> 4));
+    if (str[i + 2] !== '=') result += String.fromCharCode(((b & 15) << 4) | (c >> 2));
+    if (str[i + 3] !== '=') result += String.fromCharCode(((c & 3) << 6) | d);
+  }
+  return result;
+};
+
 /**
  * Convert ArrayBuffer to base64-encoded string.
  * @param b ArrayBuffer
@@ -123,8 +163,7 @@ export const arrayBufferToBase64 = (b: ArrayBuffer) => {
   for (let i = 0; i < bytes.byteLength; i++) {
     binary += String.fromCharCode(bytes[i]);
   }
-  // eslint-disable-next-line @typescript-eslint/no-deprecated
-  return btoa(binary);
+  return encodeBase64(binary);
 };
 
 /**
@@ -145,8 +184,7 @@ export const arrayBufferToHex = (b: ArrayBuffer) => {
  * @returns ArrayBuffer
  */
 export const base64ToArrayBuffer = (b64text: string) => {
-  // eslint-disable-next-line @typescript-eslint/no-deprecated
-  const binary = atob(b64text);
+  const binary = decodeBase64(b64text);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {
     bytes[i] = binary.charCodeAt(i);
@@ -168,8 +206,7 @@ export const hexStringToTypedArray = (hex: string) => {
 };
 
 export const base64ToBase32 = (a: string) => {
-  // eslint-disable-next-line @typescript-eslint/no-deprecated
-  const binary = atob(a);
+  const binary = decodeBase64(a);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {
     bytes[i] = binary.charCodeAt(i);
@@ -342,7 +379,7 @@ export const getSplitRanges = (bytesTotal: number, bytesEachPart: number) => {
  * @returns string of the name of the object
  */
 export const getTypeName = (obj: unknown): string => {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- third-party library returns any
   return Object.prototype.toString.call(obj).slice(8, -1) as string;
 };
 
@@ -376,7 +413,7 @@ export const unixTimeToStr = (x: number | undefined | null) => {
   if (x === undefined || x === null || Number.isNaN(x)) {
     return undefined;
   }
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- third-party library returns any
   return (moment as unknown)(x).format() as string;
 };
 

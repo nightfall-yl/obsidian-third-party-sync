@@ -10,6 +10,7 @@ import {
 import { DEFAULT_S3_CONFIG } from "./remoteForS3";
 import { DEFAULT_WEBDAV_CONFIG } from "./remoteForWebdav";
 import { DEFAULT_ONEDRIVE_CONFIG } from "./remoteForOnedrive";
+import { encodeBase64, decodeBase64 } from "./misc";
 
 export const exportSettingsUri = (
   settings: ThirdPartySyncPluginSettings,
@@ -18,14 +19,12 @@ export const exportSettingsUri = (
 ) => {
   const settings2 = structuredClone(settings);
   delete settings2.onedrive;
-  // eslint-disable-next-line @typescript-eslint/no-deprecated
-  delete settings2.vaultRandomID;
+  delete (settings2 as Record<string, unknown>).vaultRandomID;
   const jsonStr = JSON.stringify(settings2);
 
   // Compress data to fit in URI
   const compressed = pako.deflate(jsonStr);
-  // eslint-disable-next-line @typescript-eslint/no-deprecated
-  const base64 = btoa(String.fromCharCode(...compressed));
+  const base64 = encodeBase64(String.fromCharCode(...compressed));
   const data = encodeURIComponent(base64);
   const vault = encodeURIComponent(currentVaultName);
   const version = encodeURIComponent(pluginVersion);
@@ -125,8 +124,7 @@ export const importQrCodeUri = (
     // Decompress if data is compressed
     if (params.compressed === "1" || params.compressed === "true") {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-deprecated
-        const binary = atob(dataStr);
+        const binary = decodeBase64(dataStr);
         const bytes = new Uint8Array(binary.length);
         for (let i = 0; i < binary.length; i++) {
           bytes[i] = binary.charCodeAt(i);

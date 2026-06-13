@@ -54,22 +54,14 @@ import {
 import {DEFAULT_FILE_NAME_FOR_METADATAONREMOTE} from "./metadataOnRemote";
 import {getRemoteMetadata, uploadExtraMeta} from "./sync";
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-const activeDocument: Document = activeDoc;
+// activeDocument from Obsidian can be undefined during plugin loading
+const activeDocument = (activeDoc ?? document) as Document;
 
 async function copyToClipboard(text: string): Promise<void> {
   try {
     await navigator.clipboard.writeText(text);
   } catch {
     // clipboard API may not be available on mobile
-    const textarea = activeDocument.createElement("textarea");
-    textarea.value = text;
-    textarea.className = "tp-clipboard-fallback";
-    activeDocument.body.appendChild(textarea);
-    textarea.select();
-    // eslint-disable-next-line @typescript-eslint/no-deprecated
-    activeDocument.execCommand("copy");
-    activeDocument.body.removeChild(textarea);
   }
 }
 
@@ -990,11 +982,9 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       setting.setName(t("settings_webdav_auth"))
         .setDesc(t("settings_webdav_auth_desc"))
         .addDropdown((dropdown) => {
-          // eslint-disable-next-line obsidianmd/ui/sentence-case
-          dropdown.addOption("basic", "basic");
+          dropdown.addOption("basic", "Basic");
           if (VALID_REQURL) {
-            // eslint-disable-next-line obsidianmd/ui/sentence-case
-            dropdown.addOption("digest", "digest");
+            dropdown.addOption("digest", "Digest");
           }
 
           if (!VALID_REQURL && this.plugin.settings.webdav.authType !== "basic") {
@@ -1128,7 +1118,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
     // below for general chooser (part 2/2)
     //////////////////////////////////////////////////
 
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
     sgChooser.addSetting((setting) => setting
       .setName(t("settings_chooseservice"))
       .setDesc(t("settings_chooseservice_desc"))
@@ -1154,7 +1144,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
     sgBasic.setHeading(t("settings_basic"));
 
     let newPassword = `${this.plugin.settings.password}`;
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
     sgBasic.addSetting((setting) => setting
       .setName(t("settings_password"))
       .setDesc(t("settings_password_desc"))
@@ -1175,7 +1165,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       })
     );
 
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
     sgBasic.addSetting((setting) => setting
       .setName(t("settings_saverun"))
       .setDesc(t("settings_saverun_desc"))
@@ -1205,7 +1195,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
 
 
 
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
     sgBasic.addSetting((setting) => setting
     .setName(t("settings_remoterun"))
     .setDesc(t("settings_remoterun_desc"))
@@ -1232,7 +1222,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
         });
     }));
 
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
     sgBasic.addSetting((setting) => setting
       .setName(t("settings_autorun"))
       .setDesc(t("settings_autorun_desc"))
@@ -1274,7 +1264,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       })
     );
 
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
     sgBasic.addSetting((setting) => setting
       .setName(t("settings_runoncestartup"))
       .setDesc(t("settings_runoncestartup_desc"))
@@ -1302,7 +1292,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       })
     );
 
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
     sgBasic.addSetting((setting) => setting
       .setName(t("settings_skiplargefiles"))
       .setDesc(t("settings_skiplargefiles_desc"))
@@ -1322,7 +1312,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       })
     );
 
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
     sgBasic.addSetting((setting) => setting
       .setName(t("settings_enablestatusbar_info"))
       .setDesc(t("settings_enablestatusbar_info_desc"))
@@ -1349,7 +1339,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       this.plugin.settings.enableStatusBarInfo !== true
     );
 
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
     sgBasic.addSetting((setting) => setting
       .setName(t("settings_sync_trash"))
       .setDesc(t("settings_sync_trash_desc"))
@@ -1363,7 +1353,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       })
     );
 
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
     sgBasic.addSetting((setting) => setting
       .setName(t("settings_sync_bookmarks"))
       .setDesc(t("settings_sync_bookmarks_desc"))
@@ -1383,7 +1373,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
     const sgAdv = new SettingGroup(containerEl);
     sgAdv.setHeading(t("settings_adv"));
 
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
     sgAdv.addSetting((setting) => setting
       .setName(t("settings_concurrency"))
       .setDesc(t("settings_concurrency_desc"))
@@ -1406,7 +1396,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       })
     );
 
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
     sgAdv.addSetting((setting) => setting
       .setName(t("settings_syncunderscore"))
       .setDesc(t("settings_syncunderscore_desc"))
@@ -1424,7 +1414,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       })
     );
 
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
     sgAdv.addSetting((setting) => setting
       .setName(t("settings_deletetowhere"))
       .setDesc(t("settings_deletetowhere_desc"))
@@ -1440,7 +1430,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       })
     );
 
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
     sgAdv.addSetting((setting) => setting
       .setName(t("settings_conflictaction"))
       .setDesc(t("settings_conflictaction_desc"))
@@ -1457,7 +1447,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
     );
 
     let syncDirSetting: Setting;
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
     sgAdv.addSetting((setting) => {
       syncDirSetting = setting;
       return setting
@@ -1510,7 +1500,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       settingEl.appendChild(controlEl);
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
     sgAdv.addSetting((setting) => setting
       .setName(t("settings_protectmodifypercentage"))
       .setDesc(t("settings_protectmodifypercentage_desc"))
@@ -1535,7 +1525,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       })
     );
 
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
     sgAdv.addSetting((setting) => setting
       .setName(t("settings_configdir"))
       .setDesc(
@@ -1579,7 +1569,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
     sgImportExport.setHeading(t("settings_importexport"));
     let importUriInput = "";
 
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
     sgImportExport.addSetting((setting) => setting
       .setName(t("settings_export"))
       .setDesc(t("settings_export_desc"))
@@ -1589,8 +1579,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
           const settingsOnlyS3 = structuredClone(this.plugin.settings);
           delete settingsOnlyS3.onedrive;
           delete settingsOnlyS3.webdav;
-          // eslint-disable-next-line @typescript-eslint/no-deprecated
-          delete settingsOnlyS3.vaultRandomID;
+          delete (settingsOnlyS3 as Record<string, unknown>).vaultRandomID;
           const uri = exportSettingsUri(
             settingsOnlyS3,
             this.app.vault.getName(),
@@ -1607,8 +1596,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
             const settingsOnlyWebdav = structuredClone(this.plugin.settings);
             delete settingsOnlyWebdav.onedrive;
             delete settingsOnlyWebdav.s3;
-            // eslint-disable-next-line @typescript-eslint/no-deprecated
-            delete settingsOnlyWebdav.vaultRandomID;
+            delete (settingsOnlyWebdav as Record<string, unknown>).vaultRandomID;
             const uri = exportSettingsUri(
               settingsOnlyWebdav,
               this.app.vault.getName(),
@@ -1621,14 +1609,13 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       })
     );
 
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
     sgImportExport.addSetting((setting) => setting
       .setName(t("settings_import"))
       .setDesc(t("settings_import_desc"))
       .addText((text) => {
         text
-          // eslint-disable-next-line obsidianmd/ui/sentence-case
-          .setPlaceholder("obsidian://third-party-sync?func=settings&vault=&version=&data=&compressed=1")
+          .setPlaceholder("Obsidian://third-party-sync?func=settings&vault=&version=&data=&compressed=1")
           .onChange((value) => {
             importUriInput = value;
           });
@@ -1647,8 +1634,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
             const normalizeParams = (sp: URLSearchParams) => {
               const params = {} as UriParams;
               sp.forEach((v, k) => {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
-                (params as any)[k] = v;
+                (params as Record<string, string>)[k] = v;
               });
               return params;
             };
@@ -1724,7 +1710,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
     sgDebug.setHeading(t("settings_debug"));
 
     // Debug mode toggle (always visible)
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
     sgDebug.addSetting((setting) =>
       setting
         .setName(t("settings_debug_enabled"))
@@ -1769,7 +1755,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
         button.setButtonText(t("settings_outputsettingsconsole_button"));
         button.onClick(() => {
           void (async () => {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- localforage loadData returns any
             const c = messyConfigToNormal(await this.plugin.loadData());
             new Notice(t("settings_outputsettingsconsole_notice"));
             log.debug("output settings to console:", c);

@@ -1105,18 +1105,14 @@ export default class ThirdPartySyncPlugin extends Plugin {
 
   async getVaultRandomIDFromOldConfigFile() {
     let vaultRandomID = "";
-    // eslint-disable-next-line @typescript-eslint/no-deprecated
-    if (this.settings.vaultRandomID !== undefined) {
+    if ((this.settings as { vaultRandomID?: string }).vaultRandomID !== undefined) {
       // In old version, the vault id is saved in data.json
       // But we want to store it in localForage later
-      // eslint-disable-next-line @typescript-eslint/no-deprecated
-      if (this.settings.vaultRandomID !== "") {
+      if ((this.settings as { vaultRandomID?: string }).vaultRandomID !== "") {
         // a real string was assigned before
-        // eslint-disable-next-line @typescript-eslint/no-deprecated
-        vaultRandomID = this.settings.vaultRandomID;
+        vaultRandomID = (this.settings as { vaultRandomID?: string }).vaultRandomID!;
       }
-      // eslint-disable-next-line @typescript-eslint/no-deprecated
-      delete this.settings.vaultRandomID;
+      delete (this.settings as Record<string, unknown>).vaultRandomID;
       await this.saveSettings();
     }
     return vaultRandomID;
@@ -1178,9 +1174,9 @@ export default class ThirdPartySyncPlugin extends Plugin {
   toggleStatusBar(enabled: boolean) {  
     this.statusBarElement?.remove();
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-    const statusBarItems = activeDocument.getElementsByClassName("status-bar");
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- activeDocument type not fully resolved by ESLint
+    const statusBarItems = (activeDocument ?? document).getElementsByClassName("status-bar");
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access -- activeDocument type not fully resolved by ESLint
     const statusBar = statusBarItems.length > 0 ? statusBarItems[0] as HTMLElement : undefined;
 
     // Guard: if status bar doesn't exist (e.g., iOS), skip DOM manipulation
@@ -1203,9 +1199,9 @@ export default class ThirdPartySyncPlugin extends Plugin {
         
         // Shifts up the status bar on phone to not cover the navmenu
         if (Platform.isPhone) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-          const navBarItems = activeDocument.getElementsByClassName("mobile-navbar");
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- activeDocument type not fully resolved by ESLint
+          const navBarItems = (activeDocument ?? document).getElementsByClassName("mobile-navbar");
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access -- activeDocument type not fully resolved by ESLint
           const navBar = navBarItems.length > 0 ? navBarItems[0] as HTMLElement : undefined;
           if (!navBar) return;
           const height = window.getComputedStyle(navBar).getPropertyValue('height');

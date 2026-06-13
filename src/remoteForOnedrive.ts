@@ -18,6 +18,7 @@ import {
   getRandomArrayBuffer,
   getRandomIntInclusive,
   mkdirpInVault,
+  encodeBase64,
 } from "./misc";
 
 import { log } from "./moreOnLog";
@@ -50,8 +51,7 @@ async function generateCodeVerifier(): Promise<string> {
     throw new Error('Crypto API not available');
   }
   crypto.getRandomValues(arrayBuffer);
-  // eslint-disable-next-line @typescript-eslint/no-deprecated
-  return btoa(String.fromCharCode(...arrayBuffer))
+  return encodeBase64(String.fromCharCode(...arrayBuffer))
     .replace(/=/g, '')
     .replace(/\+/g, '-')
     .replace(/\//g, '_');
@@ -65,8 +65,7 @@ async function generateCodeChallenge(verifier: string): Promise<string> {
     throw new Error('Crypto subtle API not available');
   }
   const digest = await crypto.subtle.digest('SHA-256', data);
-  // eslint-disable-next-line @typescript-eslint/no-deprecated
-  return btoa(String.fromCharCode(...new Uint8Array(digest)))
+  return encodeBase64(String.fromCharCode(...new Uint8Array(digest)))
     .replace(/=/g, '')
     .replace(/\+/g, '-')
     .replace(/\//g, '_');
