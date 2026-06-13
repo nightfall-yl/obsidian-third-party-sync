@@ -55,6 +55,7 @@ import {DEFAULT_FILE_NAME_FOR_METADATAONREMOTE} from "./metadataOnRemote";
 import {getRemoteMetadata, uploadExtraMeta} from "./sync";
 
 // activeDocument from Obsidian can be undefined during plugin loading
+// eslint-disable-next-line obsidianmd/no-unsupported-api
 const activeDocument = (activeDoc ?? document) as Document;
 
 async function copyToClipboard(text: string): Promise<void> {
