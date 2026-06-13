@@ -24,9 +24,9 @@ export class SyncAlgoV2Modal extends Modal {
       .split("\n")
       .forEach((val) => {
         const p = contentEl.createEl("p");
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(val, "text/html");
-        p.append(...Array.from(doc.body.childNodes));
+        const wrapper = createSpan();
+        wrapper.innerHTML = val;
+        p.append(...Array.from(wrapper.childNodes));
       });
 
     new Setting(contentEl)

@@ -255,10 +255,6 @@ export const setToString = (a: Set<string>, delimiter: string = ",") => {
 };
 
 export const extractSvgSub = (x: string, subEl: string = "rect") => {
-  const DOMParser = (typeof window !== 'undefined' && window.DOMParser) || (typeof globalThis !== 'undefined' && globalThis.DOMParser);
-  if (!DOMParser) {
-    throw new Error('DOMParser not available');
-  }
   const parser = new DOMParser();
   const dom = parser.parseFromString(x, "image/svg+xml");
   const svg = dom.querySelector("svg");
