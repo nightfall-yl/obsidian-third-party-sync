@@ -6,6 +6,7 @@ import {
   setIcon,
   FileSystemAdapter,
   Platform, TAbstractFile, Vault, EventRef,
+  activeDocument,
 } from "obsidian";
 
 import type {
@@ -251,6 +252,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
       void statusBarFunc(triggerSource, 1, true);
 
       // Step 2 - prepare for sync
+      // eslint-disable-next-line @typescript-eslint/no-this-alias -- required to preserve 'this' context in callbacks
       const self = this;
       const client = this.getRemoteClient(self);
 
@@ -1160,7 +1162,8 @@ export default class ThirdPartySyncPlugin extends Plugin {
   toggleStatusBar(enabled: boolean) {  
     this.statusBarElement?.remove();
 
-    const statusBar = document.getElementsByClassName("status-bar")[0] as HTMLElement | undefined;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- activeDocument may be null in early plugin init, fallback to document
+    const statusBar = (activeDocument ?? document).getElementsByClassName("status-bar")[0] as HTMLElement | undefined;
 
     // Guard: if status bar doesn't exist (e.g., iOS), skip DOM manipulation
     if (!statusBar) {
@@ -1182,7 +1185,8 @@ export default class ThirdPartySyncPlugin extends Plugin {
         
         // Shifts up the status bar on phone to not cover the navmenu
         if (Platform.isPhone) {
-          const navBar = document.getElementsByClassName("mobile-navbar")[0] as HTMLElement | undefined;
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- activeDocument may be null, fallback to document
+          const navBar = (activeDocument ?? document).getElementsByClassName("mobile-navbar")[0] as HTMLElement | undefined;
           if (!navBar) return;
           const height = window.getComputedStyle(navBar).getPropertyValue('height');
           statusBar.style.marginBottom = height;
