@@ -229,7 +229,7 @@
   "settings_webdav_connect_fail": "The webdav server cannot be reached (possible to be any of address/username/password/authtype errors).",
   "settings_webdav_connect_fail_withcors": "The webdav server cannot be reached (possible to be any of address/username/password/authtype/CORS errors).",
   "settings_chooseservice": "Choose A Remote Service",
-  "settings_chooseservice_desc": "Start here. What service are you connecting to? S3, Webdav, or OneDrive for personal?",
+  "settings_chooseservice_desc": "Start here, choose the service you want to connect to: S3, Webdav, or OneDrive(Personal).",
   "settings_chooseservice_s3": "S3 or compatible",
   "settings_chooseservice_webdav": "Webdav",
   "settings_chooseservice_onedrive": "OneDrive for personal",
