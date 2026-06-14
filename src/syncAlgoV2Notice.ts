@@ -23,7 +23,24 @@ export class SyncAlgoV2Modal extends Modal {
     this.i18n.t("syncalgov2_texts")
       .split("\n")
       .forEach((val) => {
-        contentEl.createEl("p", { text: val });
+        const p = contentEl.createEl("p");
+        // Parse Markdown-style links [text](url) and create real <a> elements
+        const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+        let lastIndex = 0;
+        let match: RegExpExecArray | null;
+        while ((match = linkRegex.exec(val)) !== null) {
+          if (match.index > lastIndex) {
+            p.createSpan({ text: val.substring(lastIndex, match.index) });
+          }
+          p.createEl("a", {
+            text: match[1],
+            href: match[2],
+          });
+          lastIndex = match.index + match[0].length;
+        }
+        if (lastIndex < val.length) {
+          p.createSpan({ text: val.substring(lastIndex) });
+        }
       });
 
     new Setting(contentEl)
