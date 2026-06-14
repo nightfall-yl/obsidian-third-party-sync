@@ -968,10 +968,14 @@ export default class ThirdPartySyncPlugin extends Plugin {
     this.enableAutoSyncIfSet();
     this.enableInitSyncIfSet();
 
-    void this.toggleSyncOnRemote(true);
+    this.toggleSyncOnRemote(true);
     void this.toggleSyncOnSave(true);
-    this.toggleStatusBar(true);
     this.toggleStatusText(true);
+
+    // Delay status bar creation to onLayoutReady to ensure activeDocument is available
+    this.app.workspace.onLayoutReady(() => {
+      this.toggleStatusBar(true);
+    });
 
     this.updateSyncStatus("idle");
   }
@@ -1159,11 +1163,11 @@ export default class ThirdPartySyncPlugin extends Plugin {
     }
   }
 
-  toggleStatusBar(enabled: boolean) {  
+  toggleStatusBar(enabled: boolean) {
+    if (!activeDocument) return;
     this.statusBarElement?.remove();
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, obsidian-plugin/prefer-active-document -- activeDocument may be null in early plugin init, fallback to document
-    const statusBar = (activeDocument ?? document).getElementsByClassName("status-bar")[0] as HTMLElement | undefined;
+    const statusBar = activeDocument.getElementsByClassName("status-bar")[0] as HTMLElement | undefined;
 
     // Guard: if status bar doesn't exist (e.g., iOS), skip DOM manipulation
     if (!statusBar) {
@@ -1185,8 +1189,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
         
         // Shifts up the status bar on phone to not cover the navmenu
         if (Platform.isPhone) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, obsidian-plugin/prefer-active-document -- activeDocument may be null, fallback to document
-          const navBar = (activeDocument ?? document).getElementsByClassName("mobile-navbar")[0] as HTMLElement | undefined;
+          const navBar = activeDocument.getElementsByClassName("mobile-navbar")[0] as HTMLElement | undefined;
           if (!navBar) return;
           const height = window.getComputedStyle(navBar).getPropertyValue('height');
           statusBar.style.marginBottom = height;
