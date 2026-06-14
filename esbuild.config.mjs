@@ -12,6 +12,7 @@ if you want to view the source, please visit the github repository of this plugi
 */
 `;
 
+
 const external = [
   "obsidian",
   "electron",
@@ -66,6 +67,34 @@ const nodeCoreFallbackPlugin = {
   },
 };
 
+// Replace the 'immediate' function inside localforage's bundled lie dependency
+// to avoid dynamic <script> element creation which violates Obsidian's CSP.
+// The immediate module has a chain: MutationObserver → setImmediate+MessageChannel
+// → document.createElement("script") → setTimeout. We force the setTimeout path.
+const immediateSafePlugin = {
+  name: "immediate-safe",
+  setup(build) {
+    build.onLoad({ filter: /localforage[\/\\]dist[\/\\]localforage\.js$/ }, (args) => {
+      const fs = require("fs");
+      let contents = fs.readFileSync(args.path, "utf8");
+      // Replace the entire module 1 (the immediate/asap implementation)
+      // with a safe version that uses setTimeout.
+      const safeModule1 =
+        '1:[function(_dereq_,module,exports){(function(global){"use strict";' +
+        'var draining;var queue=[];function nextTick(){draining=true;var i,oldQueue;' +
+        'var len=queue.length;while(len){oldQueue=queue;queue=[];i=-1;' +
+        'while(++i<len){oldQueue[i]()}len=queue.length}draining=false}' +
+        'module.exports=function immediate(task){if(queue.push(task)===1&&!draining){setTimeout(nextTick,0)}}}' +
+        ').call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})';
+      contents = contents.replace(
+        /1:\[function\(_dereq_,module,exports\)\{[\s\S]*?,\{\}\],2:/,
+        safeModule1 + "\n},{}],2:"
+      );
+      return { contents, loader: "js" };
+    });
+  },
+};
+
 const copyDistFiles = () => {
   const distDir = path.join(process.cwd(), "dist");
   fs.mkdirSync(distDir, { recursive: true });
@@ -105,7 +134,7 @@ const buildOptions = {
     "process.env.NODE_ENV": JSON.stringify(prod ? "production" : "development"),
     global: "globalThis",
   },
-  plugins: [nodeCoreFallbackPlugin],
+  plugins: [nodeCoreFallbackPlugin, immediateSafePlugin],
   logLevel: "info",
 };
 
