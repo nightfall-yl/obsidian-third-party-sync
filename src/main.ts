@@ -1162,7 +1162,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
   toggleStatusBar(enabled: boolean) {  
     this.statusBarElement?.remove();
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- activeDocument may be null in early plugin init, fallback to document
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, obsidian-plugin/prefer-active-document -- activeDocument may be null in early plugin init, fallback to document
     const statusBar = (activeDocument ?? document).getElementsByClassName("status-bar")[0] as HTMLElement | undefined;
 
     // Guard: if status bar doesn't exist (e.g., iOS), skip DOM manipulation
@@ -1185,7 +1185,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
         
         // Shifts up the status bar on phone to not cover the navmenu
         if (Platform.isPhone) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- activeDocument may be null, fallback to document
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, obsidian-plugin/prefer-active-document -- activeDocument may be null, fallback to document
           const navBar = (activeDocument ?? document).getElementsByClassName("mobile-navbar")[0] as HTMLElement | undefined;
           if (!navBar) return;
           const height = window.getComputedStyle(navBar).getPropertyValue('height');
