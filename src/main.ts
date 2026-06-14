@@ -6,7 +6,6 @@ import {
   setIcon,
   FileSystemAdapter,
   Platform, TAbstractFile, Vault, EventRef,
-  activeDocument,
 } from "obsidian";
 
 import type {
@@ -968,14 +967,10 @@ export default class ThirdPartySyncPlugin extends Plugin {
     this.enableAutoSyncIfSet();
     this.enableInitSyncIfSet();
 
-    this.toggleSyncOnRemote(true);
+    void this.toggleSyncOnRemote(true);
     void this.toggleSyncOnSave(true);
+    this.toggleStatusBar(true);
     this.toggleStatusText(true);
-
-    // Delay status bar creation to onLayoutReady to ensure activeDocument is available
-    this.app.workspace.onLayoutReady(() => {
-      this.toggleStatusBar(true);
-    });
 
     this.updateSyncStatus("idle");
   }
@@ -1163,11 +1158,10 @@ export default class ThirdPartySyncPlugin extends Plugin {
     }
   }
 
-  toggleStatusBar(enabled: boolean) {
-    if (!activeDocument) return;
+  toggleStatusBar(enabled: boolean) {  
     this.statusBarElement?.remove();
 
-    const statusBar = activeDocument.getElementsByClassName("status-bar")[0] as HTMLElement | undefined;
+    const statusBar = document.getElementsByClassName("status-bar")[0] as HTMLElement | undefined;
 
     // Guard: if status bar doesn't exist (e.g., iOS), skip DOM manipulation
     if (!statusBar) {
@@ -1189,7 +1183,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
         
         // Shifts up the status bar on phone to not cover the navmenu
         if (Platform.isPhone) {
-          const navBar = activeDocument.getElementsByClassName("mobile-navbar")[0] as HTMLElement | undefined;
+          const navBar = document.getElementsByClassName("mobile-navbar")[0] as HTMLElement | undefined;
           if (!navBar) return;
           const height = window.getComputedStyle(navBar).getPropertyValue('height');
           statusBar.style.marginBottom = height;
