@@ -1,4 +1,4 @@
-import { Vault, requestUrl } from "obsidian";
+import { Vault, requestUrl, Platform } from "obsidian";
 
 import { Queue } from "@fyears/tsqueue";
 import { getReasonPhrase } from "http-status-codes";
@@ -14,166 +14,84 @@ import type {
   Response,
   ResponseDataDetailed,
 } from "webdav";
-import { getPatcher } from "webdav";
+// @ts-ignore -- explicit path to browser build ensures same instance as createClient
+import { getPatcher } from "webdav/dist/web/index.js";
 
-const WEBDAV_503_RETRY_DELAYS_MS = [300, 700, 1300];
+// Helper: lowercase all keys of an object (same as upstream)
+const objKeyToLower = (obj: Record<string, string>): Record<string, string> =>
+  Object.fromEntries(
+    Object.entries(obj).map(([k, v]) => [k.toLowerCase(), v])
+  );
 
-const sleep = (ms: number) =>
-  new Promise<void>((resolve) => window.setTimeout(resolve, ms));
-
-const isStatus503Error = (error: unknown) => {
-  if (error === undefined || error === null) {
-    return false;
-  }
-  const e = error as { status?: unknown; message?: unknown };
-  if (e.status === 503) {
-    return true;
-  }
-  if (typeof e.message === "string" && /\bstatus\s*503\b/i.test(e.message)) {
-    return true;
-  }
-  return false;
-};
-
-const isStatus503Response = (resp: unknown) => {
-  if (resp === undefined || resp === null) {
-    return false;
-  }
-  const r = resp as { status?: unknown };
-  return r.status === 503;
-};
-
-const webdavCallWith503Retry = async <T>(
-  opName: string,
-  op: () => Promise<T>
-): Promise<T> => {
-  let lastErr: unknown = undefined;
-  for (let attempt = 0; attempt <= WEBDAV_503_RETRY_DELAYS_MS.length; attempt++) {
-    try {
-      const rsp = await op();
-      if (
-        isStatus503Response(rsp) &&
-        attempt < WEBDAV_503_RETRY_DELAYS_MS.length
-      ) {
-        const waitMs = WEBDAV_503_RETRY_DELAYS_MS[attempt];
-        log.warn(
-          `webdav op "${opName}" got 503 response, retrying in ${waitMs}ms (${attempt + 1}/${WEBDAV_503_RETRY_DELAYS_MS.length})`
-        );
-        await sleep(waitMs);
-        continue;
-      }
-      return rsp;
-    } catch (error) {
-      lastErr = error;
-      if (
-        isStatus503Error(error) &&
-        attempt < WEBDAV_503_RETRY_DELAYS_MS.length
-      ) {
-        const waitMs = WEBDAV_503_RETRY_DELAYS_MS[attempt];
-        log.warn(
-          `webdav op "${opName}" threw 503, retrying in ${waitMs}ms (${attempt + 1}/${WEBDAV_503_RETRY_DELAYS_MS.length})`
-        );
-        await sleep(waitMs);
-        continue;
-      }
-      throw error;
-    }
-  }
-  throw lastErr ?? Error(`webdav op "${opName}" failed`);
-};
-
-const requestUrlWith503Retry = async (
-  req: Parameters<typeof requestUrl>[0]
-) => {
-  const reqMethod = typeof req === "string" ? "GET" : req.method;
-  const reqUrl = typeof req === "string" ? req : req.url;
-  for (let attempt = 0; attempt <= WEBDAV_503_RETRY_DELAYS_MS.length; attempt++) {
-    try {
-      const r = await requestUrl(req);
-      if (r.status === 503 && attempt < WEBDAV_503_RETRY_DELAYS_MS.length) {
-        const waitMs = WEBDAV_503_RETRY_DELAYS_MS[attempt];
-        log.warn(
-          `webdav request got 503, retrying in ${waitMs}ms (${attempt + 1}/${WEBDAV_503_RETRY_DELAYS_MS.length})`,
-          { method: reqMethod, url: reqUrl }
-        );
-        await sleep(waitMs);
-        continue;
-      }
-      return r;
-    } catch (error) {
-      if (
-        isStatus503Error(error) &&
-        attempt < WEBDAV_503_RETRY_DELAYS_MS.length
-      ) {
-        const waitMs = WEBDAV_503_RETRY_DELAYS_MS[attempt];
-        log.warn(
-          `webdav request threw 503, retrying in ${waitMs}ms (${attempt + 1}/${WEBDAV_503_RETRY_DELAYS_MS.length})`,
-          { method: reqMethod, url: reqUrl }
-        );
-        await sleep(waitMs);
-        continue;
-      }
-      throw error;
-    }
-  }
-
-  return await requestUrl(req);
-};
+// Helper: encode non-ASCII chars in header values (same as upstream)
+const onlyAscii = (s: string): string =>
+  /[\u0100-\uffff]/.test(s) ? encodeURIComponent(s) : s;
 
 if (VALID_REQURL) {
   getPatcher().patch(
     "request",
     async (
       options: Record<string, unknown>
-    ): Promise<Response | ResponseDataDetailed<unknown>> => {
-      const transformedHeaders = { ...(options.headers as Record<string, string>) };
+    ): Promise<Response> => {
+      // Lowercase all header keys (same as upstream)
+      const transformedHeaders = objKeyToLower(
+        options.headers as Record<string, string>
+      );
       delete transformedHeaders["host"];
-      delete transformedHeaders["Host"];
       delete transformedHeaders["content-length"];
-      delete transformedHeaders["Content-Length"];
-      const r = await requestUrlWith503Retry({
+
+      const reqContentType =
+        transformedHeaders["accept"] ?? transformedHeaders["content-type"];
+
+      const p: Parameters<typeof requestUrl>[0] = {
         url: options.url as string,
         method: options.method as string,
         body: options.data as string | ArrayBuffer,
         headers: transformedHeaders,
-      });
+        contentType: reqContentType,
+        throw: false,
+      };
 
-      let r2: Response | ResponseDataDetailed<unknown> = undefined;
-      // Wrap Obsidian requestUrl response properties as methods.
-      // Use lazy evaluation for .json() to avoid eagerly parsing non-JSON responses
-      // (e.g., WebDAV servers return XML for PROPFIND, which would crash on .json access).
-      const respText = r.text;
-      const respArrayBuffer = r.arrayBuffer;
-      const makeResponse = (
-        data: unknown,
-      ): Response => ({
-        data,
-        status: r.status,
-        statusText: getReasonPhrase(r.status),
-        headers: r.headers,
-        text: () => respText,
-        json: () => JSON.parse(respText),
-        arrayBuffer: () => respArrayBuffer,
-        ok: r.status >= 200 && r.status < 300,
-      });
-      if (options.responseType === undefined) {
-        r2 = makeResponse(undefined);
-      } else if (options.responseType === "json") {
-        r2 = makeResponse(JSON.parse(respText));
-      } else if (options.responseType === "text") {
-        r2 = makeResponse(respText);
-      } else if (options.responseType === "arraybuffer") {
-        r2 = makeResponse(respArrayBuffer);
-      } else {
-        throw Error(
-          `do not know how to deal with responseType = ${JSON.stringify(options.responseType)}`
-        );
+      let r = await requestUrl(p);
+
+      // iOS 401 hack (same as upstream)
+      if (
+        r.status === 401 &&
+        Platform.isIosApp &&
+        !(options.url as string).endsWith("/") &&
+        !(options.url as string).endsWith(".md") &&
+        options.method?.toString().toUpperCase() === "PROPFIND"
+      ) {
+        p.url = `${options.url}/`;
+        r = await requestUrl(p);
       }
-      return r2;
+
+      // Lowercase response header keys, encode non-ASCII values (same as upstream)
+      const rspHeaders = objKeyToLower(r.headers as Record<string, string>);
+      for (const [key, val] of Object.entries(rspHeaders)) {
+        rspHeaders[key] = onlyAscii(val);
+      }
+
+      const statusText = getReasonPhrase(r.status);
+      // Use new Response() to create a standard Response object
+      // (same approach as remotely-save upstream)
+      if ([101, 103, 204, 205, 304].includes(r.status)) {
+        return new Response(null, {
+          status: r.status,
+          statusText,
+          headers: rspHeaders,
+        });
+      }
+      return new Response(r.arrayBuffer, {
+        status: r.status,
+        statusText,
+        headers: rspHeaders,
+      });
     }
   );
 }
-import { AuthType, BufferLike, createClient } from "webdav";
+// @ts-ignore -- explicit path to browser build ensures same instance as getPatcher
+import { AuthType, BufferLike, createClient } from "webdav/dist/web/index.js";
 export type { WebDAVClient } from "webdav";
 
 export const DEFAULT_WEBDAV_CONFIG = {
@@ -283,15 +201,11 @@ export class WrappedWebdavClient {
     if (this.vaultFolderExists) {
       // pass
     } else {
-      const res = await webdavCallWith503Retry("exists(vaultRoot)", () =>
-        this.client.exists(`/${this.remoteBaseDir}/`)
-      );
+      const res = await this.client.exists(`/${this.remoteBaseDir}/`);
       if (res) {
         this.vaultFolderExists = true;
       } else {
-        await webdavCallWith503Retry("createDirectory(vaultRoot)", () =>
-          this.client.createDirectory(`/${this.remoteBaseDir}/`)
-        );
+        await this.client.createDirectory(`/${this.remoteBaseDir}/`);
         this.vaultFolderExists = true;
       }
     }
@@ -300,16 +214,15 @@ export class WrappedWebdavClient {
     if (this.webdavConfig.depth === "auto_unknown") {
       let testPassed = false;
       try {
-        const res = await webdavCallWith503Retry<unknown>(
-          "customRequest(PROPFIND infinity)",
-          () =>
-            this.client.customRequest(`/${this.remoteBaseDir}/`, {
-              method: "PROPFIND",
-              headers: {
-                Depth: "infinity",
-              },
-              responseType: "text",
-            } as Parameters<typeof this.client.customRequest>[1])
+        const res = await this.client.customRequest(
+          `/${this.remoteBaseDir}/`,
+          {
+            method: "PROPFIND",
+            headers: {
+              Depth: "infinity",
+            },
+            responseType: "text",
+          } as Parameters<typeof this.client.customRequest>[1]
         );
         if (res.status === 403) {
           throw Error("not support Infinity, get 403");
@@ -323,16 +236,15 @@ export class WrappedWebdavClient {
       }
       if (!testPassed) {
         try {
-          await webdavCallWith503Retry(
-            "customRequest(PROPFIND depth=1)",
-            () =>
-              this.client.customRequest(`/${this.remoteBaseDir}/`, {
-                method: "PROPFIND",
-                headers: {
-                  Depth: "1",
-                },
-                responseType: "text",
-              } as unknown as Parameters<typeof this.client.customRequest>[1])
+          await this.client.customRequest(
+            `/${this.remoteBaseDir}/`,
+            {
+              method: "PROPFIND",
+              headers: {
+                Depth: "1",
+              },
+              responseType: "text",
+            } as unknown as Parameters<typeof this.client.customRequest>[1]
           );
           testPassed = true;
           this.webdavConfig.depth = "auto_1";
@@ -370,11 +282,9 @@ export const getRemoteMeta = async (
 ) => {
   await client.init();
   const remotePath = getWebdavPath(fileOrFolderPath, client.remoteBaseDir);
-  const res = (await webdavCallWith503Retry("stat", () =>
-    client.client.stat(remotePath, {
+  const res = (await client.client.stat(remotePath, {
       details: false,
-    })
-  )) as FileStat;
+    })) as FileStat;
   return fromWebdavItemToRemoteItem(res, client.remoteBaseDir);
 };
 
@@ -406,20 +316,16 @@ export const uploadToRemote = async (
     // folder
     if (password === "") {
       // if not encrypted, mkdir a remote folder
-      await webdavCallWith503Retry("createDirectory(uploadFolder)", () =>
-        client.client.createDirectory(uploadFile, {
+      await client.client.createDirectory(uploadFile, {
           recursive: false, // the sync algo should guarantee no need to recursive
-        })
-      );
+        });
       const res = await getRemoteMeta(client, uploadFile);
       return res;
     } else {
       // if encrypted, upload a fake file with the encrypted file name
-      await webdavCallWith503Retry("putFileContents(uploadFakeFolderFile)", () =>
-        client.client.putFileContents(uploadFile, "", {
+      await client.client.putFileContents(uploadFile, "", {
           overwrite: true,
-        })
-      );
+        });
 
       return await getRemoteMeta(client, uploadFile);
     }
@@ -446,11 +352,9 @@ export const uploadToRemote = async (
     // if (dir !== "/" && dir !== "") {
     //   await client.client.createDirectory(dir, { recursive: false });
     // }
-    await webdavCallWith503Retry("putFileContents(uploadFile)", () =>
-      client.client.putFileContents(uploadFile, remoteContent, {
+    await client.client.putFileContents(uploadFile, remoteContent, {
         overwrite: true,
-      })
-    );
+      });
 
     return await getRemoteMeta(client, uploadFile);
   }
@@ -487,9 +391,8 @@ export const listFromRemote = async (
       // log.debug(itemsToFetchChunks);
       const subContents = [] as FileStat[];
       for (const singleChunk of itemsToFetchChunks) {
-        const r = singleChunk.map((x) => {
-          return webdavCallWith503Retry(`getDirectoryContents(${x})`, () =>
-            client.client.getDirectoryContents(x, {
+        const r = singleChunk.map(async (x) => {
+          return client.client.getDirectoryContents(x, {
               deep: false,
               details: false /* no need for verbose details here */,
               // TODO: to support .obsidian,
@@ -497,7 +400,6 @@ export const listFromRemote = async (
               // anyway to reduce the resources?
               // glob: "/**" /* avoid dot files by using glob */,
             })
-          );
         });
         const r2 = (await Promise.all(r)).flat();
         subContents.push(...r2);
@@ -512,16 +414,14 @@ export const listFromRemote = async (
     }
   } else {
     // the remote supports infinity propfind
-    contents = await webdavCallWith503Retry("getDirectoryContents(deep=true)", () =>
-      client.client.getDirectoryContents(`/${client.remoteBaseDir}`, {
+    contents = await client.client.getDirectoryContents(`/${client.remoteBaseDir}`, {
         deep: true,
         details: false /* no need for verbose details here */,
         // TODO: to support .obsidian,
         // we need to load all files including dot,
         // anyway to reduce the resources?
         // glob: "/**" /* avoid dot files by using glob */,
-      })
-    );
+      });
   }
   const unifiedContents: RemoteItem[] = [];
   for (const x of contents) {
@@ -554,10 +454,8 @@ const downloadFromRemoteRaw = async (
   fileOrFolderPath: string
 ) => {
   await client.init();
-  const buff = (await webdavCallWith503Retry("getFileContents", () =>
-    client.client.getFileContents(
-      getWebdavPath(fileOrFolderPath, client.remoteBaseDir)
-    )
+  const buff = (await client.client.getFileContents(
+    getWebdavPath(fileOrFolderPath, client.remoteBaseDir)
   )) as BufferLike;
   if (buff instanceof ArrayBuffer) {
     return buff;
@@ -628,11 +526,9 @@ export const deleteFromRemote = async (
 
   await client.init();
   try {
-    await webdavCallWith503Retry("deleteFile", () =>
-      client.client.deleteFile(remoteFileName)
-    );
-  } catch {
-    console.error("some error while deleting");
+    await client.client.deleteFile(remoteFileName);
+  } catch (err) {
+    log.warn("some error while deleting", err);
   }
 };
 

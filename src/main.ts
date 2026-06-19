@@ -266,8 +266,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
         this.settings.password
       );
 
-      // Step 5 - get remote states (skip metadata in V3)
-      await notifyFunc(triggerSource, 5);
+      // Step 4 - get remote states (part of processing remote data)
       const remoteStates = await getRemoteStates(
         remoteRsp.Contents, 
         this.db, 
@@ -276,17 +275,17 @@ export default class ThirdPartySyncPlugin extends Plugin {
         this.settings.password
       );
 
-      // Step 6 - get local files
-      await notifyFunc(triggerSource, 6);
+      // Step 5 - get local files
+      await notifyFunc(triggerSource, 4);
       const local = this.app.vault.getAllLoadedFiles();
       let localConfigDirContents: ObsConfigDirFileType[] = await listFilesInObsFolder(this.app.vault, this.manifest.id, this.settings.syncTrash);
       
-      // Step 7 - load prevSync records for V3
-      await notifyFunc(triggerSource, 4);
+      // Step 6 - load prevSync records for V3
+      await notifyFunc(triggerSource, 5);
       const prevSyncRecords = await loadPrevSyncRecordsByVault(this.db, this.vaultRandomID);
 
-      // Step 8 - generate sync plan using V3
-      await notifyFunc(triggerSource, 7);
+      // Step 7 - generate sync plan using V3
+      await notifyFunc(triggerSource, 6);
       const {
         plan, sortedKeys, deletions, sizesGoWrong
       } = await getSyncPlanV3(
@@ -307,7 +306,8 @@ export default class ThirdPartySyncPlugin extends Plugin {
         this.settings.syncDirection ?? "bidirectional"
       );
 
-      // Step 9 - execute sync using V3
+      // Step 8 - execute sync using V3
+      await notifyFunc(triggerSource, 7);
       await this.doActualSyncV3(client, plan, sortedKeys, sizesGoWrong, deletions, self);
 
       // Step 10 - update last synced time
