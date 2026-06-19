@@ -139,34 +139,31 @@ if (VALID_REQURL) {
       });
 
       let r2: Response | ResponseDataDetailed<unknown> = undefined;
+      // Wrap Obsidian requestUrl response properties as methods.
+      // Use lazy evaluation for .json() to avoid eagerly parsing non-JSON responses
+      // (e.g., WebDAV servers return XML for PROPFIND, which would crash on .json access).
+      const respText = r.text;
+      const respArrayBuffer = r.arrayBuffer;
+      const makeResponse = (
+        data: unknown,
+      ): Response => ({
+        data,
+        status: r.status,
+        statusText: getReasonPhrase(r.status),
+        headers: r.headers,
+        text: () => respText,
+        json: () => JSON.parse(respText),
+        arrayBuffer: () => respArrayBuffer,
+        ok: r.status >= 200 && r.status < 300,
+      });
       if (options.responseType === undefined) {
-        r2 = {
-          data: undefined,
-          status: r.status,
-          statusText: getReasonPhrase(r.status),
-          headers: r.headers,
-        };
+        r2 = makeResponse(undefined);
       } else if (options.responseType === "json") {
-        r2 = {
-          data: r.json,
-          status: r.status,
-          statusText: getReasonPhrase(r.status),
-          headers: r.headers,
-        };
+        r2 = makeResponse(JSON.parse(respText));
       } else if (options.responseType === "text") {
-        r2 = {
-          data: r.text,
-          status: r.status,
-          statusText: getReasonPhrase(r.status),
-          headers: r.headers,
-        };
+        r2 = makeResponse(respText);
       } else if (options.responseType === "arraybuffer") {
-        r2 = {
-          data: r.arrayBuffer,
-          status: r.status,
-          statusText: getReasonPhrase(r.status),
-          headers: r.headers,
-        };
+        r2 = makeResponse(respArrayBuffer);
       } else {
         throw Error(
           `do not know how to deal with responseType = ${JSON.stringify(options.responseType)}`
