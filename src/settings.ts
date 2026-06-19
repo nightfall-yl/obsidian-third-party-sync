@@ -1709,6 +1709,9 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
     const sgDebug = new SettingGroup(containerEl);
     sgDebug.setHeading(t("settings_debug"));
 
+    // Collect DOM elements of debug-only settings for show/hide toggling
+    const debugSettingEls: HTMLElement[] = [];
+
     // Debug mode toggle (always visible)
     // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
     sgDebug.addSetting((setting) =>
@@ -1734,232 +1737,267 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
         })
     );
 
-    // Container for debug options (hidden when debug is disabled)
-    const debugOptionsDiv = (sgDebug as { groupEl: HTMLElement }).groupEl.createEl("div", {
-      cls: "remotely-sync-debug-options"
-    });
-
-    // Update visibility and re-render options
-    this.update = () => {
-      const enabled = !!this.plugin.settings.debugEnabled;
-      debugOptionsDiv.style.display = enabled ? "block" : "none";
-      
-      // Re-render debug options
-      debugOptionsDiv.innerHTML = "";
-      
-      if (enabled) {
-        new Setting(debugOptionsDiv)
-      .setName(t("settings_outputsettingsconsole"))
-      .setDesc(t("settings_outputsettingsconsole_desc"))
-      .addButton((button) => {
-        button.setButtonText(t("settings_outputsettingsconsole_button"));
-        button.onClick(() => {
-          void (async () => {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- localforage loadData returns any
-            const c = messyConfigToNormal(await this.plugin.loadData());
-            new Notice(t("settings_outputsettingsconsole_notice"));
-            log.debug("output settings to console:", c);
-          })();
-        });
+    // Helper: add a debug-only setting and track its DOM element
+    const addDebugSetting = (cb: (setting: Setting) => void) => {
+      sgDebug.addSetting((setting) => {
+        cb(setting);
+        // setting.settingEl is the .setting-item HTMLElement created by addSetting
+        debugSettingEls.push(setting.settingEl);
       });
+    };
 
-        new Setting(debugOptionsDiv)
-          .setName(t("settings_syncplans"))
-          .setDesc(t("settings_syncplans_desc"))
-          .addButton((button) => {
-            button.setButtonText(t("settings_syncplans_button_json"));
-            button.onClick(() => {
-              void (async () => {
-                await exportVaultSyncPlansToFiles(
-                  this.plugin.db,
-                  this.app.vault,
-                  this.plugin.vaultRandomID,
-                  "json"
-                );
-                new Notice(t("settings_syncplans_notice"));
-              })();
+    // --- All debug-only settings below ---
+
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
+    addDebugSetting((setting) =>
+      setting
+        .setName(t("settings_outputsettingsconsole"))
+        .setDesc(t("settings_outputsettingsconsole_desc"))
+        .addButton((button) => {
+          button.setButtonText(t("settings_outputsettingsconsole_button"));
+          button.onClick(() => {
+            void (async () => {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- localforage loadData returns any
+              const c = messyConfigToNormal(await this.plugin.loadData());
+              new Notice(t("settings_outputsettingsconsole_notice"));
+              log.debug("output settings to console:", c);
+            })();
+          });
+        })
+    );
+
+    addDebugSetting((setting) =>
+      setting
+        .setName(t("settings_syncplans"))
+        .setDesc(t("settings_syncplans_desc"))
+        .addButton((button) => {
+          button.setButtonText(t("settings_syncplans_button_json"));
+          button.onClick(() => {
+            void (async () => {
+              await exportVaultSyncPlansToFiles(
+                this.plugin.db,
+                this.app.vault,
+                this.plugin.vaultRandomID,
+                "json"
+              );
+              new Notice(t("settings_syncplans_notice"));
+            })();
+          });
+        })
+        .addButton((button) => {
+          button.setButtonText(t("settings_syncplans_button_table"));
+          button.onClick(() => {
+            void (async () => {
+              await exportVaultSyncPlansToFiles(
+                this.plugin.db,
+                this.app.vault,
+                this.plugin.vaultRandomID,
+                "table"
+              );
+              new Notice(t("settings_syncplans_notice"));
+            })();
+          });
+        })
+    );
+
+    addDebugSetting((setting) =>
+      setting
+        .setName(t("settings_delsyncplans"))
+        .setDesc(t("settings_delsyncplans_desc"))
+        .addButton((button) => {
+          button.setButtonText(t("settings_delsyncplans_button"));
+          button.onClick(() => {
+            void (async () => {
+              await clearAllSyncPlanRecords(this.plugin.db);
+              new Notice(t("settings_delsyncplans_notice"));
+            })();
+          });
+        })
+    );
+
+    addDebugSetting((setting) =>
+      setting
+        .setName(t("settings_logtodb"))
+        .setDesc(t("settings_logtodb_desc"))
+        .addDropdown((dropdown) => {
+          dropdown.addOption("enable", t("enable"));
+          dropdown.addOption("disable", t("disable"));
+          dropdown
+            .setValue(this.plugin.settings.logToDB ? "enable" : "disable")
+            .onChange((val: string) => {
+              const logToDB = val === "enable";
+              if (logToDB) {
+                applyLogWriterInplace((...msg: unknown[]) => {
+                  void insertLoggerOutputByVault(
+                    this.plugin.db,
+                    this.plugin.vaultRandomID,
+                    ...msg
+                  );
+                });
+              } else {
+                restoreLogWritterInplace();
+              }
+              void clearExpiredLoggerOutputRecords(this.plugin.db);
+              this.plugin.settings.logToDB = logToDB;
+              void this.plugin.saveSettings();
             });
+        })
+    );
+
+    addDebugSetting((setting) =>
+      setting
+        .setName(t("settings_logtodbexport"))
+        .setDesc(
+          t("settings_logtodbexport_desc", {
+            debugFolder: DEFAULT_DEBUG_FOLDER,
           })
-          .addButton((button) => {
-            button.setButtonText(t("settings_syncplans_button_table"));
-            button.onClick(() => {
-              void (async () => {
-                await exportVaultSyncPlansToFiles(
-                  this.plugin.db,
-                  this.app.vault,
-                  this.plugin.vaultRandomID,
-                  "table"
-                );
-                new Notice(t("settings_syncplans_notice"));
-              })();
-            });
-          });
-        new Setting(debugOptionsDiv)
-          .setName(t("settings_delsyncplans"))
-          .setDesc(t("settings_delsyncplans_desc"))
-          .addButton((button) => {
-            button.setButtonText(t("settings_delsyncplans_button"));
-            button.onClick(() => {
-              void (async () => {
-                await clearAllSyncPlanRecords(this.plugin.db);
-                new Notice(t("settings_delsyncplans_notice"));
-              })();
-            });
-          });
-
-        new Setting(debugOptionsDiv)
-          .setName(t("settings_logtodb"))
-          .setDesc(t("settings_logtodb_desc"))
-          .addDropdown((dropdown) => {
-            dropdown.addOption("enable", t("enable"));
-            dropdown.addOption("disable", t("disable"));
-            dropdown
-              .setValue(this.plugin.settings.logToDB ? "enable" : "disable")
-              .onChange((val: string) => {
-                const logToDB = val === "enable";
-                if (logToDB) {
-                  applyLogWriterInplace((...msg: unknown[]) => {
-                    void insertLoggerOutputByVault(
-                      this.plugin.db,
-                      this.plugin.vaultRandomID,
-                      ...msg
-                    );
-                  });
-                } else {
-                  restoreLogWritterInplace();
-                }
-                void clearExpiredLoggerOutputRecords(this.plugin.db);
-                this.plugin.settings.logToDB = logToDB;
-                void this.plugin.saveSettings();
-              });
-          });
-
-        new Setting(debugOptionsDiv)
-          .setName(t("settings_logtodbexport"))
-          .setDesc(
-            t("settings_logtodbexport_desc", {
-              debugFolder: DEFAULT_DEBUG_FOLDER,
-            })
-          )
-          .addButton((button) => {
-            button.setButtonText(t("settings_logtodbexport_button"));
-            button.onClick(() => {
-              void (async () => {
-                await exportVaultLoggerOutputToFiles(
+        )
+        .addButton((button) => {
+          button.setButtonText(t("settings_logtodbexport_button"));
+          button.onClick(() => {
+            void (async () => {
+              await exportVaultLoggerOutputToFiles(
                 this.plugin.db,
                 this.app.vault,
                 this.plugin.vaultRandomID
               );
               new Notice(t("settings_logtodbexport_notice"));
-              })();
+            })();
+          });
+        })
+    );
+
+    addDebugSetting((setting) =>
+      setting
+        .setName(t("settings_logtodbclear"))
+        .setDesc(t("settings_logtodbclear_desc"))
+        .addButton((button) => {
+          button.setButtonText(t("settings_logtodbclear_button"));
+          button.onClick(() => {
+            void (async () => {
+              await clearAllLoggerOutputRecords(this.plugin.db);
+              new Notice(t("settings_logtodbclear_notice"));
+            })();
+          });
+        })
+    );
+
+    addDebugSetting((setting) =>
+      setting
+        .setName(t("settings_delsyncmap"))
+        .setDesc(t("settings_delsyncmap_desc"))
+        .addButton((button) => {
+          button.setButtonText(t("settings_delsyncmap_button"));
+          button.onClick(() => {
+            void (async () => {
+              await clearAllSyncMetaMapping(this.plugin.db);
+              new Notice(t("settings_delsyncmap_notice"));
+            })();
+          });
+        })
+    );
+
+    addDebugSetting((setting) =>
+      setting
+        .setName(t("settings_outputbasepathvaultid"))
+        .setDesc(t("settings_outputbasepathvaultid_desc"))
+        .addButton((button) => {
+          button.setButtonText(t("settings_outputbasepathvaultid_button"));
+          button.onClick(() => {
+            new Notice(this.plugin.getVaultBasePath());
+            new Notice(this.plugin.vaultRandomID);
+          });
+        })
+    );
+
+    addDebugSetting((setting) =>
+      setting
+        .setName(t("settings_resetcache"))
+        .setDesc(t("settings_resetcache_desc"))
+        .addButton((button) => {
+          button.setButtonText(t("settings_reset_button"));
+          button.onClick(() => {
+            void (async () => {
+              await destroyDBs();
+              new Notice(t("settings_resetcache_notice"));
+            })();
+          });
+        })
+    );
+
+    addDebugSetting((setting) =>
+      setting
+        .setName(t("settings_disable_s3_metadata_sync"))
+        .setDesc(t("settings_disable_s3_metadata_sync_desc"))
+        .addToggle((toggle) => {
+          toggle
+            .setValue(this.plugin.settings.s3.disableS3MetadataSync)
+            .onChange((val) => {
+              this.plugin.settings.s3.disableS3MetadataSync = val;
+              void this.plugin.saveSettings();
+              new Notice(t("settings_enablestatusbar_reloadrequired_notice"));
             });
+        })
+    );
+
+    addDebugSetting((setting) =>
+      setting
+        .setName(t("settings_reset_sync_metadata"))
+        .setDesc(t("settings_reset_sync_metadata_desc"))
+        .addButton((button) => {
+          button.setButtonText(t("settings_reset_button"));
+          button.onClick(() => {
+            void (async () => {
+              // Delete all remote metadata file(s) and upload empty one.
+              if (this.deletingRemoteMeta) {
+                new Notice(t("settings_reset_sync_metadata_notice_error"));
+                return;
+              }
+
+              new Notice(t("settings_reset_sync_metadata_notice_start"));
+              log.debug("Deleting remote metadata file. (1/2)");
+
+              this.deletingRemoteMeta = true;
+
+              await this.deleteRemoteMetadata();
+
+              await uploadExtraMeta(this.getClient(),
+                this.app.vault,
+                undefined,
+                undefined,
+                [],
+                this.plugin.settings.password);
+
+              this.deletingRemoteMeta = false;
+
+              new Notice(t("settings_reset_sync_metadata_notice_end"));
+              log.debug("Remote metadata file deleted. (2/2)");
+            })();
           });
+        })
+    );
 
-        new Setting(debugOptionsDiv)
-          .setName(t("settings_logtodbclear"))
-          .setDesc(t("settings_logtodbclear_desc"))
-          .addButton((button) => {
-            button.setButtonText(t("settings_logtodbclear_button"));
-            button.onClick(() => {
-              void (async () => {
-                await clearAllLoggerOutputRecords(this.plugin.db);
-                new Notice(t("settings_logtodbclear_notice"));
-              })();
-            });
-          });
-
-        new Setting(debugOptionsDiv)
-          .setName(t("settings_delsyncmap"))
-          .setDesc(t("settings_delsyncmap_desc"))
-          .addButton((button) => {
-            button.setButtonText(t("settings_delsyncmap_button"));
-            button.onClick(() => {
-              void (async () => {
-                await clearAllSyncMetaMapping(this.plugin.db);
-                new Notice(t("settings_delsyncmap_notice"));
-              })();
-            });
-          });
-
-        new Setting(debugOptionsDiv)
-          .setName(t("settings_outputbasepathvaultid"))
-          .setDesc(t("settings_outputbasepathvaultid_desc"))
-          .addButton((button) => {
-            button.setButtonText(t("settings_outputbasepathvaultid_button"));
-            button.onClick(() => {
-              new Notice(this.plugin.getVaultBasePath());
-              new Notice(this.plugin.vaultRandomID);
-            });
-          });
-
-        new Setting(debugOptionsDiv)
-          .setName(t("settings_resetcache"))
-          .setDesc(t("settings_resetcache_desc"))
-          .addButton((button) => {
-            button.setButtonText(t("settings_reset_button"));
-            button.onClick(() => {
-              void (async () => {
-                await destroyDBs();
-                new Notice(t("settings_resetcache_notice"));
-              })();
-            });
-          });
-
-        new Setting(debugOptionsDiv)
-          .setName(t("settings_disable_s3_metadata_sync"))
-          .setDesc(t("settings_disable_s3_metadata_sync_desc"))
-          .addToggle((toggle) => {
-            toggle
-              .setValue(this.plugin.settings.s3.disableS3MetadataSync)
-              .onChange((val) => {
-                this.plugin.settings.s3.disableS3MetadataSync = val;
-                void this.plugin.saveSettings();
-                new Notice(t("settings_enablestatusbar_reloadrequired_notice"));
-              });
-          });
-
-        new Setting(debugOptionsDiv)
-          .setName(t("settings_reset_sync_metadata"))
-          .setDesc(t("settings_reset_sync_metadata_desc"))
-          .addButton((button) => {
-            button.setButtonText(t("settings_reset_button"));
-            button.onClick(() => {
-              void (async () => {
-                // Delete all remote metadata file(s) and upload empty one.
-                if (this.deletingRemoteMeta) {
-                  new Notice(t("settings_reset_sync_metadata_notice_error"));
-                  return;
-                }
-
-                new Notice(t("settings_reset_sync_metadata_notice_start"))
-                log.debug("Deleting remote metadata file. (1/2)")
-
-                this.deletingRemoteMeta = true;
-
-                await this.deleteRemoteMetadata();
-
-                await uploadExtraMeta(this.getClient(),
-                  this.app.vault,
-                  undefined,
-                  undefined,
-                  [],
-                  this.plugin.settings.password );
-
-                this.deletingRemoteMeta = false;
-
-                new Notice(t("settings_reset_sync_metadata_notice_end"));
-                log.debug("Remote metadata file deleted. (2/2)")
-              })();
-            });
-          });
+    // Toggle debug options visibility
+    this.update = () => {
+      const enabled = !!this.plugin.settings.debugEnabled;
+      for (const el of debugSettingEls) {
+        el.style.display = enabled ? "" : "none";
       }
-    }
+    };
+
+    // Initialize visibility on display
+    this.update();
   };
 
   private async deleteRemoteMetadata() {
     const client = this.getClient();
     const remoteFiles = await client.listFromRemote();
     const remoteMetadata = await getRemoteMetadata(remoteFiles.Contents, client, this.plugin.settings.password)
+
+    if (remoteMetadata === undefined) {
+      // No metadata file on remote, nothing to delete
+      return;
+    }
 
     await client.deleteFromRemote(DEFAULT_FILE_NAME_FOR_METADATAONREMOTE, this.plugin.settings.password, remoteMetadata.remoteEncryptedKey);
   }
