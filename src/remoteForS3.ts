@@ -12,14 +12,14 @@ import {
   S3ClientConfig,
 } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
-import { HttpRequest, HttpResponse } from "@aws-sdk/protocol-http";
 import {
   FetchHttpHandler,
   FetchHttpHandlerOptions,
-} from "@aws-sdk/fetch-http-handler";
-// @ts-ignore
-import { requestTimeout } from "@aws-sdk/fetch-http-handler/dist-es/request-timeout";
-import { buildQueryString } from "@aws-sdk/querystring-builder";
+} from "@smithy/fetch-http-handler";
+// @ts-ignore -- explicit path to browser build ensures same instance as createClient
+import { requestTimeout } from "@smithy/fetch-http-handler/dist-es/request-timeout";
+import { HttpRequest, HttpResponse } from "@smithy/protocol-http";
+import { buildQueryString } from "@smithy/querystring-builder";
 import { HttpHandlerOptions } from "@aws-sdk/types";
 
 import * as mime from "mime-types";

@@ -1,6 +1,6 @@
 {
   "name": "third-party-sync",
-  "version": "26.0.5",
+  "version": "26.0.6",
   "description": "Security and feature updates for the obsidian-third-party-sync unofficial plugin allowing users to synchronize notes between local device and the cloud service. Not backwards compatible.",
   "scripts": {
     "build": "node esbuild.config.mjs production",
@@ -8,13 +8,14 @@
     "format": "npx prettier --write .",
     "lint": "eslint src/",
     "clean": "rm -f main.js",
-    "version": "26.0.4"
+    "version": "26.0.6"
   },
   "browser": {
     "path": "path-browserify",
     "stream": "stream-browserify",
     "crypto": "crypto-browserify",
-    "url": "url/"
+    "url": "url/",
+    "process": "process/browser"
   },
   "source": "main.ts",
   "keywords": [],
@@ -36,11 +37,11 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.427.0",
-    "@aws-sdk/fetch-http-handler": "3.78.0",
     "@aws-sdk/lib-storage": "3.449.0",
-    "@aws-sdk/protocol-http": "3.78.0",
-    "@aws-sdk/querystring-builder": "3.78.0",
     "@aws-sdk/types": "^3.78.0",
+    "@smithy/fetch-http-handler": "^3.2.4",
+    "@smithy/protocol-http": "^4.1.0",
+    "@smithy/querystring-builder": "^3.0.3",
     "@fyears/tsqueue": "^1.0.1",
     "@microsoft/microsoft-graph-client": "^3.0.2",
     "aggregate-error": "^4.0.0",
@@ -58,6 +59,7 @@
     "p-queue": "^7.2.0",
     "pako": "^2.1.0",
     "path-browserify": "^1.0.1",
+    "process": "^0.11.10",
     "rfc4648": "^1.5.1",
     "stream-browserify": "^3.0.0",
     "url": "^0.11.0",

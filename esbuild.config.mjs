@@ -50,12 +50,12 @@ const nodeCoreFallbackPlugin = {
       path: nodeCoreAliases.get(args.path.slice("node:".length)),
     }));
 
-    build.onResolve({ filter: /^(fs|http|https|os|process|vm)$/ }, (args) => ({
+    build.onResolve({ filter: /^(fs|http|https|os|vm)$/ }, (args) => ({
       path: args.path,
       namespace: "empty-module",
     }));
 
-    build.onResolve({ filter: /^node:(fs|http|https|os|process|vm)$/ }, (args) => ({
+    build.onResolve({ filter: /^node:(fs|http|https|os|vm)$/ }, (args) => ({
       path: args.path.slice("node:".length),
       namespace: "empty-module",
     }));

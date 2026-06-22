@@ -1,8 +1,9 @@
-import { Vault, requestUrl, Platform } from "obsidian";
-
+import { Buffer } from "buffer";
 import { Queue } from "@fyears/tsqueue";
-import { getReasonPhrase } from "http-status-codes";
-import { RemoteItem, VALID_REQURL, WebdavConfig } from "./baseTypes";
+// Use sub-module path to avoid Node.js-specific code in main entry on Android WebView
+import { getReasonPhrase } from "http-status-codes/build/cjs/utils-functions";
+import { requestUrl, Platform } from "obsidian";
+import { VALID_REQURL, WebdavConfig } from "./baseTypes";
 import { decryptArrayBuffer, encryptArrayBuffer } from "./encrypt";
 import { bufferToArrayBuffer, mkdirpInVault } from "./misc";
 
@@ -23,9 +24,9 @@ const objKeyToLower = (obj: Record<string, string>): Record<string, string> =>
     Object.entries(obj).map(([k, v]) => [k.toLowerCase(), v])
   );
 
-// Helper: encode non-ASCII chars in header values (same as upstream)
-const onlyAscii = (s: string): string =>
-  /[\u0100-\uffff]/.test(s) ? encodeURIComponent(s) : s;
+// Helper: check if string contains only ISO-8859-1 chars (same as upstream)
+const onlyAscii = (s: string): boolean =>
+  !/[^\u0000-\u00ff]/g.test(s);
 
 if (VALID_REQURL) {
   getPatcher().patch(
@@ -68,8 +69,14 @@ if (VALID_REQURL) {
 
       // Lowercase response header keys, encode non-ASCII values (same as upstream)
       const rspHeaders = objKeyToLower(r.headers as Record<string, string>);
-      for (const [key, val] of Object.entries(rspHeaders)) {
-        rspHeaders[key] = onlyAscii(val);
+      for (const key in rspHeaders) {
+        if (rspHeaders.hasOwnProperty(key)) {
+          // avoid: Failed to read 'headers' property from 'ResponseInit':
+          // String contains non ISO-8859-1 code point
+          if (!onlyAscii(rspHeaders[key])) {
+            rspHeaders[key] = encodeURIComponent(rspHeaders[key]);
+          }
+        }
       }
 
       const statusText = getReasonPhrase(r.status);
