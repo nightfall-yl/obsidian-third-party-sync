@@ -267,6 +267,62 @@ const constructFromDriveItemToRemoteItemError = (x: DriveItem) => {
   return `parentPath="${x.parentReference.path}", selfName="${x.name}"`;
 };
 
+/**
+ * Generic parser for OneDrive parent paths.
+ * OneDrive returns paths like:
+ *   /drive/root:/Apps/AnyAppName/VaultName/subfolder
+ *   /drive/root:/应用/任意本地化名称/VaultName/subfolder
+ *   /Livefolders/Apps/AnyAppName/VaultName/subfolder
+ *   /drive/items/<id>!<id>:/VaultName/subfolder  (URI encoded)
+ *
+ * We extract the path AFTER remoteBaseDir (the vault folder name)
+ * regardless of what App Folder name / localization scheme is used.
+ * This avoids hard-coding plugin name strings and ensures compatibility with
+ * any AAD app display name (Remotely Save, Third-party Sync, etc.)
+ */
+const extractKeyByRemoteBaseDir = (
+  fullPathOrParentPath: string,
+  remoteBaseDir: string,
+  fileName: string,
+  parentRefIsIdBased: boolean
+): string | null => {
+  // For /drive/items/ID:PATH style (ID-based parent reference),
+  // fullPathOrParentPath = parent's colon-subpath, e.g. "/VaultName/sub"
+  // or "/VaultName" itself. We need to re-append fileName at the end.
+  if (parentRefIsIdBased) {
+    const key = fullPathOrParentPath;
+    if (key === `/${remoteBaseDir}`) {
+      return fileName;
+    }
+    const prefix = `/${remoteBaseDir}/`;
+    if (key.startsWith(prefix)) {
+      return `${key.substring(prefix.length)}/${fileName}`;
+    }
+    return null;
+  }
+
+  // For named-path formats (/drive/root:/ or /Livefolders/...):
+  // fullPathOrParentPath = parentPath/name, fully assembled
+  // remoteBaseDir itself may appear at ANY path segment after the drive prefix
+  const idx = fullPathOrParentPath.indexOf(`/${remoteBaseDir}/`);
+  if (idx >= 0) {
+    return fullPathOrParentPath.substring(idx + 1 + remoteBaseDir.length + 1);
+  }
+  // remoteBaseDir is the immediate parent (no subfolder)
+  const trailing = fullPathOrParentPath.lastIndexOf(`/${remoteBaseDir}`);
+  if (trailing >= 0 && trailing + remoteBaseDir.length + 1 === fullPathOrParentPath.indexOf(`/${fileName}`, trailing)) {
+    // e.g. ".../AppFolder/VaultName/fileName"
+    return fullPathOrParentPath.substring(trailing + 1 + remoteBaseDir.length + 1);
+  }
+  // Fallback for when fileName sits exactly after remoteBaseDir:
+  // fullPathOrParentPath ends with /<remoteBaseDir>/<fileName>
+  const suffix = `/${remoteBaseDir}/${fileName}`;
+  if (fullPathOrParentPath.endsWith(suffix)) {
+    return fileName;
+  }
+  return null;
+};
+
 const fromDriveItemToRemoteItem = (
   x: DriveItem,
   remoteBaseDir: string
@@ -282,55 +338,43 @@ const fromDriveItemToRemoteItem = (
 
   let key = "";
 
-  // possible prefix:
-  // pure english: /drive/root:/Apps/third-party-sync/${remoteBaseDir}
-  // or localized, e.g.: /drive/root:/应用/third-party-sync/${remoteBaseDir}
-  const FIRST_COMMON_PREFIX_REGEX =
-    /^\/drive\/root:\/[^/]+\/Remotely (Sync|Secure|Save)\//g;
-  // or the root is absolute path /Livefolders,
-  // e.g.: /Livefolders/应用/third-party-sync/${remoteBaseDir}
-  const SECOND_COMMON_PREFIX_REGEX =
-    /^\/Livefolders\/[^/]+\/Remotely (Sync|Secure|Save)\//g;
-
   // another possibile prefix
   const THIRD_COMMON_PREFIX_RAW = `/drive/items/`;
 
   const fullPathOriginal = `${x.parentReference.path}/${x.name}`;
-  const matchFirstPrefixRes = fullPathOriginal.match(FIRST_COMMON_PREFIX_REGEX);
-  const matchSecondPrefixRes = fullPathOriginal.match(
-    SECOND_COMMON_PREFIX_REGEX
-  );
 
-  if (
-    matchFirstPrefixRes !== null &&
-    fullPathOriginal.startsWith(`${matchFirstPrefixRes[0]}${remoteBaseDir}`)
-  ) {
-    const foundPrefix = `${matchFirstPrefixRes[0]}${remoteBaseDir}`;
-    key = fullPathOriginal.substring(foundPrefix.length + 1);
-  } else if (
-    matchSecondPrefixRes !== null &&
-    fullPathOriginal.startsWith(`${matchSecondPrefixRes[0]}${remoteBaseDir}`)
-  ) {
-    const foundPrefix = `${matchSecondPrefixRes[0]}${remoteBaseDir}`;
-    key = fullPathOriginal.substring(foundPrefix.length + 1);
+  // Try generic parsing FIRST — this works for ANY app name / any localization
+  // without hard-coding "Remotely Sync" / "Third-party Sync" / etc.
+  // Format 1: /drive/root:/<LocalizedAppsFolder>/<AnyAppName>/<remoteBaseDir>/...
+  // Format 2: /Livefolders/<LocalizedAppsFolder>/<AnyAppName>/<remoteBaseDir>/...
+  let keyCandidate = extractKeyByRemoteBaseDir(
+    fullPathOriginal,
+    remoteBaseDir,
+    x.name,
+    false
+  );
+  if (keyCandidate !== null) {
+    key = keyCandidate;
   } else if (x.parentReference.path.startsWith(THIRD_COMMON_PREFIX_RAW)) {
     // it's something like
     // /drive/items/<some_id>!<another_id>:/${remoteBaseDir}/<subfolder>
     // with uri encoded!
     const parPath = decodeURIComponent(x.parentReference.path);
-    key = parPath.substring(parPath.indexOf(":") + 1);
-    if (key.startsWith(`/${remoteBaseDir}/`)) {
-      key = key.substring(`/${remoteBaseDir}/`.length);
-      key = `${key}/${x.name}`;
-    } else if (key === `/${remoteBaseDir}`) {
-      key = x.name;
-    } else {
+    const colonSubpath = parPath.substring(parPath.indexOf(":") + 1);
+    keyCandidate = extractKeyByRemoteBaseDir(
+      colonSubpath,
+      remoteBaseDir,
+      x.name,
+      true
+    );
+    if (keyCandidate === null) {
       throw Error(
         `we meet file/folder and do not know how to deal with it:\n${constructFromDriveItemToRemoteItemError(
           x
         )}`
       );
     }
+    key = keyCandidate;
   } else {
     throw Error(
       `we meet file/folder and do not know how to deal with it:\n${constructFromDriveItemToRemoteItemError(

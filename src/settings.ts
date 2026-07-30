@@ -439,7 +439,7 @@ const wrapTextWithPasswordHide = (text: TextComponent) => {
 export class ThirdPartySyncSettingTab extends PluginSettingTab {
   readonly plugin: ThirdPartySyncPlugin;
   deletingRemoteMeta: boolean;
-  update: () => void;
+  private _refreshDebugVisibility?: () => void;
 
   constructor(app: App, plugin: ThirdPartySyncPlugin) {
     super(app, plugin);
@@ -1731,7 +1731,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
               } else {
                 log.setLevel("info");
               }
-              this.update();
+              this._refreshDebugVisibility?.();
               void this.plugin.saveSettings();
             });
         })
@@ -1978,7 +1978,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
     );
 
     // Toggle debug options visibility
-    this.update = () => {
+    this._refreshDebugVisibility = () => {
       const enabled = !!this.plugin.settings.debugEnabled;
       for (const el of debugSettingEls) {
         el.style.display = enabled ? "" : "none";
@@ -1986,7 +1986,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
     };
 
     // Initialize visibility on display
-    this.update();
+    this._refreshDebugVisibility();
   };
 
   private async deleteRemoteMetadata() {
