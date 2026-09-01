@@ -48,18 +48,6 @@ export default defineConfig([
     },
   },
   {
-    // SizesConflictModal clipboard fallback uses document.execCommand("copy"),
-    // which @typescript-eslint/no-deprecated flags (and the recommended config
-    // blocks disabling it). execCommand remains the only reliable programmatic
-    // copy path on iOS/mobile WebViews when navigator.clipboard.writeText fails,
-    // so relax no-restricted-disable for this single file. All other restricted
-    // disables stay in force elsewhere.
-    files: ["src/syncSizesConflictNotice.ts"],
-    rules: {
-      "eslint-comments/no-restricted-disable": "off",
-    },
-  },
-  {
     // webdav's browser deep-import (dist/web/index.js) ships without type
     // declarations, so every call on it resolves to `any`. Suppress the
     // no-unsafe-* noise in the WebDAV client integration rather than fight the

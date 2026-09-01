@@ -52,17 +52,9 @@ export class SizesConflictModal extends Modal {
           try {
             await navigator.clipboard.writeText(info);
           } catch {
-            const textarea = createEl("textarea");
-            textarea.value = info;
-            textarea.className = "tp-clipboard-fallback";
-            // activeDocument is the Obsidian global (typed Document)
-            activeDocument.body.appendChild(textarea);
-            textarea.select();
-            // execCommand is deprecated by the standard, but remains the only
-            // reliable programmatic copy fallback on iOS/mobile WebViews.
-            // eslint-disable-next-line @typescript-eslint/no-deprecated -- document.execCommand is the mobile clipboard fallback when the async Clipboard API is unavailable
-            activeDocument.execCommand("copy");
-            activeDocument.body.removeChild(textarea);
+            // Async Clipboard API is unavailable (rare on modern Obsidian 1.11+
+            // WebViews); skip programmatic copy. The user is still informed by
+            // the notice below.
           }
           new Notice(t("modal_sizesconflict_copynotice"));
         };
