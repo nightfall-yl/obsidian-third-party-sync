@@ -1766,7 +1766,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
         })
     );
 
-    addDebugSetting((setting) =>
+    addDebugSetting((setting) => {
       setting
         .setName(t("settings_syncplans"))
         .setDesc(t("settings_syncplans_desc"))
@@ -1797,10 +1797,10 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
               new Notice(t("settings_syncplans_notice"));
             })();
           });
-        })
-    );
+        });
+    });
 
-    addDebugSetting((setting) =>
+    addDebugSetting((setting) => {
       setting
         .setName(t("settings_delsyncplans"))
         .setDesc(t("settings_delsyncplans_desc"))
@@ -1812,10 +1812,10 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
               new Notice(t("settings_delsyncplans_notice"));
             })();
           });
-        })
-    );
+        });
+    });
 
-    addDebugSetting((setting) =>
+    addDebugSetting((setting) => {
       setting
         .setName(t("settings_logtodb"))
         .setDesc(t("settings_logtodb_desc"))
@@ -1841,10 +1841,10 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
               this.plugin.settings.logToDB = logToDB;
               void this.plugin.saveSettings();
             });
-        })
-    );
+        });
+    });
 
-    addDebugSetting((setting) =>
+    addDebugSetting((setting) => {
       setting
         .setName(t("settings_logtodbexport"))
         .setDesc(
@@ -1864,10 +1864,10 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
               new Notice(t("settings_logtodbexport_notice"));
             })();
           });
-        })
-    );
+        });
+    });
 
-    addDebugSetting((setting) =>
+    addDebugSetting((setting) => {
       setting
         .setName(t("settings_logtodbclear"))
         .setDesc(t("settings_logtodbclear_desc"))
@@ -1879,10 +1879,10 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
               new Notice(t("settings_logtodbclear_notice"));
             })();
           });
-        })
-    );
+        });
+    });
 
-    addDebugSetting((setting) =>
+    addDebugSetting((setting) => {
       setting
         .setName(t("settings_delsyncmap"))
         .setDesc(t("settings_delsyncmap_desc"))
@@ -1894,10 +1894,10 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
               new Notice(t("settings_delsyncmap_notice"));
             })();
           });
-        })
-    );
+        });
+    });
 
-    addDebugSetting((setting) =>
+    addDebugSetting((setting) => {
       setting
         .setName(t("settings_outputbasepathvaultid"))
         .setDesc(t("settings_outputbasepathvaultid_desc"))
@@ -1907,10 +1907,10 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
             new Notice(this.plugin.getVaultBasePath());
             new Notice(this.plugin.vaultRandomID);
           });
-        })
-    );
+        });
+    });
 
-    addDebugSetting((setting) =>
+    addDebugSetting((setting) => {
       setting
         .setName(t("settings_resetcache"))
         .setDesc(t("settings_resetcache_desc"))
@@ -1922,10 +1922,10 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
               new Notice(t("settings_resetcache_notice"));
             })();
           });
-        })
-    );
+        });
+    });
 
-    addDebugSetting((setting) =>
+    addDebugSetting((setting) => {
       setting
         .setName(t("settings_disable_s3_metadata_sync"))
         .setDesc(t("settings_disable_s3_metadata_sync_desc"))
@@ -1937,10 +1937,10 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
               void this.plugin.saveSettings();
               new Notice(t("settings_enablestatusbar_reloadrequired_notice"));
             });
-        })
-    );
+        });
+    });
 
-    addDebugSetting((setting) =>
+    addDebugSetting((setting) => {
       setting
         .setName(t("settings_reset_sync_metadata"))
         .setDesc(t("settings_reset_sync_metadata_desc"))
@@ -1974,8 +1974,8 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
               log.debug("Remote metadata file deleted. (2/2)");
             })();
           });
-        })
-    );
+        });
+    });
 
     // Toggle debug options visibility
     this._refreshDebugVisibility = () => {

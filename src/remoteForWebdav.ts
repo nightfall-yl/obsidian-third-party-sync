@@ -1,9 +1,8 @@
-import { Buffer } from "buffer";
 import { Queue } from "@fyears/tsqueue";
 // Use sub-module path to avoid Node.js-specific code in main entry on Android WebView
 import { getReasonPhrase } from "http-status-codes/build/cjs/utils-functions";
-import { requestUrl, Platform } from "obsidian";
-import { VALID_REQURL, WebdavConfig } from "./baseTypes";
+import { requestUrl, Platform, Vault } from "obsidian";
+import { VALID_REQURL, WebdavConfig, RemoteItem } from "./baseTypes";
 import { decryptArrayBuffer, encryptArrayBuffer } from "./encrypt";
 import { bufferToArrayBuffer, mkdirpInVault } from "./misc";
 
@@ -13,7 +12,6 @@ import type {
   FileStat,
   WebDAVClient,
   Response,
-  ResponseDataDetailed,
 } from "webdav";
 // @ts-ignore -- explicit path to browser build ensures same instance as createClient
 import { getPatcher } from "webdav/dist/web/index.js";
@@ -26,6 +24,7 @@ const objKeyToLower = (obj: Record<string, string>): Record<string, string> =>
 
 // Helper: check if string contains only ISO-8859-1 chars (same as upstream)
 const onlyAscii = (s: string): boolean =>
+  // eslint-disable-next-line no-control-regex -- intentional: reject chars outside \u0000-\u00ff
   !/[^\u0000-\u00ff]/g.test(s);
 
 if (VALID_REQURL) {
@@ -34,6 +33,12 @@ if (VALID_REQURL) {
     async (
       options: Record<string, unknown>
     ): Promise<Response> => {
+      // Narrow the loosely-typed options to the fields we actually use so the
+      // TS type system doesn't infer `unknown` everywhere below.
+      const method = (options.method as string | undefined) ?? "";
+      const url = options.url as string;
+      const data = options.data as string | ArrayBuffer;
+
       // Lowercase all header keys (same as upstream)
       const transformedHeaders = objKeyToLower(
         options.headers as Record<string, string>
@@ -45,9 +50,9 @@ if (VALID_REQURL) {
         transformedHeaders["accept"] ?? transformedHeaders["content-type"];
 
       const p: Parameters<typeof requestUrl>[0] = {
-        url: options.url as string,
-        method: options.method as string,
-        body: options.data as string | ArrayBuffer,
+        url,
+        method,
+        body: data,
         headers: transformedHeaders,
         contentType: reqContentType,
         throw: false,
@@ -59,18 +64,18 @@ if (VALID_REQURL) {
       if (
         r.status === 401 &&
         Platform.isIosApp &&
-        !(options.url as string).endsWith("/") &&
-        !(options.url as string).endsWith(".md") &&
-        options.method?.toString().toUpperCase() === "PROPFIND"
+        !url.endsWith("/") &&
+        !url.endsWith(".md") &&
+        method.toUpperCase() === "PROPFIND"
       ) {
-        p.url = `${options.url}/`;
+        p.url = `${url}/`;
         r = await requestUrl(p);
       }
 
       // Lowercase response header keys, encode non-ASCII values (same as upstream)
-      const rspHeaders = objKeyToLower(r.headers as Record<string, string>);
+      const rspHeaders = objKeyToLower(r.headers);
       for (const key in rspHeaders) {
-        if (rspHeaders.hasOwnProperty(key)) {
+        if (Object.prototype.hasOwnProperty.call(rspHeaders, key)) {
           // avoid: Failed to read 'headers' property from 'ResponseInit':
           // String contains non ISO-8859-1 code point
           if (!onlyAscii(rspHeaders[key])) {
