@@ -1192,7 +1192,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
 
       // Create third-party sync element
       this.statusBarElement = this.addStatusBarItem();
-      this.statusBarElement.createEl("span");
+      this.statusBarElement.createSpan();
       this.statusBarElement.setAttribute("data-tooltip-position", "top");    
       this.updateStatusBar(); 
     }

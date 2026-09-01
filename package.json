@@ -1,6 +1,6 @@
 {
   "name": "third-party-sync",
-  "version": "26.0.9",
+  "version": "26.1.0",
   "description": "Security and feature updates for the obsidian-third-party-sync unofficial plugin allowing users to synchronize notes between local device and the cloud service. Not backwards compatible.",
   "scripts": {
     "build": "node esbuild.config.mjs production",
@@ -31,7 +31,7 @@
     "crypto-browserify": "^3.5.1",
     "esbuild": "^0.28.0",
     "eslint": "^9.39.4",
-    "eslint-plugin-obsidianmd": "^0.3.0",
+    "eslint-plugin-obsidianmd": "^0.4.2",
     "prettier": "^2.6.2",
     "typescript": "^4.6.4"
   },

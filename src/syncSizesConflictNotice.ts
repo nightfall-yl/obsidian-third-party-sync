@@ -1,4 +1,4 @@
-import { App, Modal, Notice, activeDocument } from "obsidian";
+import { App, Modal, Notice } from "obsidian";
 import type RemotelySavePlugin from "./main"; // unavoidable
 import type { TransItemType } from "./i18n";
 import type { FileOrFolderMixedState } from "./baseTypes";
@@ -52,19 +52,16 @@ export class SizesConflictModal extends Modal {
           try {
             await navigator.clipboard.writeText(info);
           } catch {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- activeDocument type not fully resolved by ESLint
-            const textarea = activeDocument.createElement("textarea");
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access -- activeDocument type not fully resolved by ESLint
+            const textarea = createEl("textarea");
             textarea.value = info;
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access -- activeDocument type not fully resolved by ESLint
             textarea.className = "tp-clipboard-fallback";
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- third-party library returns any
+            // activeDocument is the Obsidian global (typed Document)
             activeDocument.body.appendChild(textarea);
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- third-party library returns any
             textarea.select();
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- third-party library returns any
+            // execCommand is deprecated by the standard, but remains the only
+            // reliable programmatic copy fallback on iOS/mobile WebViews.
+            // eslint-disable-next-line @typescript-eslint/no-deprecated -- document.execCommand is the mobile clipboard fallback when the async Clipboard API is unavailable
             activeDocument.execCommand("copy");
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- third-party library returns any
             activeDocument.body.removeChild(textarea);
           }
           new Notice(t("modal_sizesconflict_copynotice"));

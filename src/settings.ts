@@ -6,7 +6,6 @@ import {
   Setting,
   SettingGroup,
   setIcon,
-  activeDocument as activeDoc,
 } from "obsidian";
 import type { TextComponent } from "obsidian";
 import {
@@ -54,8 +53,8 @@ import {
 import {DEFAULT_FILE_NAME_FOR_METADATAONREMOTE} from "./metadataOnRemote";
 import {getRemoteMetadata, uploadExtraMeta} from "./sync";
 
-// activeDoc may be undefined during initial plugin loading
-const activeDocument = (activeDoc ?? window.document) as Document;
+// window.activeDocument may be undefined during initial plugin loading
+const activeDocument = window.activeDocument ?? window.document;
 
 async function copyToClipboard(text: string): Promise<void> {
   try {
@@ -272,9 +271,9 @@ export class OnedriveAuthModal extends Modal {
         });
       });
 
-    const copyBtnDiv = activeDocument.createElement("div");
+    const copyBtnDiv = createDiv();
     contentEl.appendChild(copyBtnDiv);
-    const copyBtn = activeDocument.createElement("button");
+    const copyBtn = createEl("button");
     copyBtn.textContent = t("modal_onedriveauth_copybutton");
     copyBtn.className = "mod-cta";
     copyBtn.onclick = () => {
@@ -477,19 +476,19 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
     const sgServiceDetail = new SettingGroup(containerEl);
     sgServiceDetail.addClass("service-detail-group");
 
-    const serviceHeadingFrag: DocumentFragment = activeDocument.createDocumentFragment();
-    const serviceHeadingName = activeDocument.createElement("div");
+    const serviceHeadingFrag: DocumentFragment = createFragment();
+    const serviceHeadingName = createDiv();
     serviceHeadingName.textContent = serviceHeadings[this.plugin.settings.serviceType];
     serviceHeadingName.className = "setting-item-name";
     serviceHeadingFrag.appendChild(serviceHeadingName);
 
-    const s3DescEl = activeDocument.createElement("div");
+    const s3DescEl = createDiv();
     s3DescEl.className = "settings-long-desc s3-hide";
     serviceHeadingFrag.appendChild(s3DescEl);
-    const onedriveDescEl = activeDocument.createElement("div");
+    const onedriveDescEl = createDiv();
     onedriveDescEl.className = "settings-long-desc onedrive-hide";
     serviceHeadingFrag.appendChild(onedriveDescEl);
-    const webdavDescEl = activeDocument.createElement("div");
+    const webdavDescEl = createDiv();
     webdavDescEl.className = "settings-long-desc webdav-hide";
     serviceHeadingFrag.appendChild(webdavDescEl);
 
@@ -512,30 +511,30 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       t("settings_s3_disclaimer1"),
       t("settings_s3_disclaimer2"),
     ]) {
-      const p = activeDocument.createElement("p");
+      const p = createEl("p");
       p.textContent = c;
       p.className = "s3-disclaimer";
       s3DescEl.appendChild(p);
     }
 
     if (!VALID_REQURL) {
-      const p = activeDocument.createElement("p");
+      const p = createEl("p");
       p.textContent = t("settings_s3_cors");
       s3DescEl.appendChild(p);
     }
 
     {
-      const p = activeDocument.createElement("p");
+      const p = createEl("p");
       p.textContent = t("settings_s3_prod");
       s3DescEl.appendChild(p);
     }
 
-    const s3LinksUl = activeDocument.createElement("ul");
+    const s3LinksUl = createEl("ul");
     s3DescEl.appendChild(s3LinksUl);
 
     {
-      const li = activeDocument.createElement("li");
-      const a = activeDocument.createElement("a");
+      const li = createEl("li");
+      const a = createEl("a");
       a.href = "https://docs.aws.amazon.com/general/latest/gr/s3.html";
       a.textContent = t("settings_s3_prod1");
       li.appendChild(a);
@@ -543,8 +542,8 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
     }
 
     {
-      const li = activeDocument.createElement("li");
-      const a = activeDocument.createElement("a");
+      const li = createEl("li");
+      const a = createEl("a");
       a.href = "https://docs.aws.amazon.com/sdk-for-javascript/v3/developer-guide/getting-your-credentials.html";
       a.textContent = t("settings_s3_prod2");
       li.appendChild(a);
@@ -552,8 +551,8 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
     }
 
     if (!VALID_REQURL) {
-      const li = activeDocument.createElement("li");
-      const a = activeDocument.createElement("a");
+      const li = createEl("li");
+      const a = createEl("a");
       a.href = "https://docs.aws.amazon.com/AmazonS3/latest/userguide/enabling-cors-examples.html";
       a.textContent = t("settings_s3_prod3");
       li.appendChild(a);
@@ -743,14 +742,14 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       t("settings_onedrive_disclaimer1"),
       t("settings_onedrive_disclaimer2"),
     ]) {
-      const p = activeDocument.createElement("p");
+      const p = createEl("p");
       p.textContent = c;
       p.className = "onedrive-disclaimer";
       onedriveDescEl.appendChild(p);
     }
 
     {
-      const p = activeDocument.createElement("p");
+      const p = createEl("p");
       p.textContent = t("settings_onedrive_folder", {
         pluginID: this.plugin.manifest.id,
         remoteBaseDir:
@@ -761,7 +760,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
     }
 
     {
-      const p = activeDocument.createElement("p");
+      const p = createEl("p");
       p.textContent = t("settings_onedrive_nobiz");
       onedriveDescEl.appendChild(p);
     }
@@ -884,24 +883,24 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
     //////////////////////////////////////////////////
 
     {
-      const p = activeDocument.createElement("p");
+      const p = createEl("p");
       p.textContent = t("settings_webdav_disclaimer1");
       p.className = "webdav-disclaimer";
       webdavDescEl.appendChild(p);
     }
 
     if (!VALID_REQURL) {
-      const p1 = activeDocument.createElement("p");
+      const p1 = createEl("p");
       p1.textContent = t("settings_webdav_cors_os");
       webdavDescEl.appendChild(p1);
 
-      const p2 = activeDocument.createElement("p");
+      const p2 = createEl("p");
       p2.textContent = t("settings_webdav_cors");
       webdavDescEl.appendChild(p2);
     }
 
     {
-      const p = activeDocument.createElement("p");
+      const p = createEl("p");
       p.textContent = t("settings_webdav_folder", {
         remoteBaseDir:
           this.plugin.settings.webdav.remoteBaseDir || this.app.vault.getName(),
@@ -1453,10 +1452,10 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       return setting
         .setName(t("setting_syncdirection"))
         .setDesc(((desc: string) => {
-          const frag: DocumentFragment = activeDocument.createDocumentFragment();
+          const frag: DocumentFragment = createFragment();
           const parts = desc.split("\n");
           parts.forEach((part, i) => {
-            if (i > 0) frag.appendChild(activeDocument.createElement("br"));
+            if (i > 0) frag.appendChild(createEl("br"));
             frag.appendChild(activeDocument.createTextNode(part));
           });
           return frag;
