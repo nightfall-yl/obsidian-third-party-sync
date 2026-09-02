@@ -135,6 +135,9 @@ export const sendAuthReq = async (
       url: `${authority.replace(/\/$/, "")}/oauth2/v2.0/token`,
       method: "POST",
       contentType: "application/x-www-form-urlencoded",
+      // Do NOT throw on non-2xx: we must read the response body to surface the
+      // real Azure error_description (AADSTSxxxxx) instead of a bare "400".
+      throw: false,
       body: new URLSearchParams({
         tenant: tenant,
         client_id: clientID,
@@ -200,6 +203,7 @@ export const sendRefreshTokenReq = async (
     url: `${authority.replace(/\/$/, "")}/oauth2/v2.0/token`,
     method: "POST",
     contentType: "application/x-www-form-urlencoded",
+    throw: false, // surface real Azure error body on non-2xx
     body: body,
   };
   
@@ -343,6 +347,23 @@ const fromDriveItemToRemoteItem = (
 
   const fullPathOriginal = `${x.parentReference.path}/${x.name}`;
 
+  // The delta listing may surface the vault ROOT folder itself as one of the
+  // items (its parent is the app folder, which does NOT contain remoteBaseDir).
+  // Map it to the "/" root key so listFromRemote filters it out instead of
+  // treating it as an unrecognized item.
+  const isVaultRootItem =
+    x.name === remoteBaseDir &&
+    !x.parentReference.path.includes(`/${remoteBaseDir}`);
+  if (isVaultRootItem) {
+    return {
+      key: "/",
+      lastModified: Date.parse(x.fileSystemInfo.lastModifiedDateTime),
+      size: 0,
+      remoteType: "onedrive",
+      etag: x.cTag || "",
+    };
+  }
+
   // Try generic parsing FIRST — this works for ANY app name / any localization
   // without hard-coding "Remotely Sync" / "Third-party Sync" / etc.
   // Format 1: /drive/root:/<LocalizedAppsFolder>/<AnyAppName>/<remoteBaseDir>/...
@@ -396,7 +417,79 @@ const fromDriveItemToRemoteItem = (
   };
 };
 
-// to adapt to the required interface
+// Shared helper for OneDrive Graph API JSON calls.
+// Uses `throw: false` so a non-2xx response (e.g. HTTP 400) is returned instead
+// of being swallowed by an opaque RequestUrlError, then surfaces the real Graph
+// error code/message + HTTP status.
+const oneDriveApiRequest = async (
+  method: string,
+  theUrl: string,
+  headers: Record<string, string>,
+  body?: string
+): Promise<Record<string, unknown>> => {
+  const resp = await requestUrl({
+    url: theUrl,
+    method,
+    contentType: "application/json",
+    throw: false,
+    headers,
+    ...(body !== undefined ? { body } : {}),
+  });
+  const json = (resp.json ?? {}) as Record<string, unknown>;
+  const o = json as {
+    error?: unknown;
+    error_description?: string;
+    status?: number;
+  };
+
+  // Graph errors nest the real cause inside error.innerError:
+  //   { "error": { "code":"invalidRequest", "message":"Invalid request",
+  //                "innerError": { "code":"...", "message":"..." } } }
+  // Recursively walk innerError to surface the actual reason instead of the
+  // generic outer message, so the root cause is visible to the user.
+  const collectErrorDetail = (node: unknown, depth: number): string => {
+    if (node === undefined || node === null || typeof node !== "object") {
+      return "";
+    }
+    const obj = node as Record<string, unknown>;
+    const parts: string[] = [];
+    if (typeof obj.code === "string") {
+      parts.push(obj.code);
+    }
+    if (typeof obj.message === "string") {
+      parts.push(obj.message);
+    }
+    let inner = "";
+    if (
+      depth < 5 &&
+      obj.innerError &&
+      typeof obj.innerError === "object"
+    ) {
+      inner = collectErrorDetail(obj.innerError, depth + 1);
+    }
+    const joined = parts.filter(Boolean).join(" ");
+    return [ joined, inner ].filter(Boolean).join(" → ");
+  };
+
+  if (o.error !== undefined || o.error_description !== undefined) {
+    let detail = collectErrorDetail(o.error, 0);
+    // Try parsing error as a plain string fallback
+    if (!detail && typeof o.error === "string") {
+      detail = o.error;
+    }
+    if (o.error_description) {
+      detail = detail ? `${detail} — ${o.error_description}` : o.error_description;
+    }
+    // Always append the RAW response body so any detail we failed to parse
+    // (e.g. innerError under a different key, or non-JSON payload) is visible.
+    const raw = typeof resp.text === "string" ? resp.text : JSON.stringify(json);
+    throw Error(
+      `OneDrive API ${method} ${theUrl} 失败 (HTTP ${resp.status}): ${detail || "无解析详情"}\nRAW BODY: ${raw}`
+    );
+  }
+  return json;
+};
+
 class MyAuthProvider implements AuthenticationProvider {
   onedriveConfig: OnedriveConfig;
   saveUpdatedConfigFunc: () => Promise<void>;
@@ -470,20 +563,24 @@ export class WrappedOnedriveClient {
       throw Error("The user has not manually auth yet.");
     }
 
-    // check vault folder
+    // Ensure the vault folder exists under approot.
+    // Use PATCH with path-based addressing + conflictBehavior, which is the
+    // approach proven to work by upstream remotely-save on personal accounts:
+    //   PATCH /drive/special/approot:/<vaultName>
+    //   { "folder": {}, "@microsoft.graph.conflictBehavior": "replace" }
+    // This is idempotent (creates a fresh folder or is a no-op if it exists),
+    // and avoids the `POST /drive/special/approot/children` form, which can
+    // return a generic 400 invalidRequest (empty innerError) on personal
+    // Microsoft accounts.
     if (!this.vaultFolderExists) {
-      const k = await this.getJson("/drive/special/approot/children");
-      this.vaultFolderExists =
-        (k.value as DriveItem[]).filter((x) => x.name === this.remoteBaseDir)
-          .length > 0;
-      if (!this.vaultFolderExists) {
-        await this.postJson("/drive/special/approot/children", {
-          name: `${this.remoteBaseDir}`,
+      await this.patchJson(
+        `/drive/special/approot:/${this.remoteBaseDir}`,
+        {
           folder: {},
           "@microsoft.graph.conflictBehavior": "replace",
-        });
-        this.vaultFolderExists = true;
-      }
+        }
+      );
+      this.vaultFolderExists = true;
     }
   };
 
@@ -511,14 +608,7 @@ export class WrappedOnedriveClient {
       "Cache-Control": "no-cache",
     };
 
-    const requestParams: RequestUrlParam = {
-      url: theUrl,
-      method: "GET",
-      contentType: "application/json",
-      headers: headers,
-    };
-
-    return (await requestUrl(requestParams).json) as Record<string, unknown>;
+    return oneDriveApiRequest("GET", theUrl, headers);
   };
 
   postJson = async (pathFragOrig: string, payload: Record<string, unknown>) => {
@@ -529,33 +619,18 @@ export class WrappedOnedriveClient {
       Authorization: `Bearer ${accessToken}`,
     };
 
-    const requestParams: RequestUrlParam = {
-      url: theUrl,
-      method: "POST",
-      contentType: "application/json",
-      body: JSON.stringify(payload),
-      headers: headers,
-    };
-
-    return (await requestUrl(requestParams).json) as Record<string, unknown>;
+    return oneDriveApiRequest("POST", theUrl, headers, JSON.stringify(payload));
   };
 
   patchJson = async (pathFragOrig: string, payload: Record<string, unknown>) => {
     const theUrl = this.buildUrl(pathFragOrig);
+    log.debug(`patchJson, theUrl=${theUrl}`);
     const accessToken = await this.authGetter.getAccessToken();
     const headers = {
       Authorization: `Bearer ${accessToken}`,
     };
 
-    const requestParams: RequestUrlParam = {
-      url: theUrl,
-      method: "PATCH",
-      contentType: "application/json",
-      body: JSON.stringify(payload),
-      headers: headers,
-    };
-
-    await requestUrl(requestParams).json;
+    return oneDriveApiRequest("PATCH", theUrl, headers, JSON.stringify(payload));
   };
 
   deleteJson = async (pathFragOrig: string) => {
@@ -573,18 +648,33 @@ export class WrappedOnedriveClient {
   putArrayBuffer = async (pathFragOrig: string, payload: ArrayBuffer) => {
     const theUrl = this.buildUrl(pathFragOrig);
     log.debug(`putArrayBuffer, theUrl=${theUrl}`);
-    // TODO:
-    // Removed fallback from requestUrl on platforms where implementation differs.
-    await requestUrl({
+    const accessToken = await this.authGetter.getAccessToken();
+    // capture the real HTTP result instead of relying on requestUrl throwing,
+    // so a failing PUT is visible in the console rather than silently swallowed.
+    const resp = await requestUrl({
       url: theUrl,
       method: "PUT",
       body: payload,
       contentType: DEFAULT_CONTENT_TYPE,
+      throw: false,
       headers: {
         "Content-Type": DEFAULT_CONTENT_TYPE,
-        Authorization: `Bearer ${await this.authGetter.getAccessToken()}`,
+        Authorization: `Bearer ${accessToken}`,
       },
     });
+    console.log(
+      `[third-party-sync] PUT ${theUrl} -> HTTP ${resp.status}, bytes=${payload.byteLength}`
+    );
+    if (resp.status >= 200 && resp.status < 300) {
+      return;
+    }
+    const raw =
+      typeof resp.text === "string"
+        ? resp.text
+        : JSON.stringify(resp.json ?? {});
+    throw Error(
+      `OneDrive 文件上传失败 (HTTP ${resp.status}): ${raw}`
+    );
   };
 
   /**

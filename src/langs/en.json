@@ -311,7 +311,7 @@
   "settings_outputbasepathvaultid_desc": "For debugging purposes.",
   "settings_outputbasepathvaultid_button": "Output",
   "settings_resetcache": "Reset Local Internal Cache/Databases",
-  "settings_resetcache_desc": "Reset local internal caches/databases (for debugging purposes). You would want to reload the plugin after resetting this. This option will not empty the {s3, password...} settings.",
+  "settings_resetcache_desc": "Reset local internal caches/databases. You would want to reload the plugin after resetting this. This option will not empty the {s3, password...} settings.",
   "settings_resetcache_button": "Reset",
   "settings_resetcache_notice": "Local internal cache/databases deleted. Please manually reload the plugin.",
   "syncalgov3_title": "Third-party Sync has HUGE updates on the sync algorithm",

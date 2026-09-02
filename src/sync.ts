@@ -1275,9 +1275,13 @@ const assignOperationToFileInplaceV3 = (
         r.decision = "keepRemoteDelHist";
         r.decisionBranch = 61;
       } else if (isPushOnlyMode) {
-        // Push-only without delete: keep local
-        r.decision = "skipUploading";
+        // Push-only without delete: local file is present but missing on
+        // remote. prevSync may be stale (e.g. switched provider / re-created
+        // remote), so re-upload the file to keep the remote an up-to-date
+        // mirror of local, instead of stranding it locally as skipped.
+        r.decision = "uploadLocalToRemote";
         r.decisionBranch = 62;
+        keptFolder.add(getParentFolder(r.key));
       } else {
         // Bidirectional: remote deleted, delete local too
         r.decision = "keepRemoteDelHist";

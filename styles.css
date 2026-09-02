@@ -206,3 +206,14 @@
   padding: 40px 20px;
   font-size: var(--font-ui-large);
 }
+.onedrive-auth-error {
+  color: var(--text-error);
+  word-break: break-all;
+  white-space: pre-wrap;
+  max-height: 200px;
+  overflow-y: auto;
+  background: var(--background-secondary);
+  padding: 10px;
+  border-radius: 4px;
+  margin: 12px 0;
+}

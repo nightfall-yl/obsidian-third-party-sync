@@ -312,7 +312,7 @@
   "settings_outputbasepathvaultid_desc": "用于调试。",
   "settings_outputbasepathvaultid_button": "输出",
   "settings_resetcache": "重设本地缓存和数据库",
-  "settings_resetcache_desc": "（出于调试原因）重设本地缓存和数据库。您需要在重设之后重新载入此插件。本重设不会删除 s3，密码……等设定。",
+  "settings_resetcache_desc": "重设本地缓存和数据库。您需要在重设之后重新载入此插件。本重设不会删除 s3，密码……等设定。",
   "settings_resetcache_button": "重设",
   "settings_resetcache_notice": "本地同步缓存和数据库已被删除。请手动重新载入此插件。",
   "syncalgov3_title": "Third-party Sync 的同步算法有重大更新",
