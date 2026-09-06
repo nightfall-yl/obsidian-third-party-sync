@@ -1,0 +1,198 @@
+{
+  "schema": "claude-obsidian.claim-ledger.v1",
+  "generated_at": "2026-09-02T20:00:00Z",
+  "claims": {
+    "clm-css-margin-around-element": {
+      "text": "CSS margin 属性定义元素周围的空间，且该区域完全透明、无背景色。",
+      "assessment": "accepted",
+      "confidence": "high",
+      "risk": "normal",
+      "reviewed_at": "2026-09-02",
+      "location": {
+        "path": "wiki/resources/concepts/CSS-margin-padding.md"
+      },
+      "evidence": [
+        {
+          "source_id": "src-4b3aa1a53a60e34a4a1a",
+          "relation": "supports"
+        }
+      ]
+    },
+    "clm-css-margin-negative-values": {
+      "text": "margin 支持负值，会使内容产生重叠。",
+      "assessment": "accepted",
+      "confidence": "high",
+      "risk": "normal",
+      "reviewed_at": "2026-09-02",
+      "location": {
+        "path": "wiki/resources/concepts/CSS-margin-padding.md"
+      },
+      "evidence": [
+        {
+          "source_id": "src-4b3aa1a53a60e34a4a1a",
+          "relation": "supports"
+        }
+      ]
+    },
+    "clm-css-margin-shorthand": {
+      "text": "margin 简写属性可用一次声明设置全部外边距，如 margin:100px 50px。",
+      "assessment": "accepted",
+      "confidence": "medium",
+      "risk": "normal",
+      "reviewed_at": "2026-09-02",
+      "location": {
+        "path": "wiki/resources/concepts/CSS-margin-padding.md"
+      },
+      "evidence": [
+        {
+          "source_id": "src-4b3aa1a53a60e34a4a1a",
+          "relation": "supports"
+        }
+      ]
+    },
+    "clm-css-padding-shorthand": {
+      "text": "CSS padding 是简写属性，定义元素边框与内容之间的空间（内边距）。",
+      "assessment": "accepted",
+      "confidence": "high",
+      "risk": "normal",
+      "reviewed_at": "2026-09-02",
+      "location": {
+        "path": "wiki/resources/concepts/CSS-padding.md"
+      },
+      "evidence": [
+        {
+          "source_id": "src-1370537a7190d7e087cd",
+          "relation": "supports"
+        }
+      ]
+    },
+    "clm-css-padding-values": {
+      "text": "padding 支持 length（固定）与 %（百分比）两种取值。",
+      "assessment": "accepted",
+      "confidence": "high",
+      "risk": "normal",
+      "reviewed_at": "2026-09-02",
+      "location": {
+        "path": "wiki/resources/concepts/CSS-padding.md"
+      },
+      "evidence": [
+        {
+          "source_id": "src-1370537a7190d7e087cd",
+          "relation": "supports"
+        }
+      ]
+    },
+    "clm-css-padding-single-side": {
+      "text": "可为四个方向分别设置内边距 padding-top/right/bottom/left。",
+      "assessment": "accepted",
+      "confidence": "medium",
+      "risk": "normal",
+      "reviewed_at": "2026-09-02",
+      "location": {
+        "path": "wiki/resources/concepts/CSS-padding.md"
+      },
+      "evidence": [
+        {
+          "source_id": "src-1370537a7190d7e087cd",
+          "relation": "supports"
+        }
+      ]
+    },
+    "clm-karpathy-zero-to-hero": {
+      "text": "Neural Networks: Zero to Hero 覆盖从反向传播手写到 GPT 的完整路径。",
+      "assessment": "accepted",
+      "confidence": "high",
+      "risk": "normal",
+      "reviewed_at": "2026-09-02",
+      "location": {
+        "path": "wiki/resources/concepts/Karpathy-AI-知识库.md"
+      },
+      "evidence": [
+        {
+          "source_id": "src-57db75d91e8a8b8e7ccd",
+          "relation": "supports"
+        }
+      ]
+    },
+    "clm-karpathy-handcode": {
+      "text": "学习核心原则是手写代码而非只看不练，每节课代码需自己敲一遍。",
+      "assessment": "accepted",
+      "confidence": "high",
+      "risk": "normal",
+      "reviewed_at": "2026-09-02",
+      "location": {
+        "path": "wiki/resources/concepts/Karpathy-AI-知识库.md"
+      },
+      "evidence": [
+        {
+          "source_id": "src-57db75d91e8a8b8e7ccd",
+          "relation": "supports"
+        }
+      ]
+    },
+    "clm-karpathy-path": {
+      "text": "推荐先学 Neural Networks: Zero to Hero，再补 DeepLearning.AI。",
+      "assessment": "accepted",
+      "confidence": "medium",
+      "risk": "normal",
+      "reviewed_at": "2026-09-02",
+      "location": {
+        "path": "wiki/resources/concepts/Karpathy-AI-知识库.md"
+      },
+      "evidence": [
+        {
+          "source_id": "src-57db75d91e8a8b8e7ccd",
+          "relation": "supports"
+        }
+      ]
+    },
+    "clm-strand-dutp": {
+      "text": "dUTP 第二链标记法是主流链特异方案，UDG 切割含 U 第二链仅保留第一链。",
+      "assessment": "accepted",
+      "confidence": "high",
+      "risk": "normal",
+      "reviewed_at": "2026-09-02",
+      "location": {
+        "path": "wiki/resources/concepts/链特异性建库.md"
+      },
+      "evidence": [
+        {
+          "source_id": "src-033956b3837e683e7a24",
+          "relation": "supports"
+        }
+      ]
+    },
+    "clm-strand-udg": {
+      "text": "UDG 仅识别 DNA 中尿嘧啶-脱氧核糖结构，切割 N-糖苷键形成 AP 位点使第二链碎裂。",
+      "assessment": "accepted",
+      "confidence": "high",
+      "risk": "normal",
+      "reviewed_at": "2026-09-02",
+      "location": {
+        "path": "wiki/resources/concepts/链特异性建库.md"
+      },
+      "evidence": [
+        {
+          "source_id": "src-033956b3837e683e7a24",
+          "relation": "supports"
+        }
+      ]
+    },
+    "clm-strand-best-method": {
+      "text": "dUTP 法在简单性和数据质量上综合最优（Levin et al. 2010）。",
+      "assessment": "accepted",
+      "confidence": "medium",
+      "risk": "normal",
+      "reviewed_at": "2026-09-02",
+      "location": {
+        "path": "wiki/resources/concepts/链特异性建库.md"
+      },
+      "evidence": [
+        {
+          "source_id": "src-033956b3837e683e7a24",
+          "relation": "supports"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "schema": "claude-obsidian.source-ledger.v1",
+  "generated_at": "2026-09-02T20:00:00Z",
+  "sources": {
+    "src-4b3aa1a53a60e34a4a1a": {
+      "origin": {
+        "kind": "file",
+        "locator": ".raw/captured/52b5027ed8593f943d1db2d47608d8e19acad0095715719768e38c4ca3bcf137.md"
+      },
+      "content_kind": "document",
+      "authority": "secondary",
+      "review_status": "active",
+      "title": "CSS margin 与 padding | 菜鸟教程",
+      "content_sha256": "52b5027ed8593f943d1db2d47608d8e19acad0095715719768e38c4ca3bcf137",
+      "ingested_at": "2026-09-02",
+      "retrieved_at": "2026-09-02",
+      "refresh_due": "2026-09-16",
+      "pages": [
+        "wiki/resources/concepts/CSS-margin-padding.md"
+      ]
+    },
+    "src-1370537a7190d7e087cd": {
+      "origin": {
+        "kind": "file",
+        "locator": ".raw/captured/9c9eccbba4f06f935c59b064d7c0e359ab946297396097d1258a4999525b6118.md"
+      },
+      "content_kind": "document",
+      "authority": "secondary",
+      "review_status": "active",
+      "title": "CSS padding（填充）| 菜鸟教程",
+      "content_sha256": "9c9eccbba4f06f935c59b064d7c0e359ab946297396097d1258a4999525b6118",
+      "ingested_at": "2026-09-02",
+      "retrieved_at": "2026-09-02",
+      "refresh_due": "2026-09-16",
+      "pages": [
+        "wiki/resources/concepts/CSS-padding.md"
+      ]
+    },
+    "src-57db75d91e8a8b8e7ccd": {
+      "origin": {
+        "kind": "file",
+        "locator": ".raw/captured/57d1b3c6e9868f8e8f6716d37a0981cf9a45d29c66bbbc814316506cd51c2010.md"
+      },
+      "content_kind": "document",
+      "authority": "secondary",
+      "review_status": "active",
+      "title": "Karpathy AI 知识库",
+      "content_sha256": "57d1b3c6e9868f8e8f6716d37a0981cf9a45d29c66bbbc814316506cd51c2010",
+      "ingested_at": "2026-09-02",
+      "retrieved_at": "2026-09-02",
+      "refresh_due": "2026-09-16",
+      "pages": [
+        "wiki/resources/concepts/Karpathy-AI-知识库.md"
+      ]
+    },
+    "src-033956b3837e683e7a24": {
+      "origin": {
+        "kind": "file",
+        "locator": ".raw/captured/3b31918156718e94e057b9177d0d7f23fd956e8bfd95455079052586a94c4a92.md"
+      },
+      "content_kind": "document",
+      "authority": "secondary",
+      "review_status": "active",
+      "title": "链特异性建库",
+      "content_sha256": "3b31918156718e94e057b9177d0d7f23fd956e8bfd95455079052586a94c4a92",
+      "ingested_at": "2026-09-02",
+      "retrieved_at": "2026-09-02",
+      "refresh_due": "2026-09-16",
+      "pages": [
+        "wiki/resources/concepts/链特异性建库.md"
+      ]
+    }
+  }
+}

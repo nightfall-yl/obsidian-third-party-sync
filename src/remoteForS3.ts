@@ -237,6 +237,11 @@ export const getS3Client = (s3Config: S3Config) => {
     region: s3Config.s3Region,
     endpoint: endpoint,
     forcePathStyle: s3Config.forcePathStyle,
+    // S3-compatible providers (e.g. China Telecom Cloud) may not implement
+    // the default x-amz-checksum-crc32 that the SDK attaches to PutObject,
+    // which would reject the request with a checksum mismatch (status 400/403).
+    // Only send a request checksum when the service explicitly requires it.
+    requestChecksumCalculation: "WHEN_REQUIRED",
     credentials: {
       accessKeyId: s3Config.s3AccessKeyID,
       secretAccessKey: s3Config.s3SecretAccessKey,

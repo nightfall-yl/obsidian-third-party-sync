@@ -53,10 +53,7 @@ import { applyPresetRulesInplace } from "./presetRules";
 
 import { applyLogWriterInplace, log } from "./moreOnLog";
 import AggregateError from "aggregate-error";
-import {
-  exportVaultLoggerOutputToFiles,
-  exportVaultSyncPlansToFiles,
-} from "./debugMode";
+
 import { SizesConflictModal } from "./syncSizesConflictNotice";
 import {getLastSynced} from "./misc";
 
@@ -104,7 +101,6 @@ export default class ThirdPartySyncPlugin extends Plugin {
   settings: ThirdPartySyncPluginSettings;
   db: InternalDBs;
   syncStatus: SyncStatusType;
-  syncStatusText?: string;
   statusBarElement: HTMLSpanElement;
   oauth2Info: OAuth2Info;
   currSyncMsg?: string;
@@ -879,57 +875,6 @@ export default class ThirdPartySyncPlugin extends Plugin {
       },
     });
 
-    this.addCommand({
-      id: "export-sync-plans-json",
-      name: t("command_exportsyncplans_json"),
-      icon: iconNameLogs,
-      callback: async () => {
-        await exportVaultSyncPlansToFiles(
-          this.db,
-          this.app.vault,
-          this.vaultRandomID,
-          "json"
-        );
-        new Notice(t("settings_syncplans_notice"));
-      },
-    });
-
-    this.addCommand({
-      id: "export-sync-plans-table",
-      name: t("command_exportsyncplans_table"),
-      icon: iconNameLogs,
-      callback: async () => {
-        await exportVaultSyncPlansToFiles(
-          this.db,
-          this.app.vault,
-          this.vaultRandomID,
-          "table"
-        );
-        new Notice(t("settings_syncplans_notice"));
-      },
-    });
-
-    this.addCommand({
-      id: "export-logs-in-db",
-      name: t("command_exportlogsindb"),
-      icon: iconNameLogs,
-      callback: async () => {
-        await exportVaultLoggerOutputToFiles(
-          this.db,
-          this.app.vault,
-          this.vaultRandomID
-        );
-        new Notice(t("settings_logtodbexport_notice"));
-      },
-    });
-
-    this.addCommand({
-      id: "get-sync-status",
-      name: t("command_syncstatus"),
-      icon: iconNameStatusBar,
-      callback: () => new Notice(this.syncStatusText)
-    });
-    
     this.addSettingTab(new ThirdPartySyncSettingTab(this.app, this));
 
     // Show status bar show by default on desktop only
