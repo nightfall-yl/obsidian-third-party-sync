@@ -4,6 +4,17 @@
 
 > 说明：本更新日志自 `26.1.2` 起维护。
 
+## [26.1.4] - 2026-09-12
+
+### 国际化（i18n）
+
+- 新增 **12 种** 完整本地化翻译文件（共 14 种），每种均覆盖全部 217 个键：
+  - 繁體中文（zh_tw）、日本語（ja）、한국어（ko）
+  - Deutsch（de）、Français（fr）、Español（es）、Italiano（it）
+  - Nederlands（nl）、Dansk（da）、Svenska（sv）、Norsk（no）、Русский（ru）
+- 所有 `{{变量}}` Mustache 占位符、换行符 `\n` 原样保留；技术术语（Obsidian / OneDrive / S3 / Webdav / CORS / Access Key ID 等）按各语言惯例原样保留。
+- 插件通过 `moment.locale()` 自动跟随 Obsidian 界面语言切换，无需额外 UI 设置；缺键时回退到英文，不会因翻译缺失导致崩溃。
+
 ## [26.1.3] - 2026-09-04
 
 ### 问题修复
