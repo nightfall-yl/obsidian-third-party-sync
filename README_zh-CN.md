@@ -1,3 +1,8 @@
+<p align="center">
+  <a href="README.md">English</a> ·
+  <a href="README_zh-CN.md">简体中文</a>
+</p>
+
 # Obsidian Third-party Sync
 
 **Obsidian Third-party Sync** 是 [Remotely Save](https://github.com/remotely-save/remotely-save) 的非官方分叉插件，**核心聚焦于安全性升级**。在保留原版全部基础功能的前提下，重构了加密实现并精简了代码架构。**与 Remotely Save 不兼容**，切换前请务必备份 Vault 数据。
