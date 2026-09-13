@@ -109,7 +109,7 @@ Compared to the original, this fork makes the following simplifications:
 
 If you find this plugin helpful, consider buying me a coffee ☕️
 
-<img src="./docs/reward.jpg" width="300" alt="Buy me a coffee" />
+<img src="./docs/reward.jpg" width="360" alt="Buy me a coffee" />
 
 ## Credits
 
