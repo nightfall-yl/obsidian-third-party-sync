@@ -1,5 +1,6 @@
 import PQueue from "p-queue";
-import type { Entity, MixedEntity, ThirdPartySyncPluginSettings, SyncTriggerSourceType, ConflictActionType } from "./baseTypes";
+import type { Entity, MixedEntity } from "./entityTypes";
+import type { ThirdPartySyncPluginSettings, SyncTriggerSourceType, ConflictActionType } from "./baseTypes";
 import type { FakeFs } from "./fsAll";
 import type { FakeFsEncrypt } from "./fsEncrypt";
 import {

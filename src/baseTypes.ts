@@ -194,34 +194,11 @@ export type SyncDirectionType =
   | "incremental_pull_and_delete_only"
   | "incremental_push_and_delete_only";
 
-export interface Entity {
-  path: string;
-  type: 'file' | 'folder';
-  mtime?: number;
-  size?: number;
-  key?: string;
-  keyRaw?: string;
-  keyEnc?: string;
-  mtimeCli?: number;
-  mtimeSvr?: number;
-  sizeEnc?: number;
-  sizeRaw?: number;
-  hash?: string | undefined;
-  synthesizedFolder?: boolean;
-}
-
-export interface MixedEntity {
-  path: string;
-  type: 'file' | 'folder';
-  mtime?: number;
-  size?: number;
-  existLocal?: boolean;
-  existRemote?: boolean;
-  local?: Entity;
-  remote?: Entity;
-  prevSync?: Entity;
-  key?: string;
-}
+// Entity / MixedEntity now live in src/entityTypes.ts (an import-free
+// module) so they cannot degrade to `any` when this module's "obsidian"
+// import fails to resolve in the Obsidian community review sandbox. Re-export
+// them here for backward compatibility with existing importers.
+export type { Entity, MixedEntity } from "./entityTypes";
 
 export type CipherMethodType = 'aes-256-gcm' | 'aes-256-cbc' | 'openssl-base64';
 

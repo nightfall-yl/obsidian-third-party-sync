@@ -504,7 +504,29 @@ export const toText = (x: unknown): string => {
  * @param vault
  * @param path
  */
-export const statFix = async (vault: Vault, path: string) => {
+/**
+ * Local mirror of obsidian's `Stat` interface.
+ *
+ * We declare the return type of `statFix` explicitly with this interface
+ * instead of relying on the inferred `Promise<Stat | undefined>`. When the
+ * Obsidian community review sandbox type-checks without the obsidian stubs
+ * installed, obsidian's `Stat` cannot be resolved, so the inferred return
+ * degrades to `any` and `Math.max(ctime ?? 0, mtime ?? 0)` in src/sync.ts
+ * trips @typescript-eslint/no-unsafe-argument. A local, obsidian-free
+ * return type keeps `ctime`/`mtime` as `number | undefined` in every
+ * environment.
+ */
+export interface FileStat {
+  type: "file" | "folder";
+  ctime?: number;
+  mtime?: number;
+  size?: number;
+}
+
+export const statFix = async (
+  vault: Vault,
+  path: string
+): Promise<FileStat | undefined> => {
   const s = await vault.adapter.stat(path);
   if (s == undefined) {
     return;
