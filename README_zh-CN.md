@@ -109,7 +109,7 @@
 
 如果这个项目对你有帮助，欢迎请作者喝杯咖啡 ☕️
 
-<img src="./docs/reward.jpg" width="100%" alt="赞赏码" />
+<img src="./docs/reward.jpg" width="300" alt="赞赏码" />
 
 ## 鸣谢
 
