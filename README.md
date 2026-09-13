@@ -1,8 +1,3 @@
-<p align="center">
-  <a href="README.md">English</a> ·
-  <a href="README_zh-CN.md">简体中文</a>
-</p>
-
 # Obsidian Third-party Sync
 
 **Obsidian Third-party Sync** is an unofficial fork of [Remotely Save](https://github.com/remotely-save/remotely-save), **focused on security upgrades**. It retains all core features from the original while rebuilding the encryption implementation and simplifying the codebase. **It is NOT backwards compatible with Remotely Save** — backup your vault before switching.
@@ -10,6 +5,11 @@
 If you find it useful, please give it a star: [![GitHub Repo stars](https://img.shields.io/github/stars/nightfall-yl/obsidian-third-party-sync?style=social)](https://github.com/nightfall-yl/obsidian-third-party-sync)
 
 Pull requests are welcome!
+
+<p align="center">
+  <a href="README.md">English</a> ·
+  <a href="README_zh-CN.md">简体中文</a>
+</p>
 
 ## Disclaimer
 
