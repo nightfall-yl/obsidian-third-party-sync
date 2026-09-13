@@ -4,11 +4,17 @@
 
 > 说明：本更新日志自 `26.1.2` 起维护。
 
+## [26.1.5] - 2026-09-13
+
+### 修复
+
+- 补全 `en.json`（回退基准）缺失的 35 个设置项 key（saverun / remoterun / sync_trash / sync_bookmarks / reset_sync_metadata / disable_s3_metadata_sync / debug_enabled / delsyncmap / autorun_second / webdav_depth_auto 等，原仅在 `zh_cn.json` 中存在）。此前英文及其他 13 种语言（含繁体中文）的这些设置项会显示原始 key 字符串，现已修复。随后已将这 35 个 key 完整翻译至全部 12 种非中文语言包（de/fr/es/it/ja/ko/nl/da/sv/no/ru/zh_tw），14 种语言包现已全部完整覆盖所有真实 key。
+
 ## [26.1.4] - 2026-09-12
 
 ### 国际化（i18n）
 
-- 新增 **12 种** 完整本地化翻译文件（共 14 种），每种均覆盖全部 217 个键：
+- 新增 **12 种** 完整本地化翻译文件（共 14 种），每种均覆盖全部 252 个键：
   - 繁體中文（zh_tw）、日本語（ja）、한국어（ko）
   - Deutsch（de）、Français（fr）、Español（es）、Italiano（it）
   - Nederlands（nl）、Dansk（da）、Svenska（sv）、Norsk（no）、Русский（ru）

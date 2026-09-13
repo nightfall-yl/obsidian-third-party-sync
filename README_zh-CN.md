@@ -62,6 +62,7 @@
 - **[最小侵入设计](./docs/minimal_intrusive_design.md)**。
 - **完全开源**（[Apache-2.0](./LICENSE)）。
 - **[同步算法](./docs/sync_algorithm.md)**。
+- **🌐 多语言支持** — 界面自动跟随 Obsidian 显示语言（共 14 种：English、简体中文、繁體中文、日本語、한국어、Deutsch、Français、Español、Italiano、Nederlands、Dansk、Svenska、Norsk、Русский），无需手动设置，缺译时自动回退英文。
 
 ## 限制与注意事项
 

@@ -62,6 +62,7 @@ Compared to the original, this fork makes the following simplifications:
 - **[Minimal intrusive design](./docs/minimal_intrusive_design.md).**
 - **Fully open source** ([Apache-2.0](./LICENSE)).
 - **[Sync algorithm](./docs/sync_algorithm.md).**
+- **🌐 Multilingual** — The UI automatically follows your Obsidian display language (14 languages: English, 简体中文, 繁體中文, 日本語, 한국어, Deutsch, Français, Español, Italiano, Nederlands, Dansk, Svenska, Norsk, Русский). No manual setting required; falls back to English when a translation is missing.
 
 ## Limitations & Notes
 
