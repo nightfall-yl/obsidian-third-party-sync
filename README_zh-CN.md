@@ -20,13 +20,21 @@
 
 ### 安全升级（核心改进）
 
-| 改进项 | Remotely Save | 本插件 |
-|:------|:-------------|:-------|
-| **加密算法** | AES-CBC 或 AES-CTR (RClone) | **AES-256-GCM** |
-| **完整性校验** | 无（CBC 易受 padding oracle 攻击） | **GCM 内置 AuthTag 验证** |
-| **初始化向量（IV）** | 从密码派生（同密码下所有文件 IV 相同） | **每次随机生成** |
-| **Salt 长度** | 8 字节（2^64 种可能） | **16 字节**（2^128 种可能） |
-| **加密依赖** | `crypto-browserify` + `@fyears/rclone-crypt` + Web Worker | **纯浏览器原生 `window.crypto.subtle` API** |
+- **加密算法**
+  - Remotely Save：AES-CBC 或 AES-CTR (RClone)
+  - 本插件：**AES-256-GCM**
+- **完整性校验**
+  - Remotely Save：无（CBC 易受 padding oracle 攻击）
+  - 本插件：**GCM 内置 AuthTag 验证**
+- **初始化向量（IV）**
+  - Remotely Save：从密码派生（同密码下所有文件 IV 相同）
+  - 本插件：**每次随机生成**
+- **Salt 长度**
+  - Remotely Save：8 字节（2^64 种可能）
+  - 本插件：**16 字节**（2^128 种可能）
+- **加密依赖**
+  - Remotely Save：`crypto-browserify` + `@fyears/rclone-crypt` + Web Worker
+  - 本插件：**纯浏览器原生 `window.crypto.subtle` API**
 
 > 加密升级详情见 [commit d9ad76e](https://github.com/nightfall-yl/obsidian-third-party-sync/commit/d9ad76e774b0b1cee2b36316058df926f4bfb2bf)，加密原理见[加密文档](./docs/encryption.md)。
 

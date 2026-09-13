@@ -20,13 +20,21 @@ Pull requests are welcome!
 
 ### Security Upgrades (Core Improvements)
 
-| Item | Remotely Save | This Plugin |
-|:-----|:--------------|:------------|
-| **Cipher algorithm** | AES-CBC or AES-CTR (RClone) | **AES-256-GCM** |
-| **Integrity check** | None (CBC vulnerable to padding oracle attacks) | **Built-in GCM AuthTag verification** |
-| **Initialization Vector (IV)** | Derived from password (same IV for all files under same password) | **Randomly generated per file** |
-| **Salt length** | 8 bytes (2^64 possibilities) | **16 bytes** (2^128 possibilities) |
-| **Encryption dependencies** | `crypto-browserify` + `@fyears/rclone-crypt` + Web Worker | **Pure browser-native `window.crypto.subtle` API** |
+- **Cipher algorithm**
+  - Remotely Save: AES-CBC or AES-CTR (RClone)
+  - This Plugin: **AES-256-GCM**
+- **Integrity check**
+  - Remotely Save: None (CBC vulnerable to padding oracle attacks)
+  - This Plugin: **Built-in GCM AuthTag verification**
+- **Initialization Vector (IV)**
+  - Remotely Save: Derived from password (same IV for all files under same password)
+  - This Plugin: **Randomly generated per file**
+- **Salt length**
+  - Remotely Save: 8 bytes (2^64 possibilities)
+  - This Plugin: **16 bytes** (2^128 possibilities)
+- **Encryption dependencies**
+  - Remotely Save: `crypto-browserify` + `@fyears/rclone-crypt` + Web Worker
+  - This Plugin: **Pure browser-native `window.crypto.subtle` API**
 
 > See [commit d9ad76e](https://github.com/nightfall-yl/obsidian-third-party-sync/commit/d9ad76e774b0b1cee2b36316058df926f4bfb2bf) for encryption changes. Read [encryption docs](./docs/encryption.md) for details.
 
