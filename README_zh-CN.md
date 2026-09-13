@@ -123,6 +123,12 @@ cp main.js styles.css manifest.json /your/path/to/vault/.obsidian/plugins/third-
 - 默认以 `.` 或 `_` 开头的文件和文件夹不同步。
 - 可在设置中开启同步 `_` 文件夹和 `.obsidian` 配置文件夹。
 
+## 赞赏
+
+如果这个项目对你有帮助，欢迎请作者喝杯咖啡 ☕️
+
+<img src="./docs/reward.jpg" width="30%" alt="赞赏码" />
+
 ## 鸣谢
 
 - 感谢 @fyears 的原始项目 [Remotely Save](https://github.com/remotely-save/remotely-save)。

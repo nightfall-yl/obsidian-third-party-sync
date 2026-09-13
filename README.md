@@ -123,6 +123,12 @@ cp main.js styles.css manifest.json /your/path/to/vault/.obsidian/plugins/third-
 - Files/folders starting with `.` or `_` are excluded from sync by default.
 - Enable sync for `_` folders and `.obsidian` config directory in settings.
 
+## Buy Me a Coffee
+
+If you find this plugin helpful, consider buying me a coffee ☕️
+
+<img src="./docs/reward.jpg" width="30%" alt="Buy me a coffee" />
+
 ## Credits
 
 - Thanks to @fyears for the original [Remotely Save](https://github.com/remotely-save/remotely-save) project.
