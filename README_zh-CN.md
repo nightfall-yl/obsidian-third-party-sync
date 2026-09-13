@@ -4,8 +4,6 @@
 
 如果你觉得有用，欢迎给个 Star：[![GitHub Repo stars](https://img.shields.io/github/stars/nightfall-yl/obsidian-third-party-sync?style=social)](https://github.com/nightfall-yl/obsidian-third-party-sync)
 
-欢迎提交 Pull Request！
-
 <p align="center">
   <a href="README.md">English</a> ·
   <a href="README_zh-CN.md">简体中文</a>
@@ -36,24 +34,12 @@
   - Remotely Save：`crypto-browserify` + `@fyears/rclone-crypt` + Web Worker
   - 本插件：**纯浏览器原生 `window.crypto.subtle` API**
 
-> 加密升级详情见 [commit d9ad76e](https://github.com/nightfall-yl/obsidian-third-party-sync/commit/d9ad76e774b0b1cee2b36316058df926f4bfb2bf)，加密原理见[加密文档](./docs/encryption.md)。
-
 ### 架构精简
 
 相比原版，本插件做了以下精简：
 
 - **存储服务**：从 13 种精简为 3 种主流服务（S3 / WebDAV / OneDrive），移除 Dropbox、Google Drive、Box、Azure Blob、pCloud、Yandex Disk、Koofr、Webdis 等
 - **加密方案**：从 2 套（OpenSSL + RClone）合并为 1 套（AES-256-GCM）
-
-### 保留的全部基础功能
-
-- 5 种同步方向（双向 / 增量推送 / 增量拉取 / 推送+删除 / 拉取+删除）
-- 变更比例保护（防止意外大规模修改或删除）
-- 大文件跳过、冲突处理策略（保留较新或较大版本）、空文件夹清理
-- 定时同步、启动时同步、保存时同步、远端变化检测自动同步
-- 端到端加密、移动端支持、状态栏进度显示
-- URI 导入/导出设置、书签及配置文件夹同步
-- 最小侵入设计
 
 ## 功能特性
 
@@ -66,7 +52,9 @@
 - **大文件跳过**：可设置跳过超过指定大小的文件。
 - **同步书签及配置文件夹**（可选）。
 - **状态栏显示**同步进度与最后同步时间。
+- **移动端支持**：在 Obsidian 移动端（Android / iOS）完整可用，包含端到端加密。
 - **URI 导入/导出设置**（OneDrive OAuth 信息除外）。
+- **空文件夹清理**：自动清理同步后变为空的文件夹。
 - **[最小侵入设计](./docs/minimal_intrusive_design.md)**。
 - **完全开源**（[Apache-2.0](./LICENSE)）。
 - **[同步算法](./docs/sync_algorithm.md)**。
@@ -88,25 +76,6 @@
 
 **方式三**：手动下载最新 Release 的 `main.js`、`manifest.json`、`styles.css`，放入 Vault 的 `.obsidian/plugins/third-party-sync/` 目录。
 
-## 构建
-
-```bash
-git clone https://github.com/nightfall-yl/obsidian-third-party-sync
-cd obsidian-third-party-sync
-npm install
-
-# 开发构建（监听文件变化自动重编译）
-npm run dev
-
-# 生产构建（esbuild）
-npm run build
-```
-
-部署到插件目录：
-```bash
-cp main.js styles.css manifest.json /your/path/to/vault/.obsidian/plugins/third-party-sync
-```
-
 ## 使用
 
 ### S3
@@ -126,13 +95,12 @@ cp main.js styles.css manifest.json /your/path/to/vault/.obsidian/plugins/third-
 - 授权后插件在 `/Apps/third-party-sync/` 下读写文件。
 - 支持端到端加密（Vault 名称本身不加密）。
 
-## 自动同步
+### 自动同步
 
-- 支持定时自动同步、启动时自动同步、保存时自动同步、远端变化检测后自动同步。
 - 自动同步模式下出错会静默失败。
 - Obsidian 关闭后无法自动同步（浏览器插件的技术限制）。
 
-## 隐藏文件
+### 隐藏文件
 
 - 默认以 `.` 或 `_` 开头的文件和文件夹不同步。
 - 可在设置中开启同步 `_` 文件夹和 `.obsidian` 配置文件夹。

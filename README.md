@@ -4,8 +4,6 @@
 
 If you find it useful, please give it a star: [![GitHub Repo stars](https://img.shields.io/github/stars/nightfall-yl/obsidian-third-party-sync?style=social)](https://github.com/nightfall-yl/obsidian-third-party-sync)
 
-Pull requests are welcome!
-
 <p align="center">
   <a href="README.md">English</a> ·
   <a href="README_zh-CN.md">简体中文</a>
@@ -36,24 +34,12 @@ Pull requests are welcome!
   - Remotely Save: `crypto-browserify` + `@fyears/rclone-crypt` + Web Worker
   - This Plugin: **Pure browser-native `window.crypto.subtle` API**
 
-> See [commit d9ad76e](https://github.com/nightfall-yl/obsidian-third-party-sync/commit/d9ad76e774b0b1cee2b36316058df926f4bfb2bf) for encryption changes. Read [encryption docs](./docs/encryption.md) for details.
-
 ### Architecture Simplification
 
 Compared to the original, this fork makes the following simplifications:
 
 - **Storage services**: Reduced from 13 to 3 mainstream services (S3 / WebDAV / OneDrive). Removed Dropbox, Google Drive, Box, Azure Blob, pCloud, Yandex Disk, Koofr, Webdis, etc.
 - **Encryption schemes**: Merged from 2 (OpenSSL + RClone) into 1 (**AES-256-GCM**)
-
-### All Retained Core Features
-
-- 5 sync directions (bidirectional / incremental push / incremental pull / push+delete / pull+delete)
-- Modification ratio protection (prevents accidental mass changes)
-- Large file skip, conflict handling (keep newer or larger version), empty folder cleanup
-- Auto sync: scheduled interval, startup, on-save, remote-change detection
-- End-to-end encryption, mobile support, status bar progress display
-- URI import/export settings, bookmark & config directory sync
-- Minimal intrusive design
 
 ## Features
 
@@ -66,7 +52,9 @@ Compared to the original, this fork makes the following simplifications:
 - **Large file skip**: skip files exceeding a configured size threshold.
 - **Sync bookmarks and config dir** (optional).
 - **Status bar**: progress and last sync time display.
+- **Mobile support**: full functionality on Obsidian mobile (Android / iOS), including end-to-end encryption.
 - **URI import/export** for settings (excluding OneDrive OAuth info).
+- **Empty folder cleanup**: automatically removes synced folders that become empty.
 - **[Minimal intrusive design](./docs/minimal_intrusive_design.md).**
 - **Fully open source** ([Apache-2.0](./LICENSE)).
 - **[Sync algorithm](./docs/sync_algorithm.md).**
@@ -88,25 +76,6 @@ Compared to the original, this fork makes the following simplifications:
 
 **Option 3**: Manually download `main.js`, `manifest.json`, `styles.css` from the latest release and place them in your vault's `.obsidian/plugins/third-party-sync/` directory.
 
-## Building
-
-```bash
-git clone https://github.com/nightfall-yl/obsidian-third-party-sync
-cd obsidian-third-party-sync
-npm install
-
-# Development build (watch mode)
-npm run dev
-
-# Production build (esbuild)
-npm run build
-```
-
-Deploy to plugin directory:
-```bash
-cp main.js styles.css manifest.json /your/path/to/vault/.obsidian/plugins/third-party-sync
-```
-
 ## Usage
 
 ### S3
@@ -126,13 +95,12 @@ cp main.js styles.css manifest.json /your/path/to/vault/.obsidian/plugins/third-
 - Plugin reads/writes under `/Apps/third-party-sync/` after authorization.
 - E2E encryption supported (vault name itself is not encrypted).
 
-## Auto Sync
+### Auto Sync
 
-- Supports scheduled interval, startup, on-save, and remote-change detection auto sync.
 - Errors silently fail in auto sync mode.
 - Cannot run while Obsidian is closed (browser plugin technical limitation).
 
-## Hidden Files
+### Hidden Files
 
 - Files/folders starting with `.` or `_` are excluded from sync by default.
 - Enable sync for `_` folders and `.obsidian` config directory in settings.
