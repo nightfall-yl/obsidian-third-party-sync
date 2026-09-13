@@ -662,9 +662,6 @@ export class WrappedOnedriveClient {
         Authorization: `Bearer ${accessToken}`,
       },
     });
-    console.log(
-      `[third-party-sync] PUT ${theUrl} -> HTTP ${resp.status}, bytes=${payload.byteLength}`
-    );
     if (resp.status >= 200 && resp.status < 300) {
       return;
     }

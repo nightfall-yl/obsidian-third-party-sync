@@ -38,7 +38,7 @@ Compared to the original, this fork makes the following simplifications:
 - Modification ratio protection (prevents accidental mass changes)
 - Large file skip, conflict handling (keep newer or larger version), empty folder cleanup
 - Auto sync: scheduled interval, startup, on-save, remote-change detection
-- End-to-end encryption, mobile support, status bar progress display, debug mode
+- End-to-end encryption, mobile support, status bar progress display
 - URI import/export settings, bookmark & config directory sync
 - Minimal intrusive design
 
@@ -53,7 +53,6 @@ Compared to the original, this fork makes the following simplifications:
 - **Large file skip**: skip files exceeding a configured size threshold.
 - **Sync bookmarks and config dir** (optional).
 - **Status bar**: progress and last sync time display.
-- **Debug mode**: export sync plans, export console logs.
 - **URI import/export** for settings (excluding OneDrive OAuth info).
 - **[Minimal intrusive design](./docs/minimal_intrusive_design.md).**
 - **Fully open source** ([Apache-2.0](./LICENSE)).
@@ -123,10 +122,6 @@ cp main.js styles.css manifest.json /your/path/to/vault/.obsidian/plugins/third-
 
 - Files/folders starting with `.` or `_` are excluded from sync by default.
 - Enable sync for `_` folders and `.obsidian` config directory in settings.
-
-## Debugging
-
-See [debugging docs](./docs/how_to_debug/README.md).
 
 ## Credits
 

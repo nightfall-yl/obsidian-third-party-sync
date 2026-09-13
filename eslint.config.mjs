@@ -47,16 +47,4 @@ export default defineConfig([
       "import/no-nodejs-modules": "off",
     },
   },
-  {
-    // webdav's browser deep-import (dist/web/index.js) ships without type
-    // declarations, so every call on it resolves to `any`. Suppress the
-    // no-unsafe-* noise in the WebDAV client integration rather than fight the
-    // third-party typing. The actual runtime behavior is unchanged.
-    files: ["src/remoteForWebdav.ts"],
-    rules: {
-      "@typescript-eslint/no-unsafe-assignment": "off",
-      "@typescript-eslint/no-unsafe-call": "off",
-      "@typescript-eslint/no-unsafe-member-access": "off",
-    },
-  },
 ]);

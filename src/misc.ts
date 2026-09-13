@@ -379,8 +379,11 @@ export const getSplitRanges = (bytesTotal: number, bytesEachPart: number) => {
  * @returns string of the name of the object
  */
 export const getTypeName = (obj: unknown): string => {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- third-party library returns any
-  return Object.prototype.toString.call(obj).slice(8, -1) as string;
+  // `Function.prototype.call` is typed but returns `any`; wrapping in String()
+  // narrows the result back to `string` without a redundant `as string` cast
+  // (which would trip no-unnecessary-type-assertion) or an `any` return
+  // (which would trip no-unsafe-return).
+  return String(Object.prototype.toString.call(obj)).slice(8, -1);
 };
 
 /**

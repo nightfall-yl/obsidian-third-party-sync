@@ -13,8 +13,11 @@ import type {
   WebDAVClient,
   Response,
 } from "webdav";
-// @ts-ignore -- explicit path to browser build ensures same instance as createClient
-import { getPatcher } from "webdav/dist/web/index.js";
+// Import from the main entry so we get the package's own types. With esbuild
+// `platform: "browser"` this still resolves to the browser build
+// (dist/web/index.js) at bundle time, so getPatcher shares the same module
+// instance as createClient (it patches the client factory at runtime).
+import { getPatcher } from "webdav";
 
 // Helper: lowercase all keys of an object (same as upstream)
 const objKeyToLower = (obj: Record<string, string>): Record<string, string> =>
@@ -102,8 +105,10 @@ if (VALID_REQURL) {
     }
   );
 }
-// @ts-ignore -- explicit path to browser build ensures same instance as getPatcher
-import { AuthType, BufferLike, createClient } from "webdav/dist/web/index.js";
+// Import from the main entry so we get the package's own types. With esbuild
+// `platform: "browser"` this still resolves to the browser build
+// (dist/web/index.js) at bundle time, sharing the same instance as getPatcher.
+import { AuthType, BufferLike, createClient } from "webdav";
 export type { WebDAVClient } from "webdav";
 
 export const DEFAULT_WEBDAV_CONFIG = {
