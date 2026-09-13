@@ -133,7 +133,9 @@ cp main.js styles.css manifest.json /your/path/to/vault/.obsidian/plugins/third-
 
 如果这个项目对你有帮助，欢迎请作者喝杯咖啡 ☕️
 
-<img src="./docs/reward.jpg" width="30%" alt="赞赏码" />
+<div align="center">
+  <img src="./docs/reward.jpg" alt="赞赏码" />
+</div>
 
 ## 鸣谢
 

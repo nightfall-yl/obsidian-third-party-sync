@@ -133,7 +133,9 @@ cp main.js styles.css manifest.json /your/path/to/vault/.obsidian/plugins/third-
 
 If you find this plugin helpful, consider buying me a coffee ☕️
 
-<img src="./docs/reward.jpg" width="30%" alt="Buy me a coffee" />
+<div align="center">
+  <img src="./docs/reward.jpg" alt="Buy me a coffee" />
+</div>
 
 ## Credits
 
