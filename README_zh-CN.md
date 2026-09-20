@@ -2,12 +2,9 @@
 
 **Obsidian Third-party Sync** 是 [Remotely Save](https://github.com/remotely-save/remotely-save) 的非官方分叉插件，**核心聚焦于安全性升级**。在保留原版全部基础功能的前提下，重构了加密实现并精简了代码架构。**与 Remotely Save 不兼容**，切换前请务必备份 Vault 数据。
 
-如果你觉得有用，欢迎给个 Star：[![GitHub Repo stars](https://img.shields.io/github/stars/nightfall-yl/obsidian-third-party-sync?style=social)](https://github.com/nightfall-yl/obsidian-third-party-sync)
+[![Version](https://img.shields.io/badge/version-26.1.5-blue)](https://github.com/nightfall-yl/obsidian-third-party-sync) | [![Obsidian](https://img.shields.io/badge/Obsidian-1.11.0%2B-purple)](https://obsidian.md) | [![License](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
 
-<p align="center">
-  <a href="README.md">English</a> ·
-  <a href="README_zh-CN.md">简体中文</a>
-</p>
+简体中文 | [English](README.md)
 
 ## 免责声明
 
