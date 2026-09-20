@@ -1,6 +1,6 @@
 # Obsidian Third-party Sync
 
-An Obsidian sync plugin, forked from [Remotely Save](https://github.com/remotely-save/remotely-save) with **security-first improvements**. We rebuilt the encryption layer (AES-256-GCM) and simplified the codebase. **NOT backwards compatible with Remotely Save** — please back up your vault before switching.
+An Obsidian sync plugin, forked from [Remotely Save](https://github.com/remotely-save/remotely-save) with **security-first improvements**. Rebuilt the encryption layer (AES-256-GCM) and simplified the codebase. **NOT backwards compatible with Remotely Save** — please back up your vault before switching.
 
 [![Version](https://img.shields.io/badge/version-26.1.5-blue)](https://github.com/nightfall-yl/obsidian-third-party-sync) | [![Obsidian](https://img.shields.io/badge/Obsidian-1.11.0%2B-purple)](https://obsidian.md) | [![License](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
 
