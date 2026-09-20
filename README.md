@@ -1,6 +1,6 @@
 # Obsidian Third-party Sync
 
-**Obsidian Third-party Sync** is an unofficial fork of [Remotely Save](https://github.com/remotely-save/remotely-save), **focused on security upgrades**. It retains all core features from the original while rebuilding the encryption implementation and simplifying the codebase. **It is NOT backwards compatible with Remotely Save** — backup your vault before switching.
+An Obsidian sync plugin, forked from [Remotely Save](https://github.com/remotely-save/remotely-save) with **security-first improvements**. We rebuilt the encryption layer (AES-256-GCM) and simplified the codebase. **NOT backwards compatible with Remotely Save** — please back up your vault before switching.
 
 [![Version](https://img.shields.io/badge/version-26.1.5-blue)](https://github.com/nightfall-yl/obsidian-third-party-sync) | [![Obsidian](https://img.shields.io/badge/Obsidian-1.11.0%2B-purple)](https://obsidian.md) | [![License](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
 
@@ -19,7 +19,7 @@ English | [简体中文](README_zh-CN.md)
   - Remotely Save: AES-CBC or AES-CTR (RClone)
   - This Plugin: **AES-256-GCM**
 - **Integrity check**
-  - Remotely Save: None (CBC vulnerable to padding oracle attacks)
+  - Remotely Save: None (CBC mode, which is vulnerable to padding oracle attacks)
   - This Plugin: **Built-in GCM AuthTag verification**
 - **Initialization Vector (IV)**
   - Remotely Save: Derived from password (same IV for all files under same password)
@@ -48,7 +48,7 @@ Compared to the original, this fork makes the following simplifications:
 - **Conflict handling**: configurable to keep newer or larger version on conflicts.
 - **Large file skip**: skip files exceeding a configured size threshold.
 - **Sync bookmarks and config dir** (optional).
-- **Status bar**: progress and last sync time display.
+- **Status bar**: displays sync progress and last sync time.
 - **Mobile support**: full functionality on Obsidian mobile (Android / iOS), including end-to-end encryption.
 - **URI import/export** for settings (excluding OneDrive OAuth info).
 - **Empty folder cleanup**: automatically removes synced folders that become empty.
@@ -59,8 +59,8 @@ Compared to the original, this fork makes the following simplifications:
 
 ## Limitations & Notes
 
-- **Without metadata sync, deletion sync relies on timestamp comparison.** Recommended to use with Incremental Push/Pull modes.
-- **No smart conflict resolution algorithm** (original Pro feature removed). Files are compared by modification time; the newer wins.
+- **No metadata sync — deletion detection relies on timestamp comparison.** Recommended to use with Incremental Push/Pull modes.
+- **Simple conflict resolution**: files are compared by modification time; the newer version wins.
 - **Cloud services cost money.** All operations (upload, download, file listing, API calls) may incur charges.
 - **Some limitations come from browser environment**, see [technical docs](./docs/browser_env.md).
 - **Protect your `data.json` file** — it contains sensitive info (S3 keys, WebDAV passwords, etc.). Do not share with others; recommended to add to `.gitignore`.

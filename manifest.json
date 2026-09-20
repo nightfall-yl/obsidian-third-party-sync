@@ -3,7 +3,7 @@
   "name": "Third-party Sync",
   "version": "26.1.5",
   "minAppVersion": "1.11.0",
-  "description": "Security and feature updates for the remotely-save unofficial plugin allowing users to synchronize notes between local device and the cloud service. Not backwards compatible.",
+  "description": "Obsidian sync plugin forked from Remotely Save, with security-first improvements. NOT backwards compatible with Remotely Save.",
   "author": "nightfall",
   "authorUrl": "https://github.com/nightfall-yl",
   "isDesktopOnly": false

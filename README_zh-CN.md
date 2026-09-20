@@ -1,6 +1,6 @@
 # Obsidian Third-party Sync
 
-**Obsidian Third-party Sync** 是 [Remotely Save](https://github.com/remotely-save/remotely-save) 的非官方分叉插件，**核心聚焦于安全性升级**。在保留原版全部基础功能的前提下，重构了加密实现并精简了代码架构。**与 Remotely Save 不兼容**，切换前请务必备份 Vault 数据。
+基于 [Remotely Save](https://github.com/remotely-save/remotely-save) 二次开发的 Obsidian 同步插件，**聚焦安全性升级**。重构了加密实现并精简了代码架构。**与 Remotely Save 不兼容**，切换前请务必备份 Vault 数据。
 
 [![Version](https://img.shields.io/badge/version-26.1.5-blue)](https://github.com/nightfall-yl/obsidian-third-party-sync) | [![Obsidian](https://img.shields.io/badge/Obsidian-1.11.0%2B-purple)](https://obsidian.md) | [![License](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
 
@@ -19,7 +19,7 @@
   - Remotely Save：AES-CBC 或 AES-CTR (RClone)
   - 本插件：**AES-256-GCM**
 - **完整性校验**
-  - Remotely Save：无（CBC 易受 padding oracle 攻击）
+  - Remotely Save：无（CBC 模式易受 padding oracle 攻击）
   - 本插件：**GCM 内置 AuthTag 验证**
 - **初始化向量（IV）**
   - Remotely Save：从密码派生（同密码下所有文件 IV 相同）
@@ -59,8 +59,8 @@
 
 ## 限制与注意事项
 
-- **不同步元数据时，删除同步依赖时间戳判断**，建议配合增量推送/拉取模式使用。
-- **无智能冲突解决算法**（原版 Pro 功能已移除），文件以修改时间判断，修改时间较新者胜出。
+- **无元数据同步 —— 删除检测依赖时间戳判断**，建议配合增量推送/拉取模式使用。
+- **简单冲突解决**：文件以修改时间判断，较新者胜出。
 - **云存储会产生费用**：所有操作（上传、下载、列举文件、调用 API）均可能计费。
 - **部分限制来自浏览器环境**，详见[技术文档](./docs/browser_env.md)。
 - **请保护 `data.json` 文件**：包含敏感信息（S3 密钥、WebDAV 密码等），不要分享给他人，建议加入 `.gitignore`。
