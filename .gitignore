@@ -32,6 +32,9 @@ dist-ssr
 # Obsidian files
 .obsidian/
 
+# TRAE local state
+.trae/
+
 # Environment variables
 .env
 .env.local
