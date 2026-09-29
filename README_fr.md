@@ -2,7 +2,7 @@
 
 Un plugin de synchronisation Obsidian, fork de [Remotely Save](https://github.com/remotely-save/remotely-save) avec **des améliorations axées sur la sécurité**. Couche de chiffrement reconstruite (AES-256-GCM) et base de code simplifiée. **PAS rétrocompatible avec Remotely Save** — veuillez sauvegarder votre vault avant de basculer.
 
-[![Version](https://img.shields.io/badge/version-26.1.5-blue)](https://github.com/nightfall-yl/obsidian-third-party-sync) | [![Obsidian](https://img.shields.io/badge/Obsidian-1.11.0%2B-purple)](https://obsidian.md) | [![License](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
+[![Version](https://img.shields.io/github/v/release/nightfall-yl/obsidian-third-party-sync)](https://github.com/nightfall-yl/obsidian-third-party-sync) | [![Obsidian](https://img.shields.io/badge/Obsidian-1.11.0%2B-purple)](https://obsidian.md) | [![License](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
 
 [English](README.md) | [简体中文](README_zh-CN.md) | [繁體中文](README_zh-TW.md) | [日本語](README_ja.md) | [한국어](README_ko.md) | [Deutsch](README_de.md) | Français | [Español](README_es.md) | [Italiano](README_it.md) | [Nederlands](README_nl.md) | [Dansk](README_da.md) | [Svenska](README_sv.md) | [Norsk](README_no.md) | [Русский](README_ru.md)
 

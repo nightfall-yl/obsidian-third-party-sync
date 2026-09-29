@@ -2,7 +2,7 @@
 
 [Remotely Save](https://github.com/remotely-save/remotely-save)에서 포크한 Obsidian 동기화 플러그인입니다. **보안 강화**를 최우선으로, 암호화 레이어를 AES-256-GCM으로 재구축하고 코드베이스를 간소화했습니다. **Remotely Save와 하위 호환되지 않습니다** — 전환 전에 반드시 Vault를 백업하세요.
 
-[![Version](https://img.shields.io/badge/version-26.1.5-blue)](https://github.com/nightfall-yl/obsidian-third-party-sync) | [![Obsidian](https://img.shields.io/badge/Obsidian-1.11.0%2B-purple)](https://obsidian.md) | [![License](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
+[![Version](https://img.shields.io/github/v/release/nightfall-yl/obsidian-third-party-sync)](https://github.com/nightfall-yl/obsidian-third-party-sync) | [![Obsidian](https://img.shields.io/badge/Obsidian-1.11.0%2B-purple)](https://obsidian.md) | [![License](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
 
 [English](README.md) | [简体中文](README_zh-CN.md) | [繁體中文](README_zh-TW.md) | [日本語](README_ja.md) | 한국어 | [Deutsch](README_de.md) | [Français](README_fr.md) | [Español](README_es.md) | [Italiano](README_it.md) | [Nederlands](README_nl.md) | [Dansk](README_da.md) | [Svenska](README_sv.md) | [Norsk](README_no.md) | [Русский](README_ru.md)
 
