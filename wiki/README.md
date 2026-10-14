@@ -29,7 +29,7 @@
 
 | 指标 | 值 |
 |---|---|
-| TypeScript 源码 | ~10,600 行，24 个文件（`src/`；v26.1.5 后清理了实验性 syncer/fs* 死代码） |
+| TypeScript 源码 | ~10,600 行，24 个文件（`src/`；v26.1.8 后清理了实验性 syncer/fs* 死代码） |
 | 最大模块 | `src/sync.ts`（2,109 行，同步算法）、`src/settings.ts`（1,859 行，设置页） |
 | 打包产物 | `main.js`（esbuild bundle，CJS 格式） |
 | 最低 Obsidian 版本 | 1.11.0 |

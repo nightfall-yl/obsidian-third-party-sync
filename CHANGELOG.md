@@ -4,11 +4,15 @@
 
 > 说明：本更新日志自 `26.1.2` 起维护。
 
-## [26.1.6] - 2026-10-14
+## [26.1.8] - 2026-10-14
 
 ### 工程与代码质量
 
 - 移除未接入主流程的实验性死代码：`syncer.ts`、`copyLogic.ts`、`fsAll/fsLocal/fsRemote/fsEncrypt.ts`、`entityTypes.ts`，及无引用的 base32 加密变体与 `CipherMethodType` 等关联类型，净删除约 1,245 行。运行时产物不受影响（相关代码本就被 tree-shaking 剔除）。
+
+### 修复
+
+- 按社区审查要求，`manifest.json` 的 description 移除 "Obsidian" 字样。
 
 ## [26.1.5] - 2026-09-13
 
