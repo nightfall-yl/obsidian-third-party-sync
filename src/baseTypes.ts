@@ -194,14 +194,6 @@ export type SyncDirectionType =
   | "incremental_pull_and_delete_only"
   | "incremental_push_and_delete_only";
 
-// Entity / MixedEntity now live in src/entityTypes.ts (an import-free
-// module) so they cannot degrade to `any` when this module's "obsidian"
-// import fails to resolve in the Obsidian community review sandbox. Re-export
-// them here for backward compatibility with existing importers.
-export type { Entity, MixedEntity } from "./entityTypes";
-
-export type CipherMethodType = 'aes-256-gcm' | 'aes-256-cbc' | 'openssl-base64';
-
 export interface SyncPlanType {
   ts: number;
   tsFmt?: string;

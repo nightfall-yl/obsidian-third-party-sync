@@ -1738,9 +1738,6 @@ const dispatchOperationToActual = async (
   if (password !== "") {
     remoteEncryptedKey = r.remoteEncryptedKey;
     if (remoteEncryptedKey === undefined || remoteEncryptedKey === "") {
-      // the old version uses base32
-      // remoteEncryptedKey = await encryptStringToBase32(key, password);
-      // the new version users base64url
       remoteEncryptedKey = await encryptStringToBase64url(key, password);
     }
   }

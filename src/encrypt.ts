@@ -1,4 +1,4 @@
-import { base32, base64url } from "rfc4648";
+import { base64url } from "rfc4648";
 import { bufferToArrayBuffer } from "./misc";
 
 const DEFAULT_ITER = 20000;
@@ -106,33 +106,6 @@ export const decryptArrayBuffer = async (
   return dec;
 };
 
-export const encryptStringToBase32 = async (
-  text: string,
-  password: string,
-  rounds: number = DEFAULT_ITER
-) => {
-  const enc = await encryptArrayBuffer(
-    bufferToArrayBuffer(new TextEncoder().encode(text)),
-    password,
-    rounds
-  );
-  return base32.stringify(new Uint8Array(enc), { pad: false });
-};
-
-export const decryptBase32ToString = async (
-  text: string,
-  password: string,
-  rounds: number = DEFAULT_ITER
-) => {
-  return new TextDecoder().decode(
-    await decryptArrayBuffer(
-      bufferToArrayBuffer(base32.parse(text, { loose: true })),
-      password,
-      rounds
-    )
-  );
-};
-
 export const encryptStringToBase64url = async (
   text: string,
   password: string,
@@ -166,20 +139,4 @@ export const getSizeFromOrigToEnc = (x: number) => {
   }
   // plaintext size + salt + GCM authN tag + IV
   return x + 16 + 16 + 12;
-};
-
-// This is only used in tests, but should be fixed.
-export const getSizeFromEncToOrig = (x: number) => {
-  if (x < 32 || Number.isNaN(x) || !Number.isInteger(x)) {
-    throw Error(`getSizeFromEncToOrig: ${x} is not a valid size`);
-  }
-  if (x % 16 !== 0) {
-    throw Error(
-      `getSizeFromEncToOrig: ${x} is not a valid encrypted file size`
-    );
-  }
-  return {
-    minSize: ((x - 16) / 16 - 1) * 16,
-    maxSize: ((x - 16) / 16 - 1) * 16 + 15,
-  };
 };
