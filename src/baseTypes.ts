@@ -131,6 +131,9 @@ type DecisionTypeForFileSize =
   | "errorLocalTooLargeConflictRemote"
   | "errorRemoteTooLargeConflictLocal";
 
+type DecisionTypeForFileOneDriveEmpty =
+  | "skipUploadingOneDriveEmpty";
+
 type DecisionTypeForFolder =
   | "createFolder"
   | "uploadLocalDelHistToRemoteFolder"
@@ -140,6 +143,7 @@ type DecisionTypeForFolder =
 export type DecisionType =
   | DecisionTypeForFile
   | DecisionTypeForFileSize
+  | DecisionTypeForFileOneDriveEmpty
   | DecisionTypeForFolder;
 
 export interface FileOrFolderMixedState {

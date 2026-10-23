@@ -189,7 +189,7 @@
   "settings_protectmodifypercentage_050_desc": "50（預設）",
   "settings_protectmodifypercentage_100_desc": "100（停用保護）",
   "setting_syncdirection": "同步方向（實驗性）",
-  "setting_syncdirection_desc": "外掛要往哪個方向同步？請注意不論選哪個選項，都只會同步變更的檔案（根據時間和大小）。\n\n1. 雙向：兩端的變更都會同步到另一端。\n2. 增量推送：本機建立或修改的檔案複製到遠端。\n3. 增量拉取：遠端建立或修改的檔案複製到本機。\n4. 增量推送並刪除：本機建立或修改的檔案複製到遠端，本機的刪除操作也會同步到遠端。\n5. 增量拉取並刪除：遠端建立或修改的檔案複製到本機，遠端的刪除操作也會同步到本機。",
+  "setting_syncdirection_desc": "外掛要往哪個方向同步？請注意不論選哪個選項，都只會同步變更的檔案（根據時間和大小）。\n\n1. 雙向：兩端的變更都會同步到另一端。\n2. 增量推送：本機建立或修改的檔案複製到遠端。\n3. 增量拉取：遠端建立或修改的檔案複製到本機；遠端的刪除不會影響本機已有檔案（本機只增不減）。\n4. 增量推送並刪除：本機建立或修改的檔案複製到遠端，本機的刪除操作也會同步到遠端。\n5. 增量拉取並刪除：遠端建立或修改的檔案複製到本機，遠端的刪除操作也會同步到本機。",
   "setting_syncdirection_bidirectional_desc": "雙向（預設）",
   "setting_syncdirection_incremental_push_only_desc": "增量推送（又稱備份模式）",
   "setting_syncdirection_incremental_pull_only_desc": "增量拉取",

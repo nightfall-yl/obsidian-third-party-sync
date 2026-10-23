@@ -42,7 +42,7 @@ import {
 import { DEFAULT_S3_CONFIG } from "./remoteForS3";
 import { DEFAULT_WEBDAV_CONFIG } from "./remoteForWebdav";
 import { ThirdPartySyncSettingTab } from "./settings";
-import { SyncStatusType, isPasswordOk, getRemoteStates, getSyncPlanV3, doActualSyncV3, getSyncPlan, doActualSync } from "./sync";
+import { SyncStatusType, isPasswordOk, getRemoteStates, getSyncPlanV3, doActualSyncV3 } from "./sync";
 import { DeletionOnRemote, MetadataOnRemote, deserializeMetadataOnRemote } from "./metadataOnRemote";
 import { messyConfigToNormal, normalConfigToMessy } from "./configPersist";
 import { ObsConfigDirFileType, listFilesInObsFolder } from "./obsFolderLister";
@@ -299,7 +299,8 @@ export default class ThirdPartySyncPlugin extends Plugin {
         this.settings.syncUnderscoreItems,
         this.settings.skipSizeLargerThan,
         this.settings.password,
-        this.settings.syncDirection ?? "bidirectional"
+        this.settings.syncDirection ?? "bidirectional",
+        this.settings.conflictAction ?? "keep_newer"
       );
 
       // Step 8 - execute sync using V3
@@ -403,78 +404,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
         }
       }
       , this.app.vault.configDir
-    );
-  }
-
-  private async doActualSync(client: RemoteClient, plan: SyncPlanType, sortedKeys: string[], metadataFile: FileOrFolderMixedState, origMetadataOnRemote: MetadataOnRemote, sizesGoWrong: FileOrFolderMixedState[], deletions: DeletionOnRemote[], self: this) {
-    const t = (x: TransItemType, vars?: Record<string, string>) => {
-      return this.i18n.t(x, vars);
-    };
-    const effectiveConcurrency =
-      client.serviceType === "webdav"
-        ? 1
-        : this.settings.concurrency;
-    return doActualSync(
-      client,
-      this.db,
-      this.vaultRandomID,
-      this.app.vault,
-      plan,
-      sortedKeys,
-      metadataFile,
-      origMetadataOnRemote,
-      sizesGoWrong,
-      deletions,
-      (key: string) => self.trash(key),
-      this.settings.password,
-      this.settings.lastSynced,
-      effectiveConcurrency,
-      (ss: FileOrFolderMixedState[]) => {
-        new SizesConflictModal(
-          self.app,
-          self,
-          this.settings.skipSizeLargerThan,
-          ss,
-          this.settings.password !== ""
-        ).open();
-      },
-      (i: number, total: number) => self.updateStatusBar({i, total}),
-      this.settings.protectModifyPercentage,
-      (errorMsg: string) => {
-        // Parse error message: format is "syncrun_abort_protectmodifypercentage|threshold|realCount|allCount|percent"
-        const parts = errorMsg.split("|");
-        if (parts[0] === "syncrun_abort_protectmodifypercentage") {
-          const [, threshold, realCount, allCount, percent] = parts;
-          const msg = t("syncrun_abort_protectmodifypercentage", {
-            protectModifyPercentage: parseInt(threshold),
-            realModifyDeleteCount: parseInt(realCount),
-            allFilesCount: parseInt(allCount),
-            percent: percent,
-          });
-          new Notice(msg, 0); // 0 means persistent notice
-        }
-      }
-    );
-  }
-
-  private async getSyncPlan(remoteStates: FileOrFolderMixedState[], local: TAbstractFile[], localConfigDirContents: ObsConfigDirFileType[], origMetadataOnRemote: MetadataOnRemote, localHistory: FileFolderHistoryRecord[], client: RemoteClient, triggerSource: "manual" | "auto" | "autoOnceInit" | "dry") {
-    return await getSyncPlan(
-      remoteStates,
-      local,
-      localConfigDirContents,
-      origMetadataOnRemote.deletions,
-      localHistory,
-      client.serviceType,
-      triggerSource,
-      this.app.vault,
-      this.settings.syncConfigDir,
-      this.settings.syncTrash,
-      this.settings.syncBookmarks,
-      this.app.vault.configDir,
-      this.settings.syncUnderscoreItems,
-      this.settings.skipSizeLargerThan,
-      this.settings.password,
-      this.settings.syncDirection ?? "bidirectional"
+      , this.settings.syncDirection ?? "bidirectional"
     );
   }
 
@@ -1289,51 +1219,6 @@ export default class ThirdPartySyncPlugin extends Plugin {
   async getMetadataMtime() {
     // V3: No remote metadata file, use lastSynced from settings
     return this.settings.lastSynced;
-  }
-
-  private async getSyncPlan2() {
-    // If we don't create trash folder and it's used it will result in an error.
-    await this.createTrashIfDoesNotExist();
-    const client = this.getRemoteClient(this);
-    const remoteRsp = await client.listFromRemote();
-
-    await isPasswordOk(
-      remoteRsp.Contents,
-      this.settings.password
-    );
-
-    const remoteStates = await getRemoteStates(
-      remoteRsp.Contents, 
-      this.db, 
-      this.vaultRandomID, 
-      client.serviceType, 
-      this.settings.password
-    );
-
-    const local = this.app.vault.getAllLoadedFiles();
-    let localConfigDirContents: ObsConfigDirFileType[] = await listFilesInObsFolder(this.app.vault, this.manifest.id, this.settings.syncTrash);
-    const prevSyncRecords = await loadPrevSyncRecordsByVault(this.db, this.vaultRandomID);
-
-    const {
-      plan
-    } = await getSyncPlanV3(
-      remoteStates,
-      local,
-      localConfigDirContents,
-      prevSyncRecords,
-      client.serviceType,
-      "auto",
-      this.app.vault,
-      this.settings.syncConfigDir,
-      this.settings.syncTrash,
-      this.settings.syncBookmarks,
-      this.app.vault.configDir,
-      this.settings.syncUnderscoreItems,
-      this.settings.skipSizeLargerThan,
-      this.settings.password,
-      this.settings.syncDirection ?? "bidirectional"
-    );
-    return plan;
   }
 
   enableAutoSyncIfSet() {

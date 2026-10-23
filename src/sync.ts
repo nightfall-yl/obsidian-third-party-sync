@@ -14,6 +14,7 @@ import type {
   FileOrFolderMixedState,
   SUPPORTED_SERVICES_TYPE,
   RemoteItem,
+  ConflictActionType,
 } from "./baseTypes";
 import { API_VER_STAT_FOLDER } from "./baseTypes";
 import {
@@ -348,7 +349,6 @@ const isSkipItem = (
   );
   return shouldSkip;
 
-
 };
 
 const ensembleMixedStates = async (
@@ -556,502 +556,6 @@ const ensembleMixedStates = async (
   return results;
 };
 
-const assignOperationToFileInplace = (
-  origRecord: FileOrFolderMixedState,
-  keptFolder: Set<string>,
-  skipSizeLargerThan: number,
-  password: string = "",
-  syncDirection: SyncDirectionType = "bidirectional"
-) => {
-  let r = origRecord;
-
-  // files and folders are treated differently
-  // here we only check files
-  if (r.key.endsWith("/")) {
-    return r;
-  }
-
-  // we find the max date from four sources
-
-  // 0. find anything inconsistent
-  if (r.existLocal && (r.mtimeLocal === undefined || r.mtimeLocal <= 0)) {
-    throw Error(
-      `Error: Abnormal last modified time locally: ${JSON.stringify(
-        r,
-        null,
-        2
-      )}`
-    );
-  }
-  if (r.existRemote && (r.mtimeRemote === undefined || r.mtimeRemote <= 0)) {
-    throw Error(
-      `Error: Abnormal last modified time remotely: ${JSON.stringify(
-        r,
-        null,
-        2
-      )}`
-    );
-  }
-  if (r.deltimeLocal !== undefined && r.deltimeLocal <= 0) {
-    throw Error(
-      `Error: Abnormal deletion time locally: ${JSON.stringify(r, null, 2)}`
-    );
-  }
-  if (r.deltimeRemote !== undefined && r.deltimeRemote <= 0) {
-    throw Error(
-      `Error: Abnormal deletion time remotely: ${JSON.stringify(r, null, 2)}`
-    );
-  }
-
-  if (
-    (r.existLocal && password !== "" && r.sizeLocalEnc === undefined) ||
-    (r.existRemote && password !== "" && r.sizeRemoteEnc === undefined)
-  ) {
-    throw new Error(
-      `Error: No encryption sizes: ${JSON.stringify(r, null, 2)}`
-    );
-  }
-
-  const sizeLocalComp = password === "" ? r.sizeLocal : r.sizeLocalEnc;
-  const sizeRemoteComp = password === "" ? r.sizeRemote : r.sizeRemoteEnc;
-
-  // Check if pull-only modes should skip local changes
-  const isPullOnlyMode = syncDirection === "incremental_pull_only" || syncDirection === "incremental_pull_and_delete_only";
-  // Check if push-only modes should skip remote changes
-  const isPushOnlyMode = syncDirection === "incremental_push_only" || syncDirection === "incremental_push_and_delete_only";
-
-  // 1. mtimeLocal
-  if (r.existLocal) {
-    // For pull-only modes, ignore local changes - don't upload to remote
-    if (isPullOnlyMode && (!r.existRemote || r.mtimeLocal > r.mtimeRemote)) {
-      // Local has changes but we're in pull-only mode
-      if (r.mtimeLocal === r.mtimeRemote && sizeLocalComp === sizeRemoteComp) {
-        // Files are actually the same, skip
-        r.decision = "skipUploading";
-        r.decisionBranch = 50; // Pull-only: local matches remote
-        keptFolder.add(getParentFolder(r.key));
-        return r;
-      }
-      // Local is newer/missing remotely but we don't push in pull-only mode
-      r.decision = "skipUploading";
-      r.decisionBranch = 51; // Pull-only: skip local upload
-      keptFolder.add(getParentFolder(r.key));
-      return r;
-    }
-
-    const mtimeRemote = r.existRemote ? r.mtimeRemote : -1;
-    const deltimeRemote = r.deltimeRemote !== undefined ? r.deltimeRemote : -1;
-    const deltimeLocal = r.deltimeLocal !== undefined ? r.deltimeLocal : -1;
-    if (
-      r.mtimeLocal >= mtimeRemote &&
-      r.mtimeLocal >= deltimeLocal &&
-      r.mtimeLocal >= deltimeRemote
-    ) {
-      if (sizeLocalComp === undefined) {
-        throw new Error(
-          `Error: no local size but has local mtime: ${JSON.stringify(
-            r,
-            null,
-            2
-          )}`
-        );
-      }
-      if (r.mtimeLocal === r.mtimeRemote) {
-        // local and remote both exist and mtimes are the same
-        if (sizeLocalComp === sizeRemoteComp) {
-          // do not need to consider skipSizeLargerThan in this case
-          r.decision = "skipUploading";
-          r.decisionBranch = 1;
-        } else {
-          if (skipSizeLargerThan <= 0) {
-            r.decision = "uploadLocalToRemote";
-            r.decisionBranch = 2;
-          } else {
-            // limit the sizes
-            if (sizeLocalComp <= skipSizeLargerThan) {
-              if (sizeRemoteComp <= skipSizeLargerThan) {
-                r.decision = "uploadLocalToRemote";
-                r.decisionBranch = 18;
-              } else {
-                r.decision = "errorRemoteTooLargeConflictLocal";
-                r.decisionBranch = 19;
-              }
-            } else {
-              if (sizeRemoteComp <= skipSizeLargerThan) {
-                r.decision = "errorLocalTooLargeConflictRemote";
-                r.decisionBranch = 20;
-              } else {
-                r.decision = "skipUploadingTooLarge";
-                r.decisionBranch = 21;
-              }
-            }
-          }
-        }
-      } else {
-        // we have local laregest mtime,
-        // and the remote not existing or smaller mtime
-        if (skipSizeLargerThan <= 0) {
-          // no need to consider sizes
-          r.decision = "uploadLocalToRemote";
-          r.decisionBranch = 4;
-        } else {
-          // need to consider sizes
-          if (sizeLocalComp <= skipSizeLargerThan) {
-            if (sizeRemoteComp === undefined) {
-              r.decision = "uploadLocalToRemote";
-              r.decisionBranch = 22;
-            } else if (sizeRemoteComp <= skipSizeLargerThan) {
-              r.decision = "uploadLocalToRemote";
-              r.decisionBranch = 23;
-            } else {
-              r.decision = "errorRemoteTooLargeConflictLocal";
-              r.decisionBranch = 24;
-            }
-          } else {
-            if (sizeRemoteComp === undefined) {
-              r.decision = "skipUploadingTooLarge";
-              r.decisionBranch = 25;
-            } else if (sizeRemoteComp <= skipSizeLargerThan) {
-              r.decision = "errorLocalTooLargeConflictRemote";
-              r.decisionBranch = 26;
-            } else {
-              r.decision = "skipUploadingTooLarge";
-              r.decisionBranch = 27;
-            }
-          }
-        }
-      }
-      keptFolder.add(getParentFolder(r.key));
-      return r;
-    }
-  }
-
-  // 2. mtimeRemote
-  if (r.existRemote) {
-    const mtimeLocal = r.existLocal ? r.mtimeLocal : -1;
-    // For push-only modes, ignore remote changes - don't download from remote
-    if (isPushOnlyMode && r.mtimeRemote > mtimeLocal) {
-      // Remote has changes but we're in push-only mode
-      if (r.mtimeLocal === r.mtimeRemote && sizeLocalComp === sizeRemoteComp) {
-        // Files are actually the same, skip
-        r.decision = "skipUploading";
-        r.decisionBranch = 52; // Push-only: local matches remote
-        keptFolder.add(getParentFolder(r.key));
-        return r;
-      }
-      // Remote is newer but we don't pull in push-only mode
-      r.decision = "skipUploading";
-      r.decisionBranch = 53; // Push-only: skip remote download
-      keptFolder.add(getParentFolder(r.key));
-      return r;
-    }
-    const deltimeRemote = r.deltimeRemote !== undefined ? r.deltimeRemote : -1;
-    const deltimeLocal = r.deltimeLocal !== undefined ? r.deltimeLocal : -1;
-    if (
-      r.mtimeRemote > mtimeLocal &&
-      r.mtimeRemote >= deltimeLocal &&
-      r.mtimeRemote >= deltimeRemote
-    ) {
-      // we have remote laregest mtime,
-      // and the local not existing or smaller mtime
-      if (sizeRemoteComp === undefined) {
-        throw new Error(
-          `Error: no remote size but has remote mtime: ${JSON.stringify(
-            r,
-            null,
-            2
-          )}`
-        );
-      }
-
-      if (skipSizeLargerThan <= 0) {
-        // no need to consider sizes
-        r.decision = "downloadRemoteToLocal";
-        r.decisionBranch = 5;
-      } else {
-        // need to consider sizes
-        if (sizeRemoteComp <= skipSizeLargerThan) {
-          if (sizeLocalComp === undefined) {
-            r.decision = "downloadRemoteToLocal";
-            r.decisionBranch = 28;
-          } else if (sizeLocalComp <= skipSizeLargerThan) {
-            r.decision = "downloadRemoteToLocal";
-            r.decisionBranch = 29;
-          } else {
-            r.decision = "errorLocalTooLargeConflictRemote";
-            r.decisionBranch = 30;
-          }
-        } else {
-          if (sizeLocalComp === undefined) {
-            r.decision = "skipDownloadingTooLarge";
-            r.decisionBranch = 31;
-          } else if (sizeLocalComp <= skipSizeLargerThan) {
-            r.decision = "errorRemoteTooLargeConflictLocal";
-            r.decisionBranch = 32;
-          } else {
-            r.decision = "skipDownloadingTooLarge";
-            r.decisionBranch = 33;
-          }
-        }
-      }
-
-      keptFolder.add(getParentFolder(r.key));
-      return r;
-    }
-  }
-
-  // 3. deltimeLocal
-  // Only process local deletion in push modes or bidirectional
-  if (r.deltimeLocal !== undefined && r.deltimeLocal !== 0) {
-    // For pull-only modes, ignore local deletions
-    if (syncDirection === "incremental_pull_only") {
-      // Skip local deletion, but still need to handle remote side
-      r.decision = "skipUploading";
-      r.decisionBranch = 54; // Pull-only: skip local deletion
-      keptFolder.add(getParentFolder(r.key));
-      return r;
-    }
-    const mtimeLocal = r.existLocal ? r.mtimeLocal : -1;
-    const mtimeRemote = r.existRemote ? r.mtimeRemote : -1;
-    const deltimeRemote = r.deltimeRemote !== undefined ? r.deltimeRemote : -1;
-    if (
-      r.deltimeLocal >= mtimeLocal &&
-      r.deltimeLocal >= mtimeRemote &&
-      r.deltimeLocal >= deltimeRemote
-    ) {
-      if (skipSizeLargerThan <= 0) {
-        r.decision = "uploadLocalDelHistToRemote";
-        r.decisionBranch = 6;
-        if (r.existLocal || r.existRemote) {
-          // actual deletion would happen
-        }
-      } else {
-        const localTooLargeToDelete =
-          r.existLocal && sizeLocalComp > skipSizeLargerThan;
-        const remoteTooLargeToDelete =
-          r.existRemote && sizeRemoteComp > skipSizeLargerThan;
-        if (localTooLargeToDelete) {
-          if (remoteTooLargeToDelete) {
-            r.decision = "skipUsingLocalDelTooLarge";
-            r.decisionBranch = 34;
-          } else {
-            if (r.existRemote) {
-              r.decision = "errorLocalTooLargeConflictRemote";
-              r.decisionBranch = 35;
-            } else {
-              r.decision = "skipUsingLocalDelTooLarge";
-              r.decisionBranch = 36;
-            }
-          }
-        } else {
-          if (remoteTooLargeToDelete) {
-            if (r.existLocal) {
-              r.decision = "errorLocalTooLargeConflictRemote";
-              r.decisionBranch = 37;
-            } else {
-              r.decision = "skipUsingLocalDelTooLarge";
-              r.decisionBranch = 38;
-            }
-          } else {
-            r.decision = "uploadLocalDelHistToRemote";
-            r.decisionBranch = 39;
-          }
-        }
-      }
-      return r;
-    }
-  }
-
-  // 4. deltimeRemote
-  // Only process remote deletion in pull modes or bidirectional
-  if (r.deltimeRemote !== undefined && r.deltimeRemote !== 0) {
-    // For push-only modes, ignore remote deletions
-    if (syncDirection === "incremental_push_only") {
-      r.decision = "skipUploading";
-      r.decisionBranch = 55; // Push-only: skip remote deletion
-      keptFolder.add(getParentFolder(r.key));
-      return r;
-    }
-    const mtimeLocal = r.existLocal ? r.mtimeLocal : -1;
-    const mtimeRemote = r.existRemote ? r.mtimeRemote : -1;
-    const deltimeLocal = r.deltimeLocal !== undefined ? r.deltimeLocal : -1;
-    if (
-      r.deltimeRemote >= mtimeLocal &&
-      r.deltimeRemote >= mtimeRemote &&
-      r.deltimeRemote >= deltimeLocal
-    ) {
-      if (skipSizeLargerThan <= 0) {
-        r.decision = "keepRemoteDelHist";
-        r.decisionBranch = 7;
-        if (r.existLocal || r.existRemote) {
-          // actual deletion would happen
-        }
-      } else {
-        const localTooLargeToDelete =
-          r.existLocal && sizeLocalComp > skipSizeLargerThan;
-        const remoteTooLargeToDelete =
-          r.existRemote && sizeRemoteComp > skipSizeLargerThan;
-        if (localTooLargeToDelete) {
-          if (remoteTooLargeToDelete) {
-            r.decision = "skipUsingRemoteDelTooLarge";
-            r.decisionBranch = 40;
-          } else {
-            if (r.existRemote) {
-              r.decision = "errorLocalTooLargeConflictRemote";
-              r.decisionBranch = 41;
-            } else {
-              r.decision = "skipUsingRemoteDelTooLarge";
-              r.decisionBranch = 42;
-            }
-          }
-        } else {
-          if (remoteTooLargeToDelete) {
-            if (r.existLocal) {
-              r.decision = "errorLocalTooLargeConflictRemote";
-              r.decisionBranch = 43;
-            } else {
-              r.decision = "skipUsingRemoteDelTooLarge";
-              r.decisionBranch = 44;
-            }
-          } else {
-            r.decision = "keepRemoteDelHist";
-            r.decisionBranch = 45;
-          }
-        }
-      }
-      return r;
-    }
-  }
-
-  throw Error(`no decision for ${JSON.stringify(r)}`);
-};
-
-const assignOperationToFolderInplace = async (
-  origRecord: FileOrFolderMixedState,
-  keptFolder: Set<string>,
-  vault: Vault,
-  _password: string = "",
-  _syncDirection: SyncDirectionType = "bidirectional"
-) => {
-  let r = origRecord;
-
-  // files and folders are treated differently
-  // here we only check folders
-  if (!r.key.endsWith("/")) {
-    return r;
-  }
-
-  if (!keptFolder.has(r.key)) {
-    // the folder does NOT have any must-be-kept children!
-
-    if (r.deltimeLocal !== undefined || r.deltimeRemote !== undefined) {
-      // it has some deletion "commands"
-
-      const deltimeLocal = r.deltimeLocal !== undefined ? r.deltimeLocal : -1;
-      const deltimeRemote =
-        r.deltimeRemote !== undefined ? r.deltimeRemote : -1;
-
-      // if it was created after deletion, we should keep it as is
-      if (requireApiVersion(API_VER_STAT_FOLDER)) {
-        if (r.existLocal) {
-          const { ctime, mtime } = await statFix(vault, r.key);
-          const cmtime = Math.max(ctime ?? 0, mtime ?? 0);
-          if (
-            !Number.isNaN(cmtime) &&
-            cmtime > 0 &&
-            cmtime >= deltimeLocal &&
-            cmtime >= deltimeRemote
-          ) {
-            keptFolder.add(getParentFolder(r.key));
-            if (r.existLocal && r.existRemote) {
-              r.decision = "skipFolder";
-              r.decisionBranch = 14;
-            } else if (r.existLocal || r.existRemote) {
-              r.decision = "createFolder";
-              r.decisionBranch = 15;
-            } else {
-              throw Error(
-                `Error: Folder ${r.key} doesn't exist locally and remotely but is marked must be kept. Abort.`
-              );
-            }
-          }
-        }
-      }
-
-      // If it was moved to here, after deletion, we should keep it as is.
-      // The logic not necessarily needs API_VER_STAT_FOLDER.
-      // The folder needs this logic because it's also determined by file children.
-      // But the file do not need this logic because the mtimeLocal is checked firstly.
-      if (
-        r.existLocal &&
-        r.changeLocalMtimeUsingMapping &&
-        r.mtimeLocal > 0 &&
-        r.mtimeLocal > deltimeLocal &&
-        r.mtimeLocal > deltimeRemote
-      ) {
-        keptFolder.add(getParentFolder(r.key));
-        if (r.existLocal && r.existRemote) {
-          r.decision = "skipFolder";
-          r.decisionBranch = 16;
-        } else if (r.existLocal || r.existRemote) {
-          r.decision = "createFolder";
-          r.decisionBranch = 17;
-        } else {
-          throw Error(
-            `Error: Folder ${r.key} doesn't exist locally and remotely but is marked must be kept. Abort.`
-          );
-        }
-      }
-
-      if (r.decision === undefined) {
-        // not yet decided by the above reason
-        if (deltimeLocal > 0 && deltimeLocal > deltimeRemote) {
-          r.decision = "uploadLocalDelHistToRemoteFolder";
-          r.decisionBranch = 8;
-        } else {
-          r.decision = "keepRemoteDelHistFolder";
-          r.decisionBranch = 9;
-        }
-      }
-    } else {
-      // it does not have any deletion commands
-      // keep it as is, and create it if necessary
-      keptFolder.add(getParentFolder(r.key));
-      if (r.existLocal && r.existRemote) {
-        r.decision = "skipFolder";
-        r.decisionBranch = 10;
-      } else if (r.existLocal || r.existRemote) {
-        r.decision = "createFolder";
-        r.decisionBranch = 11;
-      } else {
-        throw Error(
-          `Error: Folder ${r.key} doesn't exist locally and remotely but is marked must be kept. Abort.`
-        );
-      }
-    }
-  } else {
-    // the folder has some must be kept children!
-    // so itself and its parent folder must be kept
-    keptFolder.add(getParentFolder(r.key));
-    if (r.existLocal && r.existRemote) {
-      r.decision = "skipFolder";
-      r.decisionBranch = 12;
-    } else if (r.existLocal || r.existRemote) {
-      r.decision = "createFolder";
-      r.decisionBranch = 13;
-    } else {
-      throw Error(
-        `Error: Folder ${r.key} doesn't exist locally and remotely but is marked must be kept. Abort.`
-      );
-    }
-  }
-
-  // save the memory, save the world!
-  // we have dealt with it, so we don't need it any more.
-  keptFolder.delete(r.key);
-  return r;
-};
-
 const DELETION_DECISIONS: Set<DecisionType> = new Set([
   "uploadLocalDelHistToRemote",
   "keepRemoteDelHist",
@@ -1078,7 +582,8 @@ export const getSyncPlanV3 = async (
   syncUnderscoreItems: boolean,
   skipSizeLargerThan: number,
   password: string = "",
-  syncDirection: SyncDirectionType = "bidirectional"
+  syncDirection: SyncDirectionType = "bidirectional",
+  conflictAction: ConflictActionType = "keep_newer"
 ) => {
   // Build prevSync map for quick lookup
   const prevSyncMap = new Map<string, PrevSyncRecord>();
@@ -1135,7 +640,9 @@ export const getSyncPlanV3 = async (
         keptFolder,
         skipSizeLargerThan,
         password,
-        syncDirection
+        syncDirection,
+        conflictAction,
+        remoteType
       );
     }
 
@@ -1187,12 +694,12 @@ export const getSyncPlanV3 = async (
   };
 };
 
-const assignOperationToFileInplaceV3 = (
+const assignOperationToFileInplaceV3Inner = (
   origRecord: FileOrFolderMixedState,
   keptFolder: Set<string>,
-  skipSizeLargerThan: number,
   password: string = "",
-  syncDirection: SyncDirectionType = "bidirectional"
+  syncDirection: SyncDirectionType = "bidirectional",
+  conflictAction: ConflictActionType = "keep_newer"
 ) => {
   let r = origRecord;
 
@@ -1230,14 +737,49 @@ const assignOperationToFileInplaceV3 = (
   // 6. !local + !remote + prevSync -> both deleted, skip
 
   if (existLocal && existRemote) {
+    // Genuine conflict: both sides changed since the last sync (three-way
+    // detection via prevSync). Bidirectional only. keep_newer (default) is
+    // exactly the mtime flow below; keep_larger lets the bigger file win
+    // (equal sizes fall through to the normal mtime flow).
+    if (
+      conflictAction === "keep_larger" &&
+      !isPushOnlyMode &&
+      !isPullOnlyMode &&
+      r.prevSync !== undefined &&
+      r.mtimeLocal !== undefined &&
+      r.mtimeRemote !== undefined &&
+      r.mtimeLocal > r.prevSync.mtime &&
+      r.mtimeRemote > r.prevSync.mtime &&
+      sizeLocalComp !== undefined &&
+      sizeRemoteComp !== undefined &&
+      sizeLocalComp !== sizeRemoteComp
+    ) {
+      if (sizeLocalComp > sizeRemoteComp) {
+        r.decision = "uploadLocalToRemote";
+        r.decisionBranch = 77;
+      } else {
+        r.decision = "downloadRemoteToLocal";
+        r.decisionBranch = 78;
+      }
+      keptFolder.add(getParentFolder(r.key));
+      return r;
+    }
     // Both exist - compare mtimes
     if (r.mtimeLocal === r.mtimeRemote) {
       if (sizeLocalComp === sizeRemoteComp) {
         r.decision = "skipUploading";
         r.decisionBranch = 1;
       } else {
-        r.decision = "uploadLocalToRemote";
-        r.decisionBranch = 2;
+        // Same mtime but different sizes: ambiguous content. Pull modes
+        // take the remote copy (they never write to remote); push and
+        // bidirectional modes push the local copy up.
+        if (isPullOnlyMode) {
+          r.decision = "downloadRemoteToLocal";
+          r.decisionBranch = 80;
+        } else {
+          r.decision = "uploadLocalToRemote";
+          r.decisionBranch = 2;
+        }
       }
     } else if (r.mtimeLocal > r.mtimeRemote) {
       // Local is newer
@@ -1265,23 +807,24 @@ const assignOperationToFileInplaceV3 = (
   if (existLocal && !existRemote) {
     if (existPrevSync) {
       // Remote was deleted
-      if (isPushDeleteMode && !isPullOnlyMode) {
-        // In push-and-delete mode, local deletion propagates to remote
-        // But here remote is already gone, so just clean up
-        r.decision = "skipUploading";
-        r.decisionBranch = 60;
-      } else if (isPullDeleteMode) {
+      if (isPullDeleteMode) {
         // In pull-and-delete mode, remote deletion should propagate to local
         r.decision = "keepRemoteDelHist";
         r.decisionBranch = 61;
       } else if (isPushOnlyMode) {
-        // Push-only without delete: local file is present but missing on
-        // remote. prevSync may be stale (e.g. switched provider / re-created
-        // remote), so re-upload the file to keep the remote an up-to-date
-        // mirror of local, instead of stranding it locally as skipped.
+        // Push modes (push_only and push_and_delete alike): local is the
+        // source of truth and the remote is only a bridge/target. A file
+        // that has vanished remotely — no matter why — is pushed again as
+        // long as it still exists locally.
         r.decision = "uploadLocalToRemote";
         r.decisionBranch = 62;
         keptFolder.add(getParentFolder(r.key));
+      } else if (isPullOnlyMode) {
+        // Pull-only: remote deletion must NOT delete the local copy — the
+        // local vault only accumulates. The file stays local-only and is
+        // never uploaded.
+        r.decision = "skipUploading";
+        r.decisionBranch = 79;
       } else {
         // Bidirectional: remote deleted, delete local too
         r.decision = "keepRemoteDelHist";
@@ -1290,13 +833,16 @@ const assignOperationToFileInplaceV3 = (
     } else {
       // New local file, upload to remote
       if (isPullOnlyMode) {
+        // Pull modes: local-only file stays local; do NOT mark its parent
+        // folder as must-be-kept, otherwise the folder decision would push
+        // the folder to remote
         r.decision = "skipUploading";
         r.decisionBranch = 63;
       } else {
         r.decision = "uploadLocalToRemote";
         r.decisionBranch = 64;
+        keptFolder.add(getParentFolder(r.key));
       }
-      keptFolder.add(getParentFolder(r.key));
     }
     return r;
   }
@@ -1316,6 +862,11 @@ const assignOperationToFileInplaceV3 = (
         // Pull-only without delete: download remote
         r.decision = "downloadRemoteToLocal";
         r.decisionBranch = 67;
+      } else if (isPushOnlyMode) {
+        // Push-only (backup mode): local deletion must NOT propagate to
+        // remote, and nothing may be downloaded either
+        r.decision = "skipUploading";
+        r.decisionBranch = 74;
       } else {
         // Bidirectional: local deleted, delete remote too
         r.decision = "uploadLocalDelHistToRemote";
@@ -1324,13 +875,16 @@ const assignOperationToFileInplaceV3 = (
     } else {
       // New remote file, download to local
       if (isPushOnlyMode) {
+        // Push-only: never download remote-only content, and do NOT mark
+        // its parent folder as must-be-kept, otherwise the folder decision
+        // would recreate the folder locally as an empty shell
         r.decision = "skipUploading";
         r.decisionBranch = 68;
       } else {
         r.decision = "downloadRemoteToLocal";
         r.decisionBranch = 69;
+        keptFolder.add(getParentFolder(r.key));
       }
-      keptFolder.add(getParentFolder(r.key));
     }
     return r;
   }
@@ -1350,6 +904,76 @@ const assignOperationToFileInplaceV3 = (
   }
 
   throw Error(`no decision for ${JSON.stringify(r)}`);
+};
+
+const assignOperationToFileInplaceV3 = (
+  origRecord: FileOrFolderMixedState,
+  keptFolder: Set<string>,
+  skipSizeLargerThan: number,
+  password: string = "",
+  syncDirection: SyncDirectionType = "bidirectional",
+  conflictAction: ConflictActionType = "keep_newer",
+  remoteType: SUPPORTED_SERVICES_TYPE = "webdav"
+) => {
+  const r = assignOperationToFileInplaceV3Inner(
+    origRecord,
+    keptFolder,
+    password,
+    syncDirection,
+    conflictAction
+  );
+  // Size limit post-processing. The setting stores BYTES (the settings
+  // dropdown offers MB values multiplied back to bytes). Files over the
+  // limit are never uploaded or downloaded; when exactly one side is over
+  // the limit while the other stays within it, surface a conflict so the
+  // sizes-conflict modal can resolve it. Mirrors the legacy planner's
+  // decision matrix (branches 18-27).
+  if (skipSizeLargerThan > 0 && !r.key.endsWith("/")) {
+    const sizeLocalComp = password === "" ? r.sizeLocal : r.sizeLocalEnc;
+    const sizeRemoteComp = password === "" ? r.sizeRemote : r.sizeRemoteEnc;
+    const localTooLarge =
+      sizeLocalComp !== undefined && sizeLocalComp > skipSizeLargerThan;
+    const remoteTooLarge =
+      sizeRemoteComp !== undefined && sizeRemoteComp > skipSizeLargerThan;
+    if (r.decision === "uploadLocalToRemote") {
+      if (localTooLarge) {
+        r.decision =
+          remoteTooLarge || sizeRemoteComp === undefined
+            ? "skipUploadingTooLarge"
+            : "errorLocalTooLargeConflictRemote";
+      } else if (remoteTooLarge) {
+        r.decision = "errorRemoteTooLargeConflictLocal";
+      }
+    } else if (r.decision === "downloadRemoteToLocal") {
+      if (remoteTooLarge) {
+        r.decision = localTooLarge
+          ? "skipDownloadingTooLarge"
+          : "errorRemoteTooLargeConflictLocal";
+      }
+    }
+  }
+
+  // OneDrive cannot store 0-byte files without E2E encryption (upstream
+  // limitation; encrypted payloads are never empty). Skip at the planning
+  // stage with a decision that is NEVER saved to prevSync, so the next sync
+  // still sees "local-only, never synced" instead of misreading the missing
+  // remote copy as a remote deletion (which would trash the local empty file
+  // in bidirectional mode). The stable loop is: upload planned -> skipped ->
+  // no record -> replanned next time; the file simply stays local.
+  if (
+    remoteType === "onedrive" &&
+    password === "" &&
+    r.decision === "uploadLocalToRemote" &&
+    r.sizeLocal === 0
+  ) {
+    r.decision = "skipUploadingOneDriveEmpty";
+    r.decisionBranch = 81;
+  }
+  // Root-fix option for the OneDrive empty-file limitation: create the file
+  // via Graph API JSON body instead of content upload
+  // (POST /drive/items/{parent}/children with {"name": ..., "file": {}}),
+  // then remove this skip. Needs verification against a live OneDrive.
+  return r;
 };
 
 const assignOperationToFolderInplaceV3 = async (
@@ -1381,17 +1005,44 @@ const assignOperationToFolderInplaceV3 = async (
       r.decision = "skipFolder";
       r.decisionBranch = 10;
     } else if (existLocal && !existRemote) {
-      if (existPrevSync && (isPullDeleteMode || (!isPushOnlyMode && !isPullOnlyMode))) {
-        // Remote deleted the folder
+      if (isPullDeleteMode && existPrevSync) {
+        // Pull-and-delete: remote deletion propagates to local
+        r.decision = "keepRemoteDelHistFolder";
+        r.decisionBranch = 9;
+      } else if (isPullOnlyMode) {
+        // Pull modes never write to remote: a locally-created folder stays
+        // local-only. In pull-only mode a remotely-deleted folder also keeps
+        // its local copy (the local vault only accumulates).
+        r.decision = "skipFolder";
+        r.decisionBranch = 76;
+      } else if (existPrevSync && !isPushOnlyMode) {
+        // Bidirectional: remote deleted the folder; propagate to local
         r.decision = "keepRemoteDelHistFolder";
         r.decisionBranch = 9;
       } else {
+        // Push modes re-push the local folder to remote
         r.decision = "createFolder";
         r.decisionBranch = 15;
       }
     } else if (!existLocal && existRemote) {
-      if (existPrevSync && (isPushDeleteMode || (!isPushOnlyMode && !isPullOnlyMode))) {
-        // Local deleted the folder
+      if (isPushDeleteMode && existPrevSync) {
+        // Local deleted the folder; in push-and-delete mode the deletion
+        // propagates to remote
+        r.decision = "uploadLocalDelHistToRemoteFolder";
+        r.decisionBranch = 8;
+      } else if (isPushOnlyMode) {
+        // Push modes: remote is only a push target/backup, never pull
+        // remote-only folder structure back into the local vault
+        r.decision = "skipFolder";
+        r.decisionBranch = 73;
+      } else if (isPullDeleteMode && existPrevSync) {
+        // In pull-and-delete mode a local folder deletion is intentional
+        // and must not resurrect as an empty shell (files inside are also
+        // skipped via branch 65); the remote copy stays untouched
+        r.decision = "skipFolder";
+        r.decisionBranch = 75;
+      } else if (existPrevSync && !isPullOnlyMode) {
+        // Bidirectional: local deleted the folder
         r.decision = "uploadLocalDelHistToRemoteFolder";
         r.decisionBranch = 8;
       } else {
@@ -1439,7 +1090,8 @@ export const doActualSyncV3 = async (
   callbackSyncProcess?: (index: number, total: number) => Promise<void>,
   protectModifyPercentage?: number,
   callbackProtectModifyPercentage?: (errorMsg: string) => void,
-  configDir: string
+  configDir: string,
+  syncDirection: SyncDirectionType = "bidirectional"
 ) => {
   if (sizesGoWrong.length > 0) {
     log.debug(`some sizes are larger than the threshold, abort and show hints`);
@@ -1551,8 +1203,36 @@ export const doActualSyncV3 = async (
   for (const key of sortedKeys) {
     const state = syncPlan.mixedStates[key];
     if (state.decision === "skipUploading" || state.decision === "uploadLocalToRemote" || state.decision === "downloadRemoteToLocal" || state.decision === "createFolder" || state.decision === "skipFolder") {
-      // Only save files/folders that exist after sync
-      const mtime = state.mtimeLocal ?? state.mtimeRemote ?? Date.now();
+      // Do NOT record one-sided skipped items:
+      // - push modes, remote-only skips: never part of the local vault;
+      //   recording them would phantom-mark them as "locally deleted" in a
+      //   later sync, causing the remote backup to be deleted unexpectedly.
+      // - pull modes, local-only skips: never part of the remote vault;
+      //   recording them would phantom-mark them as "remotely deleted" in a
+      //   later sync, causing locally-created content to be deleted.
+      // In pull-and-delete mode the remote-only record MUST be kept: it
+      // encodes an intentional local deletion whose remote copy is preserved.
+      const isPushMode =
+        syncDirection === "incremental_push_only" ||
+        syncDirection === "incremental_push_and_delete_only";
+      const isPullMode =
+        syncDirection === "incremental_pull_only" ||
+        syncDirection === "incremental_pull_and_delete_only";
+      if (
+        (state.decision === "skipUploading" || state.decision === "skipFolder") &&
+        ((isPushMode && !state.existLocal && state.existRemote) ||
+          (isPullMode && state.existLocal && !state.existRemote))
+      ) {
+        continue;
+      }
+      // Only save files/folders that exist after sync. For downloads the
+      // post-sync local mtime equals the remote mtime; recording the
+      // pre-download local mtime would false-positive the three-way
+      // conflict detection (both-modified) in later syncs.
+      const mtime =
+        state.decision === "downloadRemoteToLocal"
+          ? (state.mtimeRemote ?? state.mtimeLocal ?? Date.now())
+          : (state.mtimeLocal ?? state.mtimeRemote ?? Date.now());
       const size = state.sizeLocal ?? state.sizeRemote ?? 0;
       prevSyncRecords.push({
         key: key,
@@ -1568,115 +1248,6 @@ export const doActualSyncV3 = async (
   log.debug(`V3 sync finished, prevSync records saved`);
 
   return Date.now();
-};
-
-export const getSyncPlan = async (
-  remoteStates: FileOrFolderMixedState[],
-  local: TAbstractFile[],
-  localConfigDirContents: ObsConfigDirFileType[] | undefined,
-  remoteDeleteHistory: DeletionOnRemote[],
-  localFileHistory: FileFolderHistoryRecord[],
-  remoteType: SUPPORTED_SERVICES_TYPE,
-  triggerSource: SyncTriggerSourceType,
-  vault: Vault,
-  syncConfigDir: boolean,
-  syncTrashDir: boolean,
-  syncBookmarks: boolean,
-  configDir: string,
-  syncUnderscoreItems: boolean,
-  skipSizeLargerThan: number,
-  password: string = "",
-  syncDirection: SyncDirectionType = "bidirectional"
-) => {
-  const mixedStates = await ensembleMixedStates(
-    remoteStates,
-    local,
-    localConfigDirContents,
-    remoteDeleteHistory,
-    localFileHistory,
-    syncConfigDir,
-    syncTrashDir,
-    syncBookmarks,
-    configDir,
-    syncUnderscoreItems,
-    password
-  );
-
-  const sortedKeys = Object.keys(mixedStates).sort(
-    (k1, k2) => k2.length - k1.length
-  );
-
-  const sizesGoWrong: FileOrFolderMixedState[] = [];
-  const deletions: DeletionOnRemote[] = [];
-
-  const keptFolder = new Set<string>();
-  for (let i = 0; i < sortedKeys.length; ++i) {
-    const key = sortedKeys[i];
-    const val = mixedStates[key];
-
-    if (key.endsWith("/")) {
-      // decide some folders
-      // because the keys are sorted by length
-      // so all the children must have been shown up before in the iteration
-      await assignOperationToFolderInplace(val, keptFolder, vault, password, syncDirection);
-    } else {
-      // get all operations of files
-      // and at the same time get some helper info for folders
-      assignOperationToFileInplace(
-        val,
-        keptFolder,
-        skipSizeLargerThan,
-        password,
-        syncDirection
-      );
-    }
-
-    if (SIZES_GO_WRONG_DECISIONS.has(val.decision)) {
-      sizesGoWrong.push(val);
-    }
-
-    if (DELETION_DECISIONS.has(val.decision)) {
-      if (val.decision === "uploadLocalDelHistToRemote") {
-        deletions.push({
-          key: key,
-          actionWhen: val.deltimeLocal,
-        });
-      } else if (val.decision === "keepRemoteDelHist") {
-        deletions.push({
-          key: key,
-          actionWhen: val.deltimeRemote,
-        });
-      } else if (val.decision === "uploadLocalDelHistToRemoteFolder") {
-        deletions.push({
-          key: key,
-          actionWhen: val.deltimeLocal,
-        });
-      } else if (val.decision === "keepRemoteDelHistFolder") {
-        deletions.push({
-          key: key,
-          actionWhen: val.deltimeRemote,
-        });
-      } else {
-        throw Error(`do not know how to delete for decision ${val.decision}`);
-      }
-    }
-  }
-
-  const currTs = Date.now();
-  const currTsFmt = unixTimeToStr(currTs);
-  const plan = {
-    ts: currTs,
-    tsFmt: currTsFmt,
-    remoteType: remoteType,
-    syncTriggerSource: triggerSource,
-    mixedStates: mixedStates,
-  } as SyncPlanType;
-  return {
-    plan: plan,
-    sortedKeys: sortedKeys,
-    deletions: deletions,
-    sizesGoWrong: sizesGoWrong,
-  };
 };
 
 export const uploadExtraMeta = async (
@@ -1849,6 +1420,9 @@ const dispatchOperationToActual = async (
     // do nothing!
   } else if (r.decision === "skipUploadingTooLarge") {
     // do nothing!
+  } else if (r.decision === "skipUploadingOneDriveEmpty") {
+    // do nothing! Planned skip: OneDrive rejects 0-byte uploads without E2E
+    // encryption; no prevSync record is written for this decision.
   } else if (r.decision === "skipDownloadingTooLarge") {
     // do nothing!
   } else if (r.decision === "skipUsingLocalDelTooLarge") {
@@ -1891,6 +1465,7 @@ const splitThreeSteps = (syncPlan: SyncPlanType, sortedKeys: string[]): {
       val.decision === "skipUploading" ||
       val.decision === "skipDownloadingTooLarge" ||
       val.decision === "skipUploadingTooLarge" ||
+      val.decision === "skipUploadingOneDriveEmpty" ||
       val.decision === "skipUsingLocalDelTooLarge" ||
       val.decision === "skipUsingRemoteDelTooLarge"
     ) {
@@ -1977,130 +1552,3 @@ async function syncIndividualItem(key: string, deletionOp: boolean, val: FileOrF
   return deletionOp;
 }
 
-export const doActualSync = async (
-  client: RemoteClient,
-  db: InternalDBs,
-  vaultRandomID: string,
-  vault: Vault,
-  syncPlan: SyncPlanType,
-  sortedKeys: string[],
-  metadataFile: FileOrFolderMixedState,
-  origMetadata: MetadataOnRemote,
-  sizesGoWrong: FileOrFolderMixedState[],
-  deletions: DeletionOnRemote[],
-  localDeleteFunc: (key: string) => Promise<void>,
-  password: string = "",
-  lastSynced?: number,
-  concurrency: number = 1,
-  callbackSizesGoWrong?: (items: FileOrFolderMixedState[]) => void,
-  callbackSyncProcess?: (index: number, total: number) => Promise<void>,
-  protectModifyPercentage?: number,
-  callbackProtectModifyPercentage?: (errorMsg: string) => void,
-  configDir: string
-) => {
-  if (sizesGoWrong.length > 0) {
-    log.debug(`some sizes are larger than the threshold, abort and show hints`);
-    callbackSizesGoWrong(sizesGoWrong);
-    return undefined;
-  }
-
-  log.debug(`concurrency === ${concurrency}`);
-
-  const { folderCreationOps, deletionOps, uploadDownloads, realTotalCount, allFilesCount, realModifyDeleteCount } =  splitThreeSteps(syncPlan, sortedKeys);
-
-  if (protectModifyPercentage !== undefined && protectModifyPercentage >= 0 && allFilesCount > 0) {
-    log.debug(`protectModifyPercentage: ${protectModifyPercentage}`);
-    log.debug(`allFilesCount: ${allFilesCount}, realModifyDeleteCount: ${realModifyDeleteCount}`);
-
-    if (protectModifyPercentage === 100 && realModifyDeleteCount === allFilesCount) {
-      // Allow full sync when protection threshold is 100%
-    } else if (realModifyDeleteCount * 100 >= allFilesCount * protectModifyPercentage) {
-      const percent = ((100 * realModifyDeleteCount) / allFilesCount).toFixed(1);
-      const errorMsg = `syncrun_abort_protectmodifypercentage|${protectModifyPercentage}|${realModifyDeleteCount}|${allFilesCount}|${percent}`;
-      log.debug(`aborting sync due to protectModifyPercentage: ${errorMsg}`);
-      if (callbackProtectModifyPercentage) {
-        callbackProtectModifyPercentage(errorMsg);
-      }
-      return undefined;
-    }
-  }
-  const nested = [folderCreationOps, deletionOps, uploadDownloads];
-
-  log.debug("folderCreationOps: ", folderCreationOps.length,
-  " deletionOps: ", deletionOps.length,
-  " uploadDownloads: ", uploadDownloads.length);
-
-  const queue = new PQueue({ concurrency: concurrency, autoStart: true });
-  let queueTotal = realTotalCount;
-  let queueIndex = 0;
-
-  log.debug("Checking if lastSynced is set: ", lastSynced, "== -1?: ", lastSynced == -1);
-
-  const potentialErrors: Error[] = [];
-
-  for (const operation of nested) {
-    for (const singleLevelOps of operation) {
-      if (singleLevelOps === undefined || singleLevelOps === null) {
-        continue;
-      }
-
-      for (const val of singleLevelOps) {
-        const key = val.key;
-        const isDeleteOp = operation === deletionOps;
-
-        if (lastSynced == -1) {
-          const skipKeys = [`${configDir}/app.json`, `${configDir}/appearance.json`, `${configDir}/core-plugins-migration.json`, `${configDir}/core-plugins.json`, `${configDir}/graph.json`, `${configDir}/workspace.json`];
-          if (val.existRemote && skipKeys.includes(key)) {
-            log.debug("downloading from remote for first sync: ", key);
-            val.decision = "downloadRemoteToLocal";
-          }
-        }
-
-        const syncCall = queue.add(async () => {
-          const result = await syncIndividualItem(
-            key,
-            isDeleteOp,
-            val,
-            vaultRandomID,
-            client,
-            db,
-            vault,
-            localDeleteFunc,
-            password
-          );
-
-          if (!isDeleteOp && !val.decision.startsWith("createFolder")) {
-            queueIndex++;
-            if (callbackSyncProcess !== undefined) {
-              await callbackSyncProcess(queueIndex, queueTotal);
-            }
-          }
-
-          return result;
-        });
-
-        syncCall.catch((error: unknown) => {
-          const errMsg = error instanceof Error ? error.message : JSON.stringify(error);
-          const message = `${key}: ${errMsg}`;
-          potentialErrors.push(new Error(message));
-
-          if (potentialErrors.length >= 3) {
-            potentialErrors.push(new Error("too many errors, stop the remaining tasks"));
-            queue.pause();
-            queue.clear();
-          }
-        })
-      }
-    }
-  }
-
-  await queue.onIdle();
-
-  if (potentialErrors.length > 0) {
-    throw new AggregateError(potentialErrors);
-  }
-
-  log.debug(`V2 sync finished, no metadata upload in V3 mode`);
-
-  return Date.now();
-};

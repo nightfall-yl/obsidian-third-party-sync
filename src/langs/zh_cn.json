@@ -189,7 +189,7 @@
   "settings_protectmodifypercentage_050_desc": "50（默认值）",
   "settings_protectmodifypercentage_100_desc": "100（去除此保护）",
   "setting_syncdirection": "同步方向（实验性质）",
-  "setting_syncdirection_desc": "插件应该向哪里同步？注意每个选项都是只有修改了的文件（基于修改时间和大小判断）才会触发同步动作。\n\n1. 双向同步：一边的变动会同步到另一边。\n2. 增量推送：本地创建或修改的文件会复制到远端。\n3. 增量拉取：远端创建或修改的文件会复制到本地。\n4. 增量推送带删除：本地创建或修改的文件会复制到远端，本地的删除也会在远端运行。\n5. 增量拉取带删除：远端创建或修改的文件会复制到本地，远端的删除也会在本地运行。",
+  "setting_syncdirection_desc": "插件应该向哪里同步？注意每个选项都是只有修改了的文件（基于修改时间和大小判断）才会触发同步动作。\n\n1. 双向同步：一边的变动会同步到另一边。\n2. 增量推送：本地创建或修改的文件会复制到远端。\n3. 增量拉取：远端创建或修改的文件会复制到本地；远端的删除不会影响本地已有文件（本地只增不减）。\n4. 增量推送带删除：本地创建或修改的文件会复制到远端，本地的删除也会在远端运行。\n5. 增量拉取带删除：远端创建或修改的文件会复制到本地，远端的删除也会在本地运行。",
   "setting_syncdirection_bidirectional_desc": "双向同步（默认）",
   "setting_syncdirection_incremental_push_only_desc": "增量推送（也即：备份模式）",
   "setting_syncdirection_incremental_pull_only_desc": "增量拉取",
