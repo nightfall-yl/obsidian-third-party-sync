@@ -9,6 +9,7 @@
 ### 安全
 
 - 通过 `overrides` 将传递依赖 `moment` 强制提升至 2.31.0，消除 GHSA-4p3w-j4w9-5jqw 公告（`obsidian` 官方包将其精确固定在 2.29.4；实际产物不打包该库，源码使用 Obsidian 宿主提供的 moment）。
+- 升级传递依赖 `brace-expansion` 全部三条版本线至修复版（1.1.21 / 2.1.7 / 5.0.12），消除 GHSA-q2hr-2g5m-vwhr 等 3 个 DoS 公告（该包仅存在于 eslint 开发链，不进产物）。
 
 ### 工程与代码质量
 
