@@ -3,7 +3,6 @@ import {
   TFile,
   TFolder,
   Vault,
-  requireApiVersion,
 } from "obsidian";
 import AggregateError from "aggregate-error";
 import PQueue from "p-queue";
@@ -16,7 +15,6 @@ import type {
   RemoteItem,
   ConflictActionType,
 } from "./baseTypes";
-import { API_VER_STAT_FOLDER } from "./baseTypes";
 import {
   decryptBase64urlToString,
   encryptStringToBase64url,
@@ -35,7 +33,6 @@ import {
   getParentFolder,
   atWhichLevel,
   unixTimeToStr,
-  statFix,
 } from "./misc";
 import { RemoteClient } from "./remote";
 import {

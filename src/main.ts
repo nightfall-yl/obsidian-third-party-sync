@@ -5,7 +5,7 @@ import {
   Setting,
   setIcon,
   FileSystemAdapter,
-  Platform, TAbstractFile, Vault, EventRef,
+  Platform, Vault, EventRef,
 } from "obsidian";
 
 import type {
@@ -28,7 +28,6 @@ import {
   insertLoggerOutputByVault,
   clearExpiredLoggerOutputRecords,
   clearExpiredSyncPlanRecords,
-  FileFolderHistoryRecord,
   insertDeleteRecordByVault,
   insertRenameRecordByVault,
 } from "./localdb";
@@ -94,8 +93,6 @@ interface OAuth2Info {
 
 const iconNameSyncWait = "rotate-ccw";
 const iconNameSyncRunning = "refresh-ccw";
-const iconNameStatusBar = "refresh-ccw-dot";
-const iconNameLogs = "file-text";
 
 export default class ThirdPartySyncPlugin extends Plugin {
   settings: ThirdPartySyncPluginSettings;

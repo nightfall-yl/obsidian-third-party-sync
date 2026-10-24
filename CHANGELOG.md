@@ -4,6 +4,16 @@
 
 > 说明：本更新日志自 `26.1.2` 起维护。
 
+## [26.2.1] - 2026-10-24
+
+### 安全
+
+- 通过 `overrides` 将传递依赖 `moment` 强制提升至 2.31.0，消除 GHSA-4p3w-j4w9-5jqw 公告（`obsidian` 官方包将其精确固定在 2.29.4；实际产物不打包该库，源码使用 Obsidian 宿主提供的 moment）。
+
+### 工程与代码质量
+
+- 按社区审查建议移除未使用的导入与常量：`main.ts` 的 `TAbstractFile` / `FileFolderHistoryRecord` / `iconNameStatusBar` / `iconNameLogs`，`sync.ts` 的 `requireApiVersion` / `API_VER_STAT_FOLDER` / `statFix`。ESLint 现为 0 errors / 0 warnings。
+
 ## [26.1.9] - 2026-10-23
 
 ### 修复
