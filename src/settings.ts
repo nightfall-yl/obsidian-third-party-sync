@@ -32,7 +32,7 @@ import {
   getAuthUrlAndVerifier as getAuthUrlAndVerifierOnedrive,
 } from "./remoteForOnedrive";
 import type { TransItemType } from "./i18n";
-import { checkHasSpecialCharForDir } from "./misc";
+import { checkHasSpecialCharForDir, unixTimeToStr } from "./misc";
 import { applyWebdavPresetRulesInplace } from "./presetRules";
 import { openWipeCloudModal } from "./wipeRemoteNotice";
 
@@ -459,6 +459,28 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       onedrive: t("settings_onedrive"),
       webdav: t("settings_webdav"),
     };
+
+    // status summary card — one glance for "what is my current sync state"
+    sgChooser.addSetting((setting) => {
+      const lastSynced = this.plugin.settings.lastSynced ?? -1;
+      setting
+        .setName(t("settings_status_summary"))
+        .setDesc(
+          t("settings_status_summary_desc", {
+            service: serviceHeadings[this.plugin.settings.serviceType],
+            direction: t(
+              `syncdirection_short_${this.plugin.settings.syncDirection ?? "bidirectional"}`
+            ),
+            encryption: this.plugin.settings.password
+              ? t("settings_status_encrypted")
+              : t("settings_status_notencrypted"),
+            lastsynced:
+              lastSynced > 0
+                ? unixTimeToStr(lastSynced)
+                : t("settings_status_neversynced"),
+          })
+        );
+    });
 
     const sgServiceDetail = new SettingGroup(containerEl);
     sgServiceDetail.addClass("service-detail-group");
@@ -1151,6 +1173,62 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       })
     );
 
+    // sync direction — the master switch of sync semantics, kept near the top
+    let syncDirSetting: Setting;
+    sgBasic.addSetting((setting) => {
+      syncDirSetting = setting;
+      setting
+        .setName(t("setting_syncdirection"))
+        .setDesc(((desc: string) => {
+          const frag: DocumentFragment = createFragment();
+          const parts = desc.split("\n");
+          parts.forEach((part, i) => {
+            if (i > 0) frag.appendChild(createEl("br"));
+            frag.appendChild(activeDocument.createTextNode(part));
+          });
+          return frag;
+        })(t("setting_syncdirection_desc")))
+        .addDropdown((dropdown) => {
+        dropdown.addOption(
+          "bidirectional",
+          t("setting_syncdirection_bidirectional_desc")
+        );
+        dropdown.addOption(
+          "incremental_push_only",
+          t("setting_syncdirection_incremental_push_only_desc")
+        );
+        dropdown.addOption(
+          "incremental_pull_only",
+          t("setting_syncdirection_incremental_pull_only_desc")
+        );
+        dropdown.addOption(
+          "incremental_push_and_delete_only",
+          t("setting_syncdirection_incremental_push_and_delete_only_desc")
+        );
+        dropdown.addOption(
+          "incremental_pull_and_delete_only",
+          t("setting_syncdirection_incremental_pull_and_delete_only_desc")
+        );
+
+        dropdown
+          .setValue(this.plugin.settings.syncDirection ?? "bidirectional")
+          .onChange((val) => {
+            this.plugin.settings.syncDirection = val as SyncDirectionType;
+            void this.plugin.saveSettings();
+          });
+      });
+    });
+
+    // Move dropdown to be after the description
+    {
+      const settingEl = syncDirSetting.settingEl;
+      const infoEl = syncDirSetting.infoEl;
+      const controlEl = syncDirSetting.controlEl;
+      if (infoEl && controlEl) {
+        settingEl.appendChild(controlEl);
+      }
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
     sgBasic.addSetting((setting) => setting
       .setName(t("settings_saverun"))
@@ -1180,33 +1258,6 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
 
 
 
-
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
-    sgBasic.addSetting((setting) => setting
-    .setName(t("settings_remoterun"))
-    .setDesc(t("settings_remoterun_desc"))
-    .addDropdown((dropdown) => {
-      dropdown.addOption("-1", t("settings_remoterun_notset"));
-      dropdown.addOption(`${1000 * 1}`, t("settings_remoterun_1sec"));
-      dropdown.addOption(`${1000 * 5}`, t("settings_remoterun_5sec"));
-      dropdown.addOption(`${1000 * 10}`, t("settings_remoterun_10sec"));
-      dropdown.addOption(`${1000 * 60}`, t("settings_remoterun_1min"));
-
-      dropdown
-        .setValue(`${this.plugin.settings.syncOnRemoteChangesAfterMilliseconds}`)
-        .onChange((val: string) => {
-          const realVal = parseInt(val);
-          this.plugin.settings.syncOnRemoteChangesAfterMilliseconds = realVal;
-
-          void this.plugin.saveSettings();
-
-          if (realVal <= 0) {
-            void this.plugin.toggleSyncOnRemote(false);
-          } else {
-            void this.plugin.toggleSyncOnRemote(true);
-          }
-        });
-    }));
 
     // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
     sgBasic.addSetting((setting) => setting
@@ -1252,6 +1303,33 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
 
     // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
     sgBasic.addSetting((setting) => setting
+    .setName(t("settings_remoterun"))
+    .setDesc(t("settings_remoterun_desc"))
+    .addDropdown((dropdown) => {
+      dropdown.addOption("-1", t("settings_remoterun_notset"));
+      dropdown.addOption(`${1000 * 1}`, t("settings_remoterun_1sec"));
+      dropdown.addOption(`${1000 * 5}`, t("settings_remoterun_5sec"));
+      dropdown.addOption(`${1000 * 10}`, t("settings_remoterun_10sec"));
+      dropdown.addOption(`${1000 * 60}`, t("settings_remoterun_1min"));
+
+      dropdown
+        .setValue(`${this.plugin.settings.syncOnRemoteChangesAfterMilliseconds}`)
+        .onChange((val: string) => {
+          const realVal = parseInt(val);
+          this.plugin.settings.syncOnRemoteChangesAfterMilliseconds = realVal;
+
+          void this.plugin.saveSettings();
+
+          if (realVal <= 0) {
+            void this.plugin.toggleSyncOnRemote(false);
+          } else {
+            void this.plugin.toggleSyncOnRemote(true);
+          }
+        });
+    }));
+
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
+    sgBasic.addSetting((setting) => setting
       .setName(t("settings_runoncestartup"))
       .setDesc(t("settings_runoncestartup_desc"))
       .addDropdown((dropdown) => {
@@ -1278,28 +1356,86 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       })
     );
 
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
-    sgBasic.addSetting((setting) => setting
-      .setName(t("settings_skiplargefiles"))
-      .setDesc(t("settings_skiplargefiles_desc"))
-      .addDropdown((dropdown) => {
-        dropdown.addOption("-1", t("settings_skiplargefiles_notset"));
+    //////////////////////////////////////////////////
+    // subsection: what to sync
+    //////////////////////////////////////////////////
+    const sgBasicWhat = new SettingGroup(containerEl);
+    sgBasicWhat.setHeading(t("settings_basic_what"));
 
-        const mbs = [1, 5, 10, 50, 100, 500, 1000];
-        for (const mb of mbs) {
-          dropdown.addOption(`${mb * 1000 * 1000}`, `${mb} MB`);
-        }
-        dropdown
-          .setValue(`${this.plugin.settings.skipSizeLargerThan}`)
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
+    sgBasicWhat.addSetting((setting) => setting
+      .setName(t("settings_sync_trash"))
+      .setDesc(t("settings_sync_trash_desc"))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.syncTrash)
           .onChange((val) => {
-            this.plugin.settings.skipSizeLargerThan = parseInt(val);
+            this.plugin.settings.syncTrash = val;
             void this.plugin.saveSettings();
           });
       })
     );
 
     // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
-    sgBasic.addSetting((setting) => setting
+    sgBasicWhat.addSetting((setting) => setting
+      .setName(t("settings_sync_bookmarks"))
+      .setDesc(t("settings_sync_bookmarks_desc"))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.syncBookmarks)
+          .onChange((val) => {
+            this.plugin.settings.syncBookmarks = val;
+            void this.plugin.saveSettings();
+          });
+      })
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
+    sgBasicWhat.addSetting((setting) => setting
+      .setName(t("settings_syncunderscore"))
+      .setDesc(t("settings_syncunderscore_desc"))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.syncUnderscoreItems)
+          .onChange((val) => {
+            this.plugin.settings.syncUnderscoreItems = val;
+            void this.plugin.saveSettings();
+          });
+      })
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
+    sgBasicWhat.addSetting((setting) => setting
+      .setName(t("settings_configdir"))
+      .setDesc(
+        t("settings_configdir_desc", {
+          configDir: this.app.vault.configDir,
+        })
+      )
+      .addToggle((toggle) => {
+        const bridge = {
+          secondConfirm: false,
+        };
+        toggle
+          .setValue(this.plugin.settings.syncConfigDir)
+          .onChange((val) => {
+            if (val && !bridge.secondConfirm) {
+              toggle.setValue(false);
+              new SyncConfigDirModal(this.app, this.plugin, () => {
+                bridge.secondConfirm = true;
+                toggle.setValue(true);
+              }).open();
+            } else {
+              bridge.secondConfirm = false;
+              this.plugin.settings.syncConfigDir = false;
+              void this.plugin.saveSettings();
+            }
+          });
+      })
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
+    sgBasicWhat.addSetting((setting) => setting
       .setName(t("settings_enablestatusbar_info"))
       .setDesc(t("settings_enablestatusbar_info_desc"))
       .addToggle((toggle) => {
@@ -1318,7 +1454,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       })
     );
 
-    const statusBarOptions = (sgBasic as { groupEl: HTMLElement }).groupEl.createDiv({ cls: "third-party-sync-hidden" });
+    const statusBarOptions = (sgBasicWhat as { groupEl: HTMLElement }).groupEl.createDiv({ cls: "third-party-sync-hidden" });
 
     statusBarOptions.toggleClass(
       "third-party-sync-hidden",
@@ -1326,28 +1462,20 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
     );
 
     // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
-    sgBasic.addSetting((setting) => setting
-      .setName(t("settings_sync_trash"))
-      .setDesc(t("settings_sync_trash_desc"))
-      .addToggle((toggle) => {
-        toggle
-          .setValue(this.plugin.settings.syncTrash)
-          .onChange((val) => {
-            this.plugin.settings.syncTrash = val;
-            void this.plugin.saveSettings();
-          });
-      })
-    );
+    sgBasicWhat.addSetting((setting) => setting
+      .setName(t("settings_skiplargefiles"))
+      .setDesc(t("settings_skiplargefiles_desc"))
+      .addDropdown((dropdown) => {
+        dropdown.addOption("-1", t("settings_skiplargefiles_notset"));
 
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
-    sgBasic.addSetting((setting) => setting
-      .setName(t("settings_sync_bookmarks"))
-      .setDesc(t("settings_sync_bookmarks_desc"))
-      .addToggle((toggle) => {
-        toggle
-          .setValue(this.plugin.settings.syncBookmarks)
+        const mbs = [1, 5, 10, 50, 100, 500, 1000];
+        for (const mb of mbs) {
+          dropdown.addOption(`${mb * 1000 * 1000}`, `${mb} MB`);
+        }
+        dropdown
+          .setValue(`${this.plugin.settings.skipSizeLargerThan}`)
           .onChange((val) => {
-            this.plugin.settings.syncBookmarks = val;
+            this.plugin.settings.skipSizeLargerThan = parseInt(val);
             void this.plugin.saveSettings();
           });
       })
@@ -1377,24 +1505,6 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
           .onChange((val) => {
             const realVal = parseInt(val);
             this.plugin.settings.concurrency = realVal;
-            void this.plugin.saveSettings();
-          });
-      })
-    );
-
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
-    sgAdv.addSetting((setting) => setting
-      .setName(t("settings_syncunderscore"))
-      .setDesc(t("settings_syncunderscore_desc"))
-      .addDropdown((dropdown) => {
-        dropdown.addOption("disable", t("disable"));
-        dropdown.addOption("enable", t("enable"));
-        dropdown
-          .setValue(
-            `${this.plugin.settings.syncUnderscoreItems ? "enable" : "disable"}`
-          )
-          .onChange((val) => {
-            this.plugin.settings.syncUnderscoreItems = val === "enable";
             void this.plugin.saveSettings();
           });
       })
@@ -1432,60 +1542,6 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       })
     );
 
-    let syncDirSetting: Setting;
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
-    sgAdv.addSetting((setting) => {
-      syncDirSetting = setting;
-      return setting
-        .setName(t("setting_syncdirection"))
-        .setDesc(((desc: string) => {
-          const frag: DocumentFragment = createFragment();
-          const parts = desc.split("\n");
-          parts.forEach((part, i) => {
-            if (i > 0) frag.appendChild(createEl("br"));
-            frag.appendChild(activeDocument.createTextNode(part));
-          });
-          return frag;
-        })(t("setting_syncdirection_desc")))
-        .addDropdown((dropdown) => {
-        dropdown.addOption(
-          "bidirectional",
-          t("setting_syncdirection_bidirectional_desc")
-        );
-        dropdown.addOption(
-          "incremental_push_only",
-          t("setting_syncdirection_incremental_push_only_desc")
-        );
-        dropdown.addOption(
-          "incremental_pull_only",
-          t("setting_syncdirection_incremental_pull_only_desc")
-        );
-        dropdown.addOption(
-          "incremental_push_and_delete_only",
-          t("setting_syncdirection_incremental_push_and_delete_only_desc")
-        );
-        dropdown.addOption(
-          "incremental_pull_and_delete_only",
-          t("setting_syncdirection_incremental_pull_and_delete_only_desc")
-        );
-
-        dropdown
-          .setValue(this.plugin.settings.syncDirection ?? "bidirectional")
-          .onChange((val) => {
-            this.plugin.settings.syncDirection = val as SyncDirectionType;
-            void this.plugin.saveSettings();
-          });
-      });
-    });
-
-    // Move dropdown to be after the description
-    const settingEl = syncDirSetting.settingEl;
-    const infoEl = syncDirSetting.infoEl;
-    const controlEl = syncDirSetting.controlEl;
-    if (infoEl && controlEl) {
-      settingEl.appendChild(controlEl);
-    }
-
     // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
     sgAdv.addSetting((setting) => setting
       .setName(t("settings_protectmodifypercentage"))
@@ -1511,52 +1567,15 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       })
     );
 
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
-    sgAdv.addSetting((setting) => setting
-      .setName(t("settings_configdir"))
-      .setDesc(
-        t("settings_configdir_desc", {
-          configDir: this.app.vault.configDir,
-        })
-      )
-      .addDropdown((dropdown) => {
-        dropdown.addOption("disable", t("disable"));
-        dropdown.addOption("enable", t("enable"));
-
-        const bridge = {
-          secondConfirm: false,
-        };
-        dropdown
-          .setValue(
-            `${this.plugin.settings.syncConfigDir ? "enable" : "disable"}`
-          )
-          .onChange((val) => {
-            if (val === "enable" && !bridge.secondConfirm) {
-              dropdown.setValue("disable");
-              new SyncConfigDirModal(this.app, this.plugin, () => {
-                bridge.secondConfirm = true;
-                dropdown.setValue("enable");
-              }).open();
-            } else {
-              bridge.secondConfirm = false;
-              this.plugin.settings.syncConfigDir = false;
-              void this.plugin.saveSettings();
-            }
-          });
-      })
-    );
-
     //////////////////////////////////////////////////
     // below for import and export functions
     //////////////////////////////////////////////////
 
-    // import and export
-    const sgImportExport = new SettingGroup(containerEl);
-    sgImportExport.setHeading(t("settings_importexport"));
+    // import and export (merged into advanced group)
     let importUriInput = "";
 
     // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
-    sgImportExport.addSetting((setting) => setting
+    sgAdv.addSetting((setting) => setting
       .setName(t("settings_export"))
       .setDesc(t("settings_export_desc"))
       .addButton((button) => {
@@ -1596,7 +1615,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
     );
 
     // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
-    sgImportExport.addSetting((setting) => setting
+    sgAdv.addSetting((setting) => setting
       .setName(t("settings_import"))
       .setDesc(t("settings_import_desc"))
       .addText((text) => {
@@ -1807,6 +1826,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
         .setDesc(t("settings_wipecloud_desc"))
         .addButton((button) => {
           button.setButtonText(t("settings_wipecloud_button"));
+          button.setClass("mod-warning");
           button.onClick(() => {
             void openWipeCloudModal(this.plugin);
           });
