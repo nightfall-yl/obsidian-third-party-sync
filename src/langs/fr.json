@@ -188,7 +188,7 @@
   "settings_protectmodifypercentage_000_desc": "0 (toujours bloquer)",
   "settings_protectmodifypercentage_050_desc": "50 (par défaut)",
   "settings_protectmodifypercentage_100_desc": "100 (désactiver la protection)",
-  "setting_syncdirection": "Direction de synchronisation (expérimental)",
+  "setting_syncdirection": "Direction de synchronisation",
   "setting_syncdirection_desc": "Dans quelle direction le plugin doit-il synchroniser ? Veuillez noter que seuls les fichiers MODIFIÉS (basés sur l'heure et la taille) sont synchronisés indépendamment de toute option.\n\n1. Bidirectionnelle : Les modifications des deux côtés sont synchronisées vers l'autre côté.\n2. Poussée incrémentale : Les fichiers créés ou modifiés localement sont copiés vers le distant.\n3. Récupération incrémentielle : les fichiers créés ou modifiés à distance sont copiés en local. Les suppressions distantes n'affectent PAS les fichiers locaux (le coffre local ne fait que s'enrichir). 4. Poussée incrémentale et suppression : Les fichiers créés ou modifiés localement sont copiés vers le distant, et les suppressions locales sont également appliquées à distance.\n5. Tirage incrémental et suppression : Les fichiers créés ou modifiés à distance sont copiés vers le local, et les suppressions distantes sont également appliquées localement.",
   "setting_syncdirection_bidirectional_desc": "Bidirectionnelle (par défaut)",
   "setting_syncdirection_incremental_push_only_desc": "Poussée incrémentale (aussi appelée mode sauvegarde)",

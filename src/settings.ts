@@ -34,6 +34,7 @@ import {
 import type { TransItemType } from "./i18n";
 import { checkHasSpecialCharForDir } from "./misc";
 import { applyWebdavPresetRulesInplace } from "./presetRules";
+import { openWipeCloudModal } from "./wipeRemoteNotice";
 
 import { log } from "./moreOnLog";
 import {DEFAULT_FILE_NAME_FOR_METADATAONREMOTE} from "./metadataOnRemote";
@@ -1750,21 +1751,6 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
 
     addDebugSetting((setting) => {
       setting
-        .setName(t("settings_resetcache"))
-        .setDesc(t("settings_resetcache_desc"))
-        .addButton((button) => {
-          button.setButtonText(t("settings_reset_button"));
-          button.onClick(() => {
-            void (async () => {
-              await destroyDBs();
-              new Notice(t("settings_resetcache_notice"));
-            })();
-          });
-        });
-    });
-
-    addDebugSetting((setting) => {
-      setting
         .setName(t("settings_reset_sync_metadata"))
         .setDesc(t("settings_reset_sync_metadata_desc"))
         .addButton((button) => {
@@ -1796,6 +1782,33 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
               new Notice(t("settings_reset_sync_metadata_notice_end"));
               log.debug("Remote metadata file deleted. (2/2)");
             })();
+          });
+        });
+    });
+
+    addDebugSetting((setting) => {
+      setting
+        .setName(t("settings_resetcache"))
+        .setDesc(t("settings_resetcache_desc"))
+        .addButton((button) => {
+          button.setButtonText(t("settings_reset_button"));
+          button.onClick(() => {
+            void (async () => {
+              await destroyDBs();
+              new Notice(t("settings_resetcache_notice"));
+            })();
+          });
+        });
+    });
+
+    addDebugSetting((setting) => {
+      setting
+        .setName(t("settings_wipecloud"))
+        .setDesc(t("settings_wipecloud_desc"))
+        .addButton((button) => {
+          button.setButtonText(t("settings_wipecloud_button"));
+          button.onClick(() => {
+            void openWipeCloudModal(this.plugin);
           });
         });
     });

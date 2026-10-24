@@ -188,7 +188,7 @@
   "settings_protectmodifypercentage_000_desc": "0 (immer blockieren)",
   "settings_protectmodifypercentage_050_desc": "50 (Standard)",
   "settings_protectmodifypercentage_100_desc": "100 (Schutz deaktivieren)",
-  "setting_syncdirection": "Synchronisierungsrichtung (experimentell)",
+  "setting_syncdirection": "Synchronisierungsrichtung",
   "setting_syncdirection_desc": "In welche Richtung soll das Plugin synchronisieren? Bitte beachten Sie, dass nur GEÄNDERTE Dateien (basierend auf Zeit und Größe) unabhängig von jeder Option synchronisiert werden.\n\n1. Bidirektional: Änderungen auf beiden Seiten werden auf die andere Seite synchronisiert.\n2. Inkrementelles Pushen: Lokal erstellte oder geänderte Dateien werden auf das Remote kopiert.\n3. Inkrementelles Ziehen (Pull): Remote erstellte oder geänderte Dateien werden lokal kopiert. Remote-Löschungen betreffen lokale Dateien NICHT (der lokale Vault wächst nur an). 4. Inkrementelles Pushen und Löschen: Lokal erstellte oder geänderte Dateien werden auf das Remote kopiert, und lokale Löschvorgänge werden auch auf dem Remote ausgeführt.\n5. Inkrementelles Pullen und Löschen: Remote erstellte oder geänderte Dateien werden auf das Lokale kopiert, und Remote-Löschvorgänge werden auch lokal ausgeführt.",
   "setting_syncdirection_bidirectional_desc": "Bidirektional (Standard)",
   "setting_syncdirection_incremental_push_only_desc": "Inkrementelles Pushen (auch Backup-Modus)",

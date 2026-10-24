@@ -188,7 +188,7 @@
   "settings_protectmodifypercentage_000_desc": "0 (blockera alltid)",
   "settings_protectmodifypercentage_050_desc": "50 (standard)",
   "settings_protectmodifypercentage_100_desc": "100 (inaktivera skyddet)",
-  "setting_syncdirection": "Synkroniseringsriktning (experimentell)",
+  "setting_syncdirection": "Synkroniseringsriktning",
   "setting_syncdirection_desc": "Vilken riktning ska pluginet synkronisera till? Vänligen notera att endast ÄNDRADE filer (baserat på tid och storlek) synkroniseras oavsett vilket alternativ.\n\n1. Tvåvägs: Ändringar på båda sidor synkroniseras till den andra sidan.\n2. Inkrementell push: Lokalt skapade eller modifierade filer kopieras till fjärrtjänsten.\n3. Inkrementell hämtning: Filer som skapas eller ändras på distans kopieras lokalt. Fjärrborttagningar påverkar INTE lokala filer (det lokala valvet ackumulerar bara). 4. Inkrementell push och radering: Lokalt skapade eller modifierade filer kopieras till fjärrtjänsten, och lokala raderingsåtgärder körs också på fjärrtjänsten.\n5. Inkrementell pull och radering: Fjärrskapade eller modifierade filer kopieras lokalt, och fjärrraderingsåtgärder körs också lokalt.",
   "setting_syncdirection_bidirectional_desc": "Tvåvägs (standard)",
   "setting_syncdirection_incremental_push_only_desc": "Inkrementell push (även känd som säkerhetskopieringsläge)",

@@ -188,7 +188,7 @@
   "settings_protectmodifypercentage_000_desc": "0 (alltid blokkere)",
   "settings_protectmodifypercentage_050_desc": "50 (standard)",
   "settings_protectmodifypercentage_100_desc": "100 (deaktiver beskyttelsen)",
-  "setting_syncdirection": "Synkroniseringsretning (eksperimentell)",
+  "setting_syncdirection": "Synkroniseringsretning",
   "setting_syncdirection_desc": "Hvilken retning skal pluginet synkronisere til? Vennligst merk at bare ENDREDE filer (basert på tid og størrelse) synkroniseres uavhengig av hvilket alternativ.\n\n1. Toveis: Endringer på begge sider synkroniseres til den andre siden.\n2. Inkrementell push: Lokalt opprettede eller endrede filer kopieres til fjernserver.\n3. Inkrementell pull: Filer som opprettes eller endres eksternt kopieres til lokal maskin. Fjerning eksternt påvirker IKKE lokale filer (det lokale hvelvet akkumulerer bare). 4. Inkrementell push og slett: Lokalt opprettede eller endrede filer kopieres til fjernserver, og lokale slettingshandlinger kjøres også på fjernserver.\n5. Inkrementell pull og slett: Fjernopprettede eller endrede filer kopieres lokalt, og fjernslettingshandlinger kjøres også lokalt.",
   "setting_syncdirection_bidirectional_desc": "Toveis (standard)",
   "setting_syncdirection_incremental_push_only_desc": "Inkrementell push (også kalt sikkerhetskopieringsmodus)",

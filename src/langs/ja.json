@@ -188,7 +188,7 @@
   "settings_protectmodifypercentage_000_desc": "0（常にブロック）",
   "settings_protectmodifypercentage_050_desc": "50（デフォルト）",
   "settings_protectmodifypercentage_100_desc": "100（保護を無効）",
-  "setting_syncdirection": "同期方向（実験的）",
+  "setting_syncdirection": "同期方向",
   "setting_syncdirection_desc": "プラグインはどの方向に同期すべきですか？どのオプションでも、変更されたファイル（時間とサイズに基づく）のみが同期されることに注意してください。\n\n1. 双方向: 両方の側の変更が他方の側に同期されます。\n2. 増分プッシュ: ローカルで作成または変更されたファイルがリモートにコピーされます。\n3. 増分プル: リモートで作成または変更されたファイルはローカルにコピーされます。リモートでの削除はローカルのファイルに影響しません（ローカルの vault は蓄積のみ行います）。 4. 増分プッシュ＆削除: ローカルで作成または変更されたファイルがリモートにコピーされ、ローカルでの削除操作もリモートで実行されます。\n5. 増分プル＆削除: リモートで作成または変更されたファイルがローカルにコピーされ、リモートでの削除操作もローカルで実行されます。",
   "setting_syncdirection_bidirectional_desc": "双方向（デフォルト）",
   "setting_syncdirection_incremental_push_only_desc": "増分プッシュ（別名バックアップモード）",

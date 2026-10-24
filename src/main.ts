@@ -25,9 +25,6 @@ import {
   loadPrevSyncRecordsByVault,
   prepareDBs,
   InternalDBs,
-  insertLoggerOutputByVault,
-  clearExpiredLoggerOutputRecords,
-  clearExpiredSyncPlanRecords,
   insertDeleteRecordByVault,
   insertRenameRecordByVault,
 } from "./localdb";
@@ -50,7 +47,7 @@ import type { LangTypeAndAuto, TransItemType } from "./i18n";
 import { SyncAlgoV2Modal } from "./syncAlgoV2Notice";
 import { applyPresetRulesInplace } from "./presetRules";
 
-import { applyLogWriterInplace, log } from "./moreOnLog";
+import { log } from "./moreOnLog";
 import AggregateError from "aggregate-error";
 
 import { SizesConflictModal } from "./syncSizesConflictNotice";
@@ -73,7 +70,6 @@ const DEFAULT_SETTINGS: ThirdPartySyncPluginSettings = {
   syncConfigDir: false,
   syncUnderscoreItems: false,
   lang: "auto",
-  logToDB: false,
   skipSizeLargerThan: -1,
   enableStatusBarInfo: undefined,
   lastSynced: -1,
@@ -605,11 +601,6 @@ export default class ThirdPartySyncPlugin extends Plugin {
     }
 
     // must AFTER preparing DB
-    this.addOutputToDBIfSet();
-    this.enableAutoClearOutputToDBHistIfSet();
-
-    // must AFTER preparing DB
-    this.enableAutoClearSyncPlanHist();
 
     this.registerEvent(
       this.app.vault.on("delete", async (fileOrFolder) => {
@@ -1278,54 +1269,6 @@ export default class ThirdPartySyncPlugin extends Plugin {
     } catch {
       // just skip
     }
-  }
-
-  addOutputToDBIfSet() {
-    if (this.settings.logToDB) {
-      applyLogWriterInplace((...msg: unknown[]) => {
-        void insertLoggerOutputByVault(this.db, this.vaultRandomID, ...msg);
-      });
-    }
-  }
-
-  enableAutoClearOutputToDBHistIfSet() {
-    const initClearOutputToDBHistAfterMilliseconds = 1000 * 45;
-    const autoClearOutputToDBHistAfterMilliseconds = 1000 * 60 * 5;
-
-    this.app.workspace.onLayoutReady(() => {
-      // init run
-      window.setTimeout(() => {
-        if (this.settings.logToDB) {
-          void clearExpiredLoggerOutputRecords(this.db);
-        }
-      }, initClearOutputToDBHistAfterMilliseconds);
-
-      // scheduled run
-      const intervalID = window.setInterval(() => {
-        if (this.settings.logToDB) {
-          void clearExpiredLoggerOutputRecords(this.db);
-        }
-      }, autoClearOutputToDBHistAfterMilliseconds);
-      this.registerInterval(intervalID);
-    });
-  }
-
-  enableAutoClearSyncPlanHist() {
-    const initClearSyncPlanHistAfterMilliseconds = 1000 * 45;
-    const autoClearSyncPlanHistAfterMilliseconds = 1000 * 60 * 5;
-
-    this.app.workspace.onLayoutReady(() => {
-      // init run
-      window.setTimeout(() => {
-        void clearExpiredSyncPlanRecords(this.db);
-      }, initClearSyncPlanHistAfterMilliseconds);
-
-      // scheduled run
-      const intervalID = window.setInterval(() => {
-        void clearExpiredSyncPlanRecords(this.db);
-      }, autoClearSyncPlanHistAfterMilliseconds);
-      this.registerInterval(intervalID);
-    });
   }
 
   private async createTrashFolderIfDoesNotExist(vault: Vault) {

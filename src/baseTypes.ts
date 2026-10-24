@@ -74,7 +74,6 @@ export interface ThirdPartySyncPluginSettings {
   syncConfigDir?: boolean;
   syncUnderscoreItems?: boolean;
   lang?: LangTypeAndAuto;
-  logToDB?: boolean;
   skipSizeLargerThan?: number;
   enableStatusBarInfo: boolean;
   lastSynced?: number;

@@ -188,7 +188,7 @@
   "settings_protectmodifypercentage_000_desc": "0 (altijd blokkeren)",
   "settings_protectmodifypercentage_050_desc": "50 (standaard)",
   "settings_protectmodifypercentage_100_desc": "100 (beveiliging uitschakelen)",
-  "setting_syncdirection": "Synchronisatierichting (experimenteel)",
+  "setting_syncdirection": "Synchronisatierichting",
   "setting_syncdirection_desc": "Welke richting moet de plugin synchroniseren? Houd er rekening mee dat alleen GEWIJZIGDE bestanden (op basis van tijd en grootte) worden gesynchroniseerd ongeacht welke optie.\n\n1. Bidirectioneel: Wijzigingen aan beide kanten worden gesynchroniseerd naar de andere kant.\n2. Incrementeel pushen: Lokaal aangemaakte of gewijzigde bestanden worden gekopieerd naar extern.\n3. Incrementeel ophalen: op afstand gemaakte of gewijzigde bestanden worden lokaal gekopieerd. Verwijderingen op afstand beïnvloeden lokale bestanden NIET (de lokale kluis groeit alleen maar). 4. Incrementeel pushen en verwijderen: Lokaal aangemaakte of gewijzigde bestanden worden gekopieerd naar extern, en lokale verwijderbewerkingen worden ook op afstand uitgevoerd.\n5. Incrementeel pullen en verwijderen: Op afstand aangemaakte of gewijzigde bestanden worden gekopieerd naar lokaal, en externe verwijderbewerkingen worden ook lokaal uitgevoerd.",
   "setting_syncdirection_bidirectional_desc": "Bidirectioneel (standaard)",
   "setting_syncdirection_incremental_push_only_desc": "Incrementeel pushen (ook bekend als back-upmodus)",

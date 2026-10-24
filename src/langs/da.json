@@ -188,7 +188,7 @@
   "settings_protectmodifypercentage_000_desc": "0 (bloker altid)",
   "settings_protectmodifypercentage_050_desc": "50 (standard)",
   "settings_protectmodifypercentage_100_desc": "100 (deaktiver beskyttelsen)",
-  "setting_syncdirection": "Synkroniseringsretning (eksperimentel)",
+  "setting_syncdirection": "Synkroniseringsretning",
   "setting_syncdirection_desc": "Hvilken retning skal plugin'et synkronisere til? Vær opmærksom på, at kun ÆNDREDE filer (baseret på tid og størrelse) synkroniseres uanset hvilken mulighed.\n\n1. Tovejs: Ændringer på begge sider synkroniseres til den anden side.\n2. Inkrementel push: Lokalt oprettede eller ændrede filer kopieres til fjernserveren.\n3. Inkrementel træk: Filer, der oprettes eller ændres eksternt, kopieres til den lokale maskine. Fjernslettelser påvirker IKKE lokale filer (det lokale vault akkumulerer blot). 4. Inkrementel push og sletning: Lokalt oprettede eller ændrede filer kopieres til fjernserveren, og lokale sletningshandlinger udføres også på fjernserveren.\n5. Inkrementel pull og sletning: Fjernoprettede eller ændrede filer kopieres lokalt, og fjernsletningshandlinger udføres også lokalt.",
   "setting_syncdirection_bidirectional_desc": "Tovejs (standard)",
   "setting_syncdirection_incremental_push_only_desc": "Inkrementel push (også kendt som sikkerhedskopieringstilstand)",

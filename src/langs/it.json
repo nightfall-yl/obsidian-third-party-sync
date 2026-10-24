@@ -188,7 +188,7 @@
   "settings_protectmodifypercentage_000_desc": "0 (blocca sempre)",
   "settings_protectmodifypercentage_050_desc": "50 (predefinito)",
   "settings_protectmodifypercentage_100_desc": "100 (disattiva la protezione)",
-  "setting_syncdirection": "Direzione di sincronizzazione (sperimentale)",
+  "setting_syncdirection": "Direzione di sincronizzazione",
   "setting_syncdirection_desc": "In quale direzione deve sincronizzare il plugin? Tieni presente che solo i file MODIFICATI (in base a ora e dimensione) vengono sincronizzati indipendentemente da qualsiasi opzione.\n\n1. Bidirezionale: le modifiche su entrambi i lati vengono sincronizzate con l'altro lato.\n2. Incremental Push: i file creati o modificati localmente vengono copiati sul remoto.\n3. Pull incrementale: i file creati o modificati da remoto vengono copiati in locale. Le eliminazioni remote NON influiscono sui file locali (il vault locale cresce solo). 4. Incremental Push And Delete: i file creati o modificati localmente vengono copiati sul remoto e le operazioni di eliminazione locali vengono eseguite anche sul remoto.\n5. Incremental Pull And Delete: i file creati o modificati remotamente vengono copiati sul locale e le operazioni di eliminazione remote vengono eseguite anche sul locale.",
   "setting_syncdirection_bidirectional_desc": "Bidirezionale (predefinito)",
   "setting_syncdirection_incremental_push_only_desc": "Incremental Push (noto anche come modalità backup)",
