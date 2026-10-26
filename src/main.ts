@@ -90,6 +90,16 @@ interface OAuth2Info {
 const iconNameSyncWait = "rotate-ccw";
 const iconNameSyncRunning = "refresh-ccw";
 
+// Display name for a service type identifier ({{serviceType}} in i18n texts):
+// the raw identifier "onedrive" must show as "OneDrive"
+const SERVICE_DISPLAY_NAMES: Record<string, string> = {
+  s3: "S3",
+  onedrive: "OneDrive",
+  webdav: "WebDAV",
+};
+const serviceDisplayName = (serviceType: string): string =>
+  SERVICE_DISPLAY_NAMES[serviceType] ?? serviceType;
+
 export default class ThirdPartySyncPlugin extends Plugin {
   settings: ThirdPartySyncPluginSettings;
   db: InternalDBs;
@@ -120,6 +130,10 @@ export default class ThirdPartySyncPlugin extends Plugin {
       return this.i18n.t(x, vars);
     };
 
+    // Display name for the current service ({{serviceType}} in syncrun_step1 /
+    // syncrun_shortstep1)
+    const serviceDisplayNameCurrent = serviceDisplayName(this.settings.serviceType);
+
     const getNotice = (s: SyncTriggerSourceType, msg: string, timeout?: number) => {
       if (s === "manual" || s === "dry") {
         new Notice(msg, timeout);
@@ -137,12 +151,12 @@ export default class ThirdPartySyncPlugin extends Plugin {
         switch (step) {
           case 0:
             if (s === "dry") {
-              getNotice(s, t("syncrun_step0", { current: "0", maxSteps: "8" }), 0);
+              getNotice(s, t("syncrun_step0", { current: "0", maxSteps: "8", serviceType: serviceDisplayNameCurrent }), 0);
             }
             break;
           case 1:
             getNotice(s, t("syncrun_step1", {
-              current: "1", maxSteps: "8", serviceType: this.settings.serviceType
+              current: "1", maxSteps: "8", serviceType: serviceDisplayNameCurrent
             }));
             break;
           case 2:
@@ -156,13 +170,13 @@ export default class ThirdPartySyncPlugin extends Plugin {
             break;
           case 7:
             if (s === "dry") {
-              getNotice(s, t("syncrun_step7skip", { current: "7", maxSteps: "8" }));
+              getNotice(s, t("syncrun_step7skip", { current: "7", maxSteps: "8", serviceType: serviceDisplayNameCurrent }));
             } else {
-              getNotice(s, t("syncrun_step7", { current: "7", maxSteps: "8" }));
+              getNotice(s, t("syncrun_step7", { current: "7", maxSteps: "8", serviceType: serviceDisplayNameCurrent }));
             }
             break;
           case 8:
-            getNotice(s, t("syncrun_step8", { current: "8", maxSteps: "8" }));
+            getNotice(s, t("syncrun_step8", { current: "8", maxSteps: "8", serviceType: serviceDisplayNameCurrent }));
             break;
         }
       } else {
@@ -170,25 +184,81 @@ export default class ThirdPartySyncPlugin extends Plugin {
         switch (step) {
           case 0:
             if (s === "dry") {
-              getNotice(s, t("syncrun_shortstep0"), 0);
+              getNotice(s, t("syncrun_shortstep0", { serviceType: serviceDisplayNameCurrent }), 0);
             }
             break;
-          case 1:
-            getNotice(s, t("syncrun_shortstep1", { serviceType: this.settings.serviceType }));
-            break;
+          // case 1: no "starting" notice any more - the status bar shows live
+          // progress (1/2 … 45/120 (37%)) right after the click; only the
+          // completion notice stays (case 8)
           case 7:
             if (s === "dry") {
-              getNotice(s, t("syncrun_shortstep2skip"));
+              getNotice(s, t("syncrun_shortstep2skip", { serviceType: serviceDisplayNameCurrent }));
             }
             break;
           case 8:
-            getNotice(s, t("syncrun_shortstep2"));
+            getNotice(s, t("syncrun_shortstep2", { serviceType: serviceDisplayNameCurrent }));
             if (s === "dry") {
-              getNotice(s, t("syncrun_shortstep3drydone"));
+              getNotice(s, t("syncrun_shortstep3drydone", { serviceType: serviceDisplayNameCurrent }));
             }
             break;
         }
       }
+    };
+
+    // Step message builder - shared wording for notices and the status bar.
+    // Not gated by trigger source: auto syncs stay silent on notices
+    // but still update the status bar.
+    const stepMsg = (s: SyncTriggerSourceType, step: number): string => {
+      if (this.settings.debugEnabled) {
+        switch (step) {
+          case 0:
+            return t("syncrun_step0", { current: "0", maxSteps: "8", serviceType: serviceDisplayNameCurrent });
+          case 1:
+            return t("syncrun_step1", {
+              current: "1", maxSteps: "8", serviceType: serviceDisplayNameCurrent
+            });
+          case 2:
+          case 3:
+          case 4:
+          case 5:
+          case 6:
+            return t(`syncrun_step${step}`, {
+              current: `${step}`, maxSteps: "8"
+            });
+          case 7:
+            return s === "dry"
+              ? t("syncrun_step7skip", { current: "7", maxSteps: "8", serviceType: serviceDisplayNameCurrent })
+              : t("syncrun_step7", { current: "7", maxSteps: "8", serviceType: serviceDisplayNameCurrent });
+          case 8:
+            return t("syncrun_step8", { current: "8", maxSteps: "8", serviceType: serviceDisplayNameCurrent });
+        }
+        return "";
+      }
+      switch (step) {
+        case 0:
+          return t("syncrun_shortstep0", { serviceType: serviceDisplayNameCurrent });
+        case 1:
+          return t("syncrun_shortstep1", { serviceType: serviceDisplayNameCurrent });
+        case 7:
+          return s === "dry" ? t("syncrun_shortstep2skip", { serviceType: serviceDisplayNameCurrent }) : "";
+        case 8:
+          return s === "dry" ? t("syncrun_shortstep3drydone", { serviceType: serviceDisplayNameCurrent }) : t("syncrun_shortstep2", { serviceType: serviceDisplayNameCurrent });
+      }
+      return "";
+    };
+
+    // Status bar step function - mirrors the notice messages onto
+    // the status bar so the sync progress is visible while running
+    const statusBarStepFunc = (s: SyncTriggerSourceType, step: number) => {
+      if (this.statusBarElement === undefined || this.settings.enableStatusBarInfo !== true) {
+        return;
+      }
+      const msg = stepMsg(s, step);
+      if (msg === "") {
+        return;
+      }
+      this.statusBarElement.setText(msg);
+      this.statusBarElement.setAttribute("aria-label", msg);
     };
 
     // Status bar function - updates status bar at step 1 and step 8
@@ -233,10 +303,12 @@ export default class ThirdPartySyncPlugin extends Plugin {
       // Step 0 for dry mode
       if (triggerSource === "dry") {
         void notifyFunc(triggerSource, 0);
+        statusBarStepFunc(triggerSource, 0);
       }
 
       // Step 1 - start
       void notifyFunc(triggerSource, 1);
+      statusBarStepFunc(triggerSource, 1);
       void statusBarFunc(triggerSource, 1, true);
 
       // Step 2 - prepare for sync
@@ -246,10 +318,12 @@ export default class ThirdPartySyncPlugin extends Plugin {
 
       // Step 3 - list remote files
       await notifyFunc(triggerSource, 2);
+      statusBarStepFunc(triggerSource, 2);
       const remoteRsp = await client.listFromRemote();
 
       // Step 4 - check password
       await notifyFunc(triggerSource, 3);
+      statusBarStepFunc(triggerSource, 3);
       await isPasswordOk(
         remoteRsp.Contents,
         this.settings.password
@@ -266,15 +340,18 @@ export default class ThirdPartySyncPlugin extends Plugin {
 
       // Step 5 - get local files
       await notifyFunc(triggerSource, 4);
+      statusBarStepFunc(triggerSource, 4);
       const local = this.app.vault.getAllLoadedFiles();
       let localConfigDirContents: ObsConfigDirFileType[] = await listFilesInObsFolder(this.app.vault, this.manifest.id, this.settings.syncTrash);
       
       // Step 6 - load prevSync records for V3
       await notifyFunc(triggerSource, 5);
+      statusBarStepFunc(triggerSource, 5);
       const prevSyncRecords = await loadPrevSyncRecordsByVault(this.db, this.vaultRandomID);
 
       // Step 7 - generate sync plan using V3
       await notifyFunc(triggerSource, 6);
+      statusBarStepFunc(triggerSource, 6);
       const {
         plan, sortedKeys, deletions, sizesGoWrong
       } = await getSyncPlanV3(
@@ -298,6 +375,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
 
       // Step 8 - execute sync using V3
       await notifyFunc(triggerSource, 7);
+      statusBarStepFunc(triggerSource, 7);
       await this.doActualSyncV3(client, plan, sortedKeys, sizesGoWrong, deletions, self);
 
       // Step 10 - update last synced time
@@ -310,6 +388,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
       // Step 8 (finish)
       void notifyFunc(triggerSource, 8);
       void statusBarFunc(triggerSource, 8, true);
+      statusBarStepFunc(triggerSource, 8);
 
       this.setSyncIcon(false);
     } catch (error) {
@@ -381,7 +460,23 @@ export default class ThirdPartySyncPlugin extends Plugin {
           this.settings.password !== ""
         ).open();
       },
-      undefined,
+      async (index: number, total: number) => {
+        // live exchange progress onto the status bar:
+        // "1/2 OneDrive … 45/120 (37%)"; in debug mode this is step 7/8
+        if (this.statusBarElement === undefined || this.settings.enableStatusBarInfo !== true) {
+          return;
+        }
+        const percent = total > 0 ? Math.round((index / total) * 100) : 0;
+        const stepPrefix = this.settings.debugEnabled ? "7/8 " : "1/2 ";
+        const msg = `${stepPrefix}${t("syncrun_progressing", {
+          serviceType: serviceDisplayName(this.settings.serviceType),
+          index: `${index}`,
+          total: `${total}`,
+          percent: `${percent}`,
+        })}`;
+        this.statusBarElement.setText(msg);
+        this.statusBarElement.setAttribute("aria-label", msg);
+      },
       this.settings.protectModifyPercentage,
       (errorMsg: string) => {
         const parts = errorMsg.split("|");

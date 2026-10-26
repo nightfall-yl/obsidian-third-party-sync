@@ -160,7 +160,6 @@ export interface FileOrFolderMixedState {
   changeRemoteMtimeUsingMapping?: boolean;
   changeLocalMtimeUsingMapping?: boolean;
   decision?: DecisionType;
-  decisionBranch?: number;
   syncDone?: "done";
   remoteEncryptedKey?: string;
   prevSync?: { mtime: number; size: number; keyType: "folder" | "file" };

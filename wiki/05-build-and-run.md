@@ -1,114 +1,113 @@
-# 05 · 运行与构建
+# 05 · 构建与运行
 
-## 1. 环境要求
+## 1. 命令速查
 
-- Node.js（建议 ≥ 18，配合 esbuild 0.28）
-- npm
-- 测试用 Obsidian（桌面端），或用 BRAT 安装开发版
+| 命令 | 作用 |
+|---|---|
+| `npm install` | 安装依赖（会应用 package.json `overrides` 的安全版本覆盖） |
+| `npm run dev` | 开发构建：esbuild watch 模式，产物输出到 `dist/`，**inline sourcemap** 便于断点调试 |
+| `npm run build` | 生产构建：esbuild 压缩 → `dist/main.js`，并复制 `manifest.json` / `styles.css` |
+| `npm run lint` | ESLint 检查 `src/`（v26.2.1 清理死代码后 **0 errors / 0 warnings**） |
+| `npm run format` | Prettier 格式化整个仓库 |
+| `bash scripts/version.sh <版本号>` | **升级版本**（见第 5 节） |
 
-## 2. 常用命令（package.json scripts）
+> ⚠️ `npm run version` 无效——package.json 里的 `"version"` 是静态字段而非 script。升级版本请使用 `scripts/version.sh`。
 
-| 命令 | 实际执行 | 说明 |
-|---|---|---|
-| `npm install` | — | 安装依赖（含 Node polyfill 依赖） |
-| `npm run dev` | `node esbuild.config.mjs` | 开发模式：**watch 增量构建 + inline sourcemap**，不压缩，持续监听 `src/` |
-| `npm run build` | `node esbuild.config.mjs production` | 生产构建：压缩（minify）、无 sourcemap，产物 `main.js`，并把 `main.js / manifest.json / styles.css` 复制到 `dist/` |
-| `npm run lint` | `eslint src/` | ESLint 检查（配置 `eslint.config.mjs`，含 obsidianmd 官方规则） |
-| `npm run format` | `prettier --write .` | 全仓库格式化 |
-| `npm run clean` | `rm -f main.js` | 清理产物 |
-| `bash scripts/version.sh <ver>` | sed + python | **三文件联动升版**：manifest.json、package.json、package-lock.json 同步写入同一版本号 |
-
-> 仓库**没有测试框架**与 test script；质量保障靠 ESLint + TS 类型检查 + 手动验证。
-
-## 3. esbuild 配置详解（esbuild.config.mjs）
-
-入口 `src/main.ts` → 产物 `main.js`，`format: "cjs"`、`platform: "browser"`、`target: "es2018"`、`treeShaking: true`。
-
-### 3.1 external（运行时由 Obsidian 提供）
-
-`obsidian`、`electron`、`@codemirror/*`、`@lezer/*` —— 不打包进产物，减小体积并复用宿主模块。
-
-### 3.2 `nodeCoreFallbackPlugin`（L42-68）
-
-- `assert/buffer/crypto/path/stream/url/util`（含 `node:` 前缀形式）→ 别名到对应 browserify 垫片；
-- `fs/http/https/os/vm` → `empty-module` 命名空间（`export default {}`），因为只有传递依赖引用它们。
-
-### 3.3 `immediateSafePlugin`（L74-96）
-
-将 localforage 内嵌的 `lie` 库中 `immediate` 模块整体替换为 `setTimeout` 实现。原因：原实现链路 `MutationObserver → setImmediate+MessageChannel → document.createElement("script")` 中的动态 script 会**违反 Obsidian CSP**。这是本 fork 特有的兼容性修补。
-
-### 3.4 define 与注入
+## 2. esbuild 配置详解（esbuild.config.mjs）
 
 ```js
-"process.env.DEFAULT_ONEDRIVE_CLIENT_ID":  构建期环境变量（默认 ""）
-"process.env.DEFAULT_ONEDRIVE_AUTHORITY":  构建期环境变量（默认 ""）
-"process.env.NODE_ENV": "production" | "development"
-global: "globalThis"
+const production = process.env.NODE_ENV === "production";
+const context = await esbuild.context({
+  entryPoints: ["src/main.ts"],
+  bundle: true,
+  external: ["obsidian", "electron", "@codemirror/...", "@lezer/..."],
+  format: "cjs",
+  target: "es2018",
+  logLevel: "info",
+  sourcemap: production ? false : "inline",
+  treeShaking: true,
+  outfile: "dist/main.js",
+  ... 详见下方插件与选项
+});
 ```
 
-OneDrive 的默认 clientID/authority 在构建时注入（`remoteForOnedrive.ts` 的 `DEFAULT_ONEDRIVE_CONFIG` 读取）。**若构建时未提供，OneDrive 授权界面将缺少默认应用 ID，需要用户自填 clientID**。
+### 自定义插件
 
-### 3.5 其他
-
-- `inject: ["./esbuild.buffer-shim.js"]`：注入全局 `Buffer` 垫片（内容：`module.exports = { Buffer }`）。
-- 生产构建后 `copyDistFiles()` 把三个发布文件复制到 `dist/`，方便直接复制进 vault。
-
-## 4. 安装到 Obsidian（三种方式）
-
-1. **手动安装**：
-   ```bash
-   npm run build
-   mkdir -p "<Vault>/.obsidian/plugins/third-party-sync"
-   cp main.js manifest.json styles.css "<Vault>/.obsidian/plugins/third-party-sync/"
-   # 重启 Obsidian → 设置 → 第三方插件 → 启用 Third-party Sync
-   ```
-2. **BRAT**：添加仓库 `nightfall-yl/obsidian-third-party-sync`，自动跟踪 release。
-3. **下载 Release**：从 GitHub Releases 取 `main.js`、`manifest.json`、`styles.css` 三个文件放入插件目录。
-
-> 插件首次加载会自动在插件配置目录写 `.gitignore`（内容 `data.json`），防止敏感设置被 vault 内的 git 同步泄露（`main.ts:1376 tryToAddIgnoreFile`）。首次启用会弹出"同步算法知情同意"弹窗，同意后才启用全部功能。
-
-## 5. 调试手段
-
-| 手段 | 入口 | 作用 |
+| 插件 | 位置 | 作用 |
 |---|---|---|
-| 干跑 | 命令面板 "start-sync-dry-run" / 设置页按钮 | 只生成同步计划（`triggerSource="dry"`），不执行任何写操作，观察每项 `decision` |
-| 调试模式 | 设置页 `debugEnabled` | `log.setLevel("debug")`，Notice 显示 8 步详细进度 |
-| 日志入库 | 设置页 `logToDB` | 日志写入 IndexedDB `loggeroutput` 表，自动清理过期记录 |
-| 同步计划导出 | `debugMode.ts` | 把 DB 中的同步计划/日志导出为 `_debug_remotely_save/` 下的 Markdown 表格（`sync_plans_hist_exported_on_*` / `log_hist_exported_on_*`） |
-| 源码映射 | `npm run dev` | inline sourcemap，Obsidian 控制台可直接定位 TS 源码 |
+| `nodeCoreFallbackPlugin` | L42-68 | Node 内建模块映射：`buffer`/`assert`/`url`/`util`/`process` → 对应 browserify 包；`fs`/`http`/`https`/`os`/`vm` → **空模块**（命名空间 `empty-module`），因为插件在 Obsidian 浏览器环境运行 |
+| `immediateSafePlugin` | L74-96 | 给 esbuild 产物中顶层立即执行的代码包一层 `try-catch`（防个别初始化异常拖垮整个插件加载） |
+| `copyDistFiles` | L98-110 | 构建结束把 `manifest.json` / `styles.css` 复制到 `dist/` |
 
-## 6. 发布流程
+### 关键注入（`define` / `inject`）
 
-1. 版本联动：`bash scripts/version.sh 26.1.6` → manifest.json / package.json / package-lock.json 同步。
-2. 更新 `CHANGELOG.md`（自 26.1.2 起维护，Keep a Changelog 格式）与 `versions.json`（版本 → minAppVersion 映射）。
-3. 提交后打 tag 并推送：`git tag 26.1.6 && git push origin 26.1.6`。
-4. GitHub Actions（`.github/workflows/release.yml`）自动触发：
-   - 用 `softprops/action-gh-release` 把 **main.js、manifest.json、styles.css** 发布为 Release 资产（自动生成 release notes）；
-   - 用 `attest-build-provenance` 为三个资产生成构建来源证明（attestation）。
+| 注入 | 作用 |
+|---|---|
+| `global: "globalThis"` | 补 `global` 引用 |
+| `"process.env.NODE_ENV": '"production"'` | 环境常量 |
+| `DEFAULT_ONEDRIVE_CLIENT_ID` / `DEFAULT_ONEDRIVE_AUTHORITY` | OneDrive 应用凭据（构建期写死，源码中不含） |
+| inject `esbuild.buffer-shim.js` | 全局 `Buffer` 垫片（配合 `buffer` polyfill） |
 
-> 注意：CI 直接打包**仓库中已提交的 main.js**（工作流中没有 build 步骤），因此发布前必须确保本地 `npm run build` 后的 `main.js` 已提交入库。
+## 3. 安装与调试
 
-## 7. 项目目录速览
+1. `npm run dev`（或 `npm run build`）产出 `dist/`（`main.js` + `manifest.json` + `styles.css`）。
+2. 复制三个文件到 `<Vault>/.obsidian/plugins/third-party-sync/`（或建符号链接指向 `dist/`，改代码后无需重复复制）。
+3. 重启 Obsidian → 设置 → 第三方插件 → 启用 **Third-party Sync**。
+4. 首次启用会弹**同步算法知情同意**弹窗（`SyncAlgoV2Modal`），同意后才启用全部同步功能；不同意则插件自动卸载。
+
+### 调试手段
+
+| 手段 | 说明 |
+|---|---|
+| 源码映射 | `npm run dev` 产物内联 sourcemap，可在 DevTools 直接定位 `src/*.ts` |
+| 干跑 | 命令 **Third-party Sync: Run sync (dry-run)**：完整走一遍"列远端 → 校验密码 → 生成计划"，**不执行任何上传/下载/删除**，适合改动后验证决策结果 |
+| 调试模式 | 设置 → 调试 → 开启"调试模式"：恢复 8 步详细通知（「1/8 OneDrive 正在准备」…），控制台出现 `debug` 级日志（经 loglevel） |
+| 状态栏实时进度 | 同步期间状态栏显示当前步骤与「正在交换数据 45/120（37%）」，结束后显示"上次同步于 …" |
+| 调试区修复按钮 | 设置 → 调试（按破坏性从轻到重）：删除同步映射记录 → 重置远端同步元数据 → 重设本地缓存和数据库 → 清空远端并重新推送（两阶段弹窗确认） |
+
+插件首次加载时会自动在自身配置目录（`.obsidian/plugins/third-party-sync/`）写入 `.gitignore`（内容为 `data.json`），避免把用户凭据提交进 vault 的 git 仓库（`main.ts:1344`）。
+
+## 4. 目录速览
 
 ```
-obsidian-third-party-sync/
-├── src/                    # 全部 TypeScript 源码（24 文件，~10.6k 行）
-│   ├── main.ts             # 插件入口
-│   ├── sync.ts             # 同步算法（V3 主路径 + 旧版）
-│   ├── settings.ts         # 设置页
-│   ├── remote*.ts          # 云存储后端（门面 + S3/WebDAV/OneDrive）
-│   ├── localdb.ts          # IndexedDB 数据层
-│   ├── encrypt.ts          # AES-256-GCM 加密
-│   ├── i18n.ts + langs/    # 国际化（14 语言）
-│   └── ...
-├── esbuild.config.mjs      # 构建配置（含 2 个自定义插件）
-├── manifest.json           # 插件清单（id/version/minAppVersion）
-├── versions.json           # 版本映射
-├── styles.css              # 样式
-├── main.js                 # 构建产物（提交入库，供 Release 直接使用）
-├── dist/                   # 本地构建输出副本
-├── docs/                   # 设计文档（算法/加密/CORS/兼容性）
-├── scripts/version.sh      # 三文件版本联动脚本
-├── .github/workflows/release.yml  # tag 触发的发布流水线
-└── wiki/                   # 本 Code Wiki
+.
+├── esbuild.config.mjs        # esbuild 打包配置（见上）
+├── manifest.json              # Obsidian 插件清单（id: third-party-sync，minAppVersion 1.11.0）
+├── versions.json              # 插件版本 ↔ minAppVersion 映射
+├── package.json               # 依赖与 scripts（overrides 见 04）
+├── scripts/
+│   └── version.sh             # 版本升级脚本（同步改 3 个 JSON）
+├── dist/                      # 构建产物（.gitignore）
+├── docs/                      # 用户向设计文档（同步算法/加密/CORS/浏览器环境等）
+├── wiki/                      # 本 Code Wiki
+└── src/                       # TypeScript 源码（23 个文件，~9,900 行）
+    ├── main.ts                # 插件入口 ThirdPartySyncPlugin
+    ├── settings.ts            # 设置页（1,892 行）
+    ├── sync.ts                # V3 同步算法（1,576 行）
+    ├── baseTypes.ts           # 核心类型 + DecisionType/SyncDirectionType
+    ├── wipeRemoteNotice.ts    # 「清空远端并重新推送」两阶段弹窗
+    ├── syncAlgoV2Notice.ts    # 算法知情同意弹窗
+    ├── syncSizesConflictNotice.ts # 大小冲突弹窗
+    ├── remote.ts              # 云存储统一门面 RemoteClient
+    ├── remoteForS3.ts         # S3 后端（含 ObsHttpHandler/分片/限流重试）
+    ├── remoteForWebdav.ts     # WebDAV 后端（depth 自适应）
+    ├── remoteForOnedrive.ts   # OneDrive 后端（OAuth2+PKCE）
+    ├── localdb.ts             # localforage/IndexedDB（7 张表，含 prevSync 基线）
+    ├── metadataOnRemote.ts    # 远端 metadata 文件格式
+    ├── encrypt.ts             # AES-256-GCM 加密（fork 核心）
+    ├── configPersist.ts       # data.json 包装格式互转
+    ├── importExport.ts        # 设置 URI 导入导出
+    ├── i18n.ts + langs/       # 国际化（14 个语言包）
+    ├── misc.ts / moreOnLog.ts / obsFolderLister.ts / presetRules.ts
+    ├── stubs/empty.js         # 空模块占位
+    └── types/pako.d.ts        # 类型声明
 ```
+
+## 5. 版本升级与发布流程
+
+1. **升级版本**：`bash scripts/version.sh 26.2.5`（示例）——脚本会同步修改 `manifest.json`、`package.json`、`versions.json`。
+2. **本地验证**：`npm run lint` && `npm run build` 通过。
+3. **提交**：commit 后推送到 `main`。
+4. **打 tag 触发 Release**：`git tag 26.2.5 && git push origin 26.2.5`。
+5. GitHub Actions（`.github/workflows/release.yml`）自动创建 Release：以仓库当前文件（含 `manifest.json`、`versions.json`）作为附件上传，并执行 `attest-build-provenance` 生成构建来源证明（工作流本身不执行构建）。
+6. **Obsidian 社区插件上架**：release 中的 `manifest.json` / `main.js` / `versions.json` 文件 URL 即为上架所需素材。

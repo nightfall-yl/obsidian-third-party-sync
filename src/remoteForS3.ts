@@ -242,6 +242,11 @@ export const getS3Client = (s3Config: S3Config) => {
     // which would reject the request with a checksum mismatch (status 400/403).
     // Only send a request checksum when the service explicitly requires it.
     requestChecksumCalculation: "WHEN_REQUIRED",
+    // Providers rate-limit bursty GET/PUT bursts with HTTP 429 (surfaced by
+    // the SDK as an opaque "UnknownError"). Adaptive retry mode backs off
+    // automatically and throttles the client instead of failing the request.
+    retryMode: "adaptive",
+    maxAttempts: 10,
     credentials: {
       accessKeyId: s3Config.s3AccessKeyID,
       secretAccessKey: s3Config.s3SecretAccessKey,

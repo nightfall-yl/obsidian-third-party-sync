@@ -305,6 +305,40 @@ export const fetchMetadataFile = async (
   return metadata;
 };
 
+/**
+ * Extract actionable details from a remote sync error.
+ * AWS SDK often wraps failures as opaque "UnknownError"; the HTTP status,
+ * S3 error code, response content type and request id reveal the real cause
+ * (e.g. connection drop, HTML error page from a gateway, access denied).
+ */
+const extractRemoteErrorDetails = (error: unknown): string => {
+  if (!(error instanceof Error)) {
+    return JSON.stringify(error);
+  }
+  const parts: string[] = [error.message];
+  const err = error as Record<string, unknown>;
+  const meta = (err.$metadata ?? {}) as Record<string, unknown>;
+  const extras: string[] = [];
+  if (typeof meta.httpStatusCode === "number") {
+    extras.push(`http=${meta.httpStatusCode}`);
+  }
+  if (typeof err.Code === "string") {
+    extras.push(`code=${err.Code}`);
+  }
+  if (error.name && error.name !== "Error") {
+    extras.push(`type=${error.name}`);
+  }
+  const response = err.$response as Record<string, unknown> | undefined;
+  const headers = response?.headers as Record<string, unknown> | undefined;
+  if (typeof headers?.["content-type"] === "string") {
+    extras.push(`ctype=${headers["content-type"]}`);
+  }
+  if (typeof meta.requestId === "string") {
+    extras.push(`reqid=${meta.requestId}`);
+  }
+  return extras.length > 0 ? `${parts[0]} (${extras.join(", ")})` : parts[0];
+};
+
 const isSkipItem = (
   key: string,
   syncConfigDir: boolean,
@@ -753,48 +787,68 @@ const assignOperationToFileInplaceV3Inner = (
     ) {
       if (sizeLocalComp > sizeRemoteComp) {
         r.decision = "uploadLocalToRemote";
-        r.decisionBranch = 77;
       } else {
         r.decision = "downloadRemoteToLocal";
-        r.decisionBranch = 78;
       }
       keptFolder.add(getParentFolder(r.key));
       return r;
+    }
+    // No-baseline creation conflicts (both sides exist, prevSync has no
+    // record — e.g. auto-created daily journal files racing across two
+    // devices): a brand-new EMPTY local file must not silently overwrite
+    // a non-empty remote copy just because its mtime is newer, no matter
+    // which conflict resolution is chosen. Symmetrically, an empty remote
+    // file should not shadow a non-empty local one; in encrypted mode the
+    // remote plaintext size is unknowable, so that check is limited to
+    // plaintext syncs. Bidirectional with conflict resolution only.
+    if (
+      !isPushOnlyMode &&
+      !isPullOnlyMode &&
+      r.prevSync === undefined &&
+      conflictAction !== "disabled" &&
+      r.sizeLocal !== undefined &&
+      r.sizeRemote !== undefined &&
+      sizeLocalComp !== undefined &&
+      sizeRemoteComp !== undefined
+    ) {
+      if (r.sizeLocal === 0 && (password !== "" || sizeRemoteComp > 0)) {
+        r.decision = "downloadRemoteToLocal";
+        keptFolder.add(getParentFolder(r.key));
+        return r;
+      }
+      if (password === "" && sizeRemoteComp === 0 && sizeLocalComp > 0) {
+        r.decision = "uploadLocalToRemote";
+        keptFolder.add(getParentFolder(r.key));
+        return r;
+      }
     }
     // Both exist - compare mtimes
     if (r.mtimeLocal === r.mtimeRemote) {
       if (sizeLocalComp === sizeRemoteComp) {
         r.decision = "skipUploading";
-        r.decisionBranch = 1;
       } else {
         // Same mtime but different sizes: ambiguous content. Pull modes
         // take the remote copy (they never write to remote); push and
         // bidirectional modes push the local copy up.
         if (isPullOnlyMode) {
           r.decision = "downloadRemoteToLocal";
-          r.decisionBranch = 80;
         } else {
           r.decision = "uploadLocalToRemote";
-          r.decisionBranch = 2;
         }
       }
     } else if (r.mtimeLocal > r.mtimeRemote) {
       // Local is newer
       if (isPullOnlyMode) {
         r.decision = "skipUploading";
-        r.decisionBranch = 51;
       } else {
         r.decision = "uploadLocalToRemote";
-        r.decisionBranch = 4;
       }
     } else {
       // Remote is newer
       if (isPushOnlyMode) {
         r.decision = "skipUploading";
-        r.decisionBranch = 53;
       } else {
         r.decision = "downloadRemoteToLocal";
-        r.decisionBranch = 5;
       }
     }
     keptFolder.add(getParentFolder(r.key));
@@ -807,25 +861,21 @@ const assignOperationToFileInplaceV3Inner = (
       if (isPullDeleteMode) {
         // In pull-and-delete mode, remote deletion should propagate to local
         r.decision = "keepRemoteDelHist";
-        r.decisionBranch = 61;
       } else if (isPushOnlyMode) {
         // Push modes (push_only and push_and_delete alike): local is the
         // source of truth and the remote is only a bridge/target. A file
         // that has vanished remotely — no matter why — is pushed again as
         // long as it still exists locally.
         r.decision = "uploadLocalToRemote";
-        r.decisionBranch = 62;
         keptFolder.add(getParentFolder(r.key));
       } else if (isPullOnlyMode) {
         // Pull-only: remote deletion must NOT delete the local copy — the
         // local vault only accumulates. The file stays local-only and is
         // never uploaded.
         r.decision = "skipUploading";
-        r.decisionBranch = 79;
       } else {
         // Bidirectional: remote deleted, delete local too
         r.decision = "keepRemoteDelHist";
-        r.decisionBranch = 7;
       }
     } else {
       // New local file, upload to remote
@@ -834,10 +884,8 @@ const assignOperationToFileInplaceV3Inner = (
         // folder as must-be-kept, otherwise the folder decision would push
         // the folder to remote
         r.decision = "skipUploading";
-        r.decisionBranch = 63;
       } else {
         r.decision = "uploadLocalToRemote";
-        r.decisionBranch = 64;
         keptFolder.add(getParentFolder(r.key));
       }
     }
@@ -850,24 +898,19 @@ const assignOperationToFileInplaceV3Inner = (
       if (isPullDeleteMode && !isPushOnlyMode) {
         // In pull-and-delete mode, keep remote (don't delete)
         r.decision = "skipUploading";
-        r.decisionBranch = 65;
       } else if (isPushDeleteMode) {
         // In push-and-delete mode, local deletion propagates to remote
         r.decision = "uploadLocalDelHistToRemote";
-        r.decisionBranch = 66;
       } else if (isPullOnlyMode) {
         // Pull-only without delete: download remote
         r.decision = "downloadRemoteToLocal";
-        r.decisionBranch = 67;
       } else if (isPushOnlyMode) {
         // Push-only (backup mode): local deletion must NOT propagate to
         // remote, and nothing may be downloaded either
         r.decision = "skipUploading";
-        r.decisionBranch = 74;
       } else {
         // Bidirectional: local deleted, delete remote too
         r.decision = "uploadLocalDelHistToRemote";
-        r.decisionBranch = 6;
       }
     } else {
       // New remote file, download to local
@@ -876,10 +919,8 @@ const assignOperationToFileInplaceV3Inner = (
         // its parent folder as must-be-kept, otherwise the folder decision
         // would recreate the folder locally as an empty shell
         r.decision = "skipUploading";
-        r.decisionBranch = 68;
       } else {
         r.decision = "downloadRemoteToLocal";
-        r.decisionBranch = 69;
         keptFolder.add(getParentFolder(r.key));
       }
     }
@@ -889,14 +930,12 @@ const assignOperationToFileInplaceV3Inner = (
   if (!existLocal && !existRemote && existPrevSync) {
     // Both deleted
     r.decision = "skipUploading";
-    r.decisionBranch = 70;
     return r;
   }
 
   if (!existLocal && !existRemote && !existPrevSync) {
     // Should not happen, but skip just in case
     r.decision = "skipUploading";
-    r.decisionBranch = 71;
     return r;
   }
 
@@ -964,7 +1003,6 @@ const assignOperationToFileInplaceV3 = (
     r.sizeLocal === 0
   ) {
     r.decision = "skipUploadingOneDriveEmpty";
-    r.decisionBranch = 81;
   }
   // Root-fix option for the OneDrive empty-file limitation: create the file
   // via Graph API JSON body instead of content upload
@@ -1000,66 +1038,53 @@ const assignOperationToFolderInplaceV3 = async (
 
     if (existLocal && existRemote) {
       r.decision = "skipFolder";
-      r.decisionBranch = 10;
     } else if (existLocal && !existRemote) {
       if (isPullDeleteMode && existPrevSync) {
         // Pull-and-delete: remote deletion propagates to local
         r.decision = "keepRemoteDelHistFolder";
-        r.decisionBranch = 9;
       } else if (isPullOnlyMode) {
         // Pull modes never write to remote: a locally-created folder stays
         // local-only. In pull-only mode a remotely-deleted folder also keeps
         // its local copy (the local vault only accumulates).
         r.decision = "skipFolder";
-        r.decisionBranch = 76;
       } else if (existPrevSync && !isPushOnlyMode) {
         // Bidirectional: remote deleted the folder; propagate to local
         r.decision = "keepRemoteDelHistFolder";
-        r.decisionBranch = 9;
       } else {
         // Push modes re-push the local folder to remote
         r.decision = "createFolder";
-        r.decisionBranch = 15;
       }
     } else if (!existLocal && existRemote) {
       if (isPushDeleteMode && existPrevSync) {
         // Local deleted the folder; in push-and-delete mode the deletion
         // propagates to remote
         r.decision = "uploadLocalDelHistToRemoteFolder";
-        r.decisionBranch = 8;
       } else if (isPushOnlyMode) {
         // Push modes: remote is only a push target/backup, never pull
         // remote-only folder structure back into the local vault
         r.decision = "skipFolder";
-        r.decisionBranch = 73;
       } else if (isPullDeleteMode && existPrevSync) {
         // In pull-and-delete mode a local folder deletion is intentional
         // and must not resurrect as an empty shell (files inside are also
         // skipped via branch 65); the remote copy stays untouched
         r.decision = "skipFolder";
-        r.decisionBranch = 75;
       } else if (existPrevSync && !isPullOnlyMode) {
         // Bidirectional: local deleted the folder
         r.decision = "uploadLocalDelHistToRemoteFolder";
-        r.decisionBranch = 8;
       } else {
         r.decision = "createFolder";
-        r.decisionBranch = 11;
       }
     } else {
       // !existLocal && !existRemote
       r.decision = "skipFolder";
-      r.decisionBranch = 72;
     }
   } else {
     // Folder has must-be-kept children
     keptFolder.add(getParentFolder(r.key));
     if (existLocal && existRemote) {
       r.decision = "skipFolder";
-      r.decisionBranch = 12;
     } else if (existLocal || existRemote) {
       r.decision = "createFolder";
-      r.decisionBranch = 13;
     } else {
       throw Error(
         `Error: Folder ${r.key} doesn't exist locally and remotely but is marked must be kept. Abort.`
@@ -1173,7 +1198,7 @@ export const doActualSyncV3 = async (
         });
 
         syncCall.catch((error: unknown) => {
-          const errMsg = error instanceof Error ? error.message : JSON.stringify(error);
+          const errMsg = extractRemoteErrorDetails(error);
           const message = `${key}: ${errMsg}`;
           potentialErrors.push(new Error(message));
 
