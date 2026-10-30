@@ -1,7 +1,7 @@
 {
   "id": "third-party-sync",
   "name": "Third-party Sync",
-  "version": "26.2.4",
+  "version": "26.2.5",
   "minAppVersion": "1.11.0",
   "description": "A sync plugin forked from Remotely Save, with security-first improvements. NOT backwards compatible with Remotely Save.",
   "author": "nightfall",

@@ -890,10 +890,8 @@ export default class ThirdPartySyncPlugin extends Plugin {
 
     this.addSettingTab(new ThirdPartySyncSettingTab(this.app, this));
 
-    // Show status bar show by default on desktop only
-    if (this.settings.enableStatusBarInfo === undefined) {
-      this.settings.enableStatusBarInfo = Platform.isMobile ? false : true;
-    }
+    // Status bar info is always shown (the toggle setting was removed in 26.2.5)
+    this.settings.enableStatusBarInfo = true;
 
     void this.saveSettings();
 

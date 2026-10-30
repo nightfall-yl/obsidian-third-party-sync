@@ -476,7 +476,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
               : t("settings_status_notencrypted"),
             lastsynced:
               lastSynced > 0
-                ? unixTimeToStr(lastSynced)
+                ? unixTimeToStr(lastSynced, "YYYY-MM-DD HH:mm:ss")
                 : t("settings_status_neversynced"),
           })
         );
@@ -673,27 +673,31 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
         s3Settings.push(setting);
         setting.setName(t("settings_s3_bypasscorslocally"))
           .setDesc(t("settings_s3_bypasscorslocally_desc"))
-          .addDropdown((dropdown) => {
-            dropdown
-              .addOption("disable", t("disable"))
-              .addOption("enable", t("enable"));
-
-            dropdown
-              .setValue(
-                `${this.plugin.settings.s3.bypassCorsLocally ? "enable" : "disable"
-                }`
-              )
-              .onChange((value) => {
-                if (value === "enable") {
-                  this.plugin.settings.s3.bypassCorsLocally = true;
-                } else {
-                  this.plugin.settings.s3.bypassCorsLocally = false;
-                }
+          .addToggle((toggle) => {
+            toggle
+              .setValue(this.plugin.settings.s3.bypassCorsLocally)
+              .onChange((val) => {
+                this.plugin.settings.s3.bypassCorsLocally = val;
                 void this.plugin.saveSettings();
               });
           });
       });
     }
+
+    sgServiceDetail.addSetting((setting) => {
+      s3Settings.push(setting);
+      setting.setName(t("settings_disable_s3_metadata_sync"))
+        .setDesc(t("settings_disable_s3_metadata_sync_desc"))
+        .addToggle((toggle) => {
+          toggle
+            .setValue(this.plugin.settings.s3.disableS3MetadataSync)
+            .onChange((val) => {
+              this.plugin.settings.s3.disableS3MetadataSync = val;
+              void this.plugin.saveSettings();
+              new Notice(t("settings_enablestatusbar_reloadrequired_notice"));
+            });
+        });
+    });
 
     sgServiceDetail.addSetting((setting) => {
       s3Settings.push(setting);
@@ -1434,53 +1438,6 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       })
     );
 
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
-    sgBasicWhat.addSetting((setting) => setting
-      .setName(t("settings_enablestatusbar_info"))
-      .setDesc(t("settings_enablestatusbar_info_desc"))
-      .addToggle((toggle) => {
-        toggle
-          .setValue(this.plugin.settings.enableStatusBarInfo)
-          .onChange((val) => {
-            this.plugin.settings.enableStatusBarInfo = val;
-            void this.plugin.saveSettings();
-            this.plugin.toggleStatusBar(val);
-
-            statusBarOptions.toggleClass(
-              "third-party-sync-hidden",
-              this.plugin.settings.enableStatusBarInfo !== true
-            );
-          });
-      })
-    );
-
-    const statusBarOptions = (sgBasicWhat as { groupEl: HTMLElement }).groupEl.createDiv({ cls: "third-party-sync-hidden" });
-
-    statusBarOptions.toggleClass(
-      "third-party-sync-hidden",
-      this.plugin.settings.enableStatusBarInfo !== true
-    );
-
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
-    sgBasicWhat.addSetting((setting) => setting
-      .setName(t("settings_skiplargefiles"))
-      .setDesc(t("settings_skiplargefiles_desc"))
-      .addDropdown((dropdown) => {
-        dropdown.addOption("-1", t("settings_skiplargefiles_notset"));
-
-        const mbs = [1, 5, 10, 50, 100, 500, 1000];
-        for (const mb of mbs) {
-          dropdown.addOption(`${mb * 1000 * 1000}`, `${mb} MB`);
-        }
-        dropdown
-          .setValue(`${this.plugin.settings.skipSizeLargerThan}`)
-          .onChange((val) => {
-            this.plugin.settings.skipSizeLargerThan = parseInt(val);
-            void this.plugin.saveSettings();
-          });
-      })
-    );
-
     //////////////////////////////////////////////////
     // below for advanced settings
     //////////////////////////////////////////////////
@@ -1505,6 +1462,26 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
           .onChange((val) => {
             const realVal = parseInt(val);
             this.plugin.settings.concurrency = realVal;
+            void this.plugin.saveSettings();
+          });
+      })
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
+    sgAdv.addSetting((setting) => setting
+      .setName(t("settings_skiplargefiles"))
+      .setDesc(t("settings_skiplargefiles_desc"))
+      .addDropdown((dropdown) => {
+        dropdown.addOption("-1", t("settings_skiplargefiles_notset"));
+
+        const mbs = [1, 5, 10, 50, 100, 500, 1000];
+        for (const mb of mbs) {
+          dropdown.addOption(`${mb * 1000 * 1000}`, `${mb} MB`);
+        }
+        dropdown
+          .setValue(`${this.plugin.settings.skipSizeLargerThan}`)
+          .onChange((val) => {
+            this.plugin.settings.skipSizeLargerThan = parseInt(val);
             void this.plugin.saveSettings();
           });
       })
@@ -1723,15 +1700,12 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       setting
         .setName(t("settings_debug_enabled"))
         .setDesc(t("settings_debug_enabled_desc"))
-        .addDropdown((dropdown) => {
-          dropdown.addOption("disable", t("disable"));
-          dropdown.addOption("enable", t("enable"));
-          dropdown
-            .setValue(this.plugin.settings.debugEnabled ? "enable" : "disable")
-            .onChange((val: string) => {
-              const debugEnabled = val === "enable";
-              this.plugin.settings.debugEnabled = debugEnabled;
-              if (debugEnabled) {
+        .addToggle((toggle) => {
+          toggle
+            .setValue(this.plugin.settings.debugEnabled)
+            .onChange((val) => {
+              this.plugin.settings.debugEnabled = val;
+              if (val) {
                 log.setLevel("debug");
               } else {
                 log.setLevel("info");
@@ -1814,6 +1788,8 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
           button.onClick(() => {
             void (async () => {
               await destroyDBs();
+              this.plugin.settings.lastSynced = -1;
+              void this.plugin.saveSettings();
               new Notice(t("settings_resetcache_notice"));
             })();
           });
@@ -1830,21 +1806,6 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
           button.onClick(() => {
             void openWipeCloudModal(this.plugin);
           });
-        });
-    });
-
-    addDebugSetting((setting) => {
-      setting
-        .setName(t("settings_disable_s3_metadata_sync"))
-        .setDesc(t("settings_disable_s3_metadata_sync_desc"))
-        .addToggle((toggle) => {
-          toggle
-            .setValue(this.plugin.settings.s3.disableS3MetadataSync)
-            .onChange((val) => {
-              this.plugin.settings.s3.disableS3MetadataSync = val;
-              void this.plugin.saveSettings();
-              new Notice(t("settings_enablestatusbar_reloadrequired_notice"));
-            });
         });
     });
 

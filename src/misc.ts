@@ -412,12 +412,15 @@ export const checkHasSpecialCharForDir = (x: string) => {
   return /[?/\\]/.test(x);
 };
 
-export const unixTimeToStr = (x: number | undefined | null) => {
+export const unixTimeToStr = (
+  x: number | undefined | null,
+  fmt?: string
+) => {
   if (x === undefined || x === null || Number.isNaN(x)) {
     return undefined;
   }
   // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- third-party library returns any
-  return (moment as unknown)(x).format() as string;
+  return (fmt ? (moment as unknown)(x).format(fmt) : (moment as unknown)(x).format()) as string;
 };
 
 /**
