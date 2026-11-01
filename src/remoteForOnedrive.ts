@@ -725,10 +725,18 @@ export const getOnedriveClient = (
 };
 
 /**
- * Use delta api to list all files and folders
- * https://docs.microsoft.com/en-us/onedrive/developer/rest-api/api/driveitem_delta?view=odsp-graph-online
- * @param client
- * @param prefix
+ * Use OneDrive delta API to list all files and folders.
+ * https://learn.microsoft.com/en-us/onedrive/developer/rest-api/api/driveitem_delta
+ *
+ * Two modes:
+ *   1. Full enumeration (first sync / expired deltaLink): start from
+ *      /delta?$top=200, page through everything, store the snapshot and
+ *      deltaLink, return the full Contents.
+ *   2. Delta resume (both deltaLink and snapshot present): fetch only the
+ *      incremental changes via the stored deltaLink, merge them into the
+ *      local snapshot (upsert for created/updated, removal for deleted),
+ *      and return the merged full Contents. Any network error or 410 Gone
+ *      falls back to a full enumeration (deltaLink + snapshot are cleared).
  */
 export const listFromRemote = async (
   client: WrappedOnedriveClient,
@@ -742,39 +750,106 @@ export const listFromRemote = async (
   const NEXT_LINK_KEY = "@odata.nextLink";
   const DELTA_LINK_KEY = "@odata.deltaLink";
 
-  let res = await client.getJson(
-    `/drive/special/approot:/${client.remoteBaseDir}:/delta`
-  );
-  let driveItems = (res.value as DriveItem[]);
+  const tryDeltaResume =
+    !!client.onedriveConfig.deltaLink &&
+    !!client.onedriveConfig.remoteSnapshot &&
+    Object.keys(client.onedriveConfig.remoteSnapshot).length > 0;
 
-  while (NEXT_LINK_KEY in res) {
-    res = await client.getJson(res[NEXT_LINK_KEY] as string);
-    driveItems.push(...structuredClone(res.value as DriveItem[]));
+  let items: DriveItem[] = [];
+  let newDeltaLink = "";
+  let usedFullEnumeration = false;
+
+  const fetchAllPages = async (startUrl: string) => {
+    const collected: DriveItem[] = [];
+    let res = await client.getJson(startUrl);
+    collected.push(...((res.value ?? []) as DriveItem[]));
+    while (NEXT_LINK_KEY in res) {
+      res = await client.getJson(res[NEXT_LINK_KEY] as string);
+      collected.push(...((res.value ?? []) as DriveItem[]));
+    }
+    if (DELTA_LINK_KEY in res) {
+      newDeltaLink = res[DELTA_LINK_KEY] as string;
+    }
+    return collected;
+  };
+
+  if (tryDeltaResume) {
+    try {
+      items = await fetchAllPages(client.onedriveConfig.deltaLink);
+    } catch (err) {
+      // deltaLink expired or remote unavailable -> fall back to full enumeration
+      log.warn(
+        `deltaLink resume failed, falling back to full enumeration: ${
+          err instanceof Error ? err.message : String(err)
+        }`
+      );
+      client.onedriveConfig.deltaLink = "";
+      client.onedriveConfig.remoteSnapshot = undefined;
+      await client.saveUpdatedConfigFunc();
+      usedFullEnumeration = true;
+    }
+  } else {
+    usedFullEnumeration = true;
   }
 
-  // lastly we should have delta link?
-  if (DELTA_LINK_KEY in res) {
-    client.onedriveConfig.deltaLink = res[DELTA_LINK_KEY] as string;
-    await client.saveUpdatedConfigFunc();
+  if (usedFullEnumeration) {
+    const startUrl = `/drive/special/approot:/${client.remoteBaseDir}:/delta?$top=200`;
+    items = await fetchAllPages(startUrl);
   }
 
-  // unify everything to RemoteItem
-  const unifiedContents: RemoteItem[] = [];
-  for (const item of driveItems) {
-    if ((item as Record<string, unknown>).deleted !== undefined) {
+  // build the change set (distinguish regular items from deleted ones)
+  type DeltaEntry = { item: DriveItem; deleted: boolean };
+  const entries: DeltaEntry[] = items.map((item) => ({
+    item,
+    deleted: (item as Record<string, unknown>).deleted !== undefined,
+  }));
+
+  // merge into the snapshot
+  let snapshot: Record<string, RemoteItem> =
+    client.onedriveConfig.remoteSnapshot ?? {};
+
+  for (const entry of entries) {
+    // deleted items: remove from the snapshot (deletion detection does not
+    // depend on fromDriveItemToRemoteItem succeeding)
+    if (entry.deleted) {
+      const name = entry.item.name;
+      const parentPath = entry.item.parentReference?.path;
+      if (name !== undefined && parentPath !== undefined) {
+        try {
+          const deletedItem = fromDriveItemToRemoteItem(
+            entry.item,
+            client.remoteBaseDir
+          );
+          if (deletedItem.key !== "/") {
+            delete snapshot[deletedItem.key];
+          }
+        } catch {
+          // incomplete metadata: fall back to looking the key up by name suffix
+          for (const key of Object.keys(snapshot)) {
+            if (key.endsWith(`/${name}`) || key === `/${name}`) {
+              delete snapshot[key];
+              break;
+            }
+          }
+        }
+      }
       continue;
     }
+
     try {
-      const normalized = fromDriveItemToRemoteItem(item, client.remoteBaseDir);
-      if (normalized.key !== "/") {
-        unifiedContents.push(normalized);
+      const remoteItem = fromDriveItemToRemoteItem(
+        entry.item,
+        client.remoteBaseDir
+      );
+      if (remoteItem.key !== "/") {
+        snapshot[remoteItem.key] = remoteItem;
       }
     } catch (err) {
       log.warn(
         `skip unrecognized onedrive item while listing remote: ${JSON.stringify(
           {
-            name: item?.name,
-            parentPath: item?.parentReference?.path,
+            name: entry.item?.name,
+            parentPath: entry.item?.parentReference?.path,
           }
         )}`,
         err
@@ -782,8 +857,18 @@ export const listFromRemote = async (
     }
   }
 
+  // persist deltaLink + snapshot
+  if (newDeltaLink) {
+    client.onedriveConfig.deltaLink = newDeltaLink;
+  }
+  // only a full enumeration resets the snapshot; delta resume merges
+  // incrementally into the existing snapshot
+  client.onedriveConfig.remoteSnapshot = snapshot;
+  await client.saveUpdatedConfigFunc();
+
+  // return the full Contents
   return {
-    Contents: unifiedContents,
+    Contents: Object.values(snapshot),
   };
 };
 

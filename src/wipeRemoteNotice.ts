@@ -159,6 +159,13 @@ export class WipeCloudModal extends Modal {
     try {
       await clearAllPrevSyncRecordsByVault(plugin.db, plugin.vaultRandomID);
       await clearAllSyncMetaMapping(plugin.db);
+      if (plugin.settings.serviceType === "onedrive") {
+        // invalidate the delta resume state, otherwise the next sync
+        // would merge a stale snapshot with a wiped remote
+        plugin.settings.onedrive.deltaLink = "";
+        plugin.settings.onedrive.remoteSnapshot = undefined;
+        await plugin.saveSettings();
+      }
     } catch (err) {
       console.error("wipe remote: failed to reset local baselines", err);
       progressNotice.setMessage(t("modal_wipecloud_notice_resetfail"));

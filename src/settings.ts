@@ -1368,6 +1368,20 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
 
     // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
     sgBasicWhat.addSetting((setting) => setting
+      .setName(t("settings_syncunderscore"))
+      .setDesc(t("settings_syncunderscore_desc"))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.syncUnderscoreItems)
+          .onChange((val) => {
+            this.plugin.settings.syncUnderscoreItems = val;
+            void this.plugin.saveSettings();
+          });
+      })
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
+    sgBasicWhat.addSetting((setting) => setting
       .setName(t("settings_sync_trash"))
       .setDesc(t("settings_sync_trash_desc"))
       .addToggle((toggle) => {
@@ -1389,20 +1403,6 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.syncBookmarks)
           .onChange((val) => {
             this.plugin.settings.syncBookmarks = val;
-            void this.plugin.saveSettings();
-          });
-      })
-    );
-
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
-    sgBasicWhat.addSetting((setting) => setting
-      .setName(t("settings_syncunderscore"))
-      .setDesc(t("settings_syncunderscore_desc"))
-      .addToggle((toggle) => {
-        toggle
-          .setValue(this.plugin.settings.syncUnderscoreItems)
-          .onChange((val) => {
-            this.plugin.settings.syncUnderscoreItems = val;
             void this.plugin.saveSettings();
           });
       })

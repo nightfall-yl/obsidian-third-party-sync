@@ -53,6 +53,13 @@ export interface OnedriveConfig {
   accessTokenExpiresInSeconds: number;
   accessTokenExpiresAtTime: number;
   deltaLink: string;
+  /**
+   * Remote snapshot (key -> RemoteItem) for delta API resume.
+   * Stored next to deltaLink so the next sync can fetch only the
+   * incremental changes instead of a full enumeration.
+   * Cleared together with deltaLink when it expires (410 Gone) or on wipe.
+   */
+  remoteSnapshot?: Record<string, RemoteItem>;
   username: string;
   credentialsShouldBeDeletedAtTime?: number;
   remoteBaseDir?: string;

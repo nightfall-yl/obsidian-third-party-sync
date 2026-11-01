@@ -4,7 +4,7 @@
 
 [![Version](https://img.shields.io/github/v/release/nightfall-yl/obsidian-third-party-sync)](https://github.com/nightfall-yl/obsidian-third-party-sync) | [![Obsidian](https://img.shields.io/badge/Obsidian-1.11.0%2B-purple)](https://obsidian.md) | [![License](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
 
-[English](README.md) | [简体中文](README_zh-CN.md) | 繁體中文 | [日本語](README_ja.md) | [한국어](README_ko.md) | [Deutsch](README_de.md) | [Français](README_fr.md) | [Español](README_es.md) | [Italiano](README_it.md) | [Nederlands](README_nl.md) | [Dansk](README_da.md) | [Svenska](README_sv.md) | [Norsk](README_no.md) | [Русский](README_ru.md)
+[English](README.md) | [简体中文](README_zh-CN.md) | 繁體中文
 
 ## 免責聲明
 
@@ -55,7 +55,7 @@
 - **[最小侵入設計](./docs/minimal_intrusive_design.md)**。
 - **完全開源**（[Apache-2.0](./LICENSE)）。
 - **[同步演算法](./docs/sync_algorithm.md)**。
-- **🌐 多語言支援** — 介面自動跟隨 Obsidian 顯示語言（共 14 種：English、简体中文、繁體中文、日本語、한국어、Deutsch、Français、Español、Italiano、Nederlands、Dansk、Svenska、Norsk、Русский），無需手動設定，缺譯時自動回退英文。
+- **🌐 多語言支援** — 介面自動跟隨 Obsidian 顯示語言（English、简体中文、繁體中文），無需手動設定，缺譯時自動回退英文。
 
 ## 限制與注意事項
 

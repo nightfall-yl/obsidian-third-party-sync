@@ -35,27 +35,26 @@ const nodeCoreAliases = new Map([
   ["crypto", require.resolve("crypto-browserify")],
   ["path", require.resolve("path-browserify")],
   ["stream", require.resolve("stream-browserify")],
-  ["url", require.resolve("url/")],
   ["util", require.resolve("util/")],
 ]);
 
 const nodeCoreFallbackPlugin = {
   name: "node-core-fallback",
   setup(build) {
-    build.onResolve({ filter: /^(assert|buffer|crypto|path|stream|url|util)$/ }, (args) => ({
+    build.onResolve({ filter: /^(assert|buffer|crypto|path|stream|util)$/ }, (args) => ({
       path: nodeCoreAliases.get(args.path),
     }));
 
-    build.onResolve({ filter: /^node:(assert|buffer|crypto|path|stream|url|util)$/ }, (args) => ({
+    build.onResolve({ filter: /^node:(assert|buffer|crypto|path|stream|util)$/ }, (args) => ({
       path: nodeCoreAliases.get(args.path.slice("node:".length)),
     }));
 
-    build.onResolve({ filter: /^(fs|http|https|os|vm)$/ }, (args) => ({
+    build.onResolve({ filter: /^(fs|http|https|os|url|vm)$/ }, (args) => ({
       path: args.path,
       namespace: "empty-module",
     }));
 
-    build.onResolve({ filter: /^node:(fs|http|https|os|vm)$/ }, (args) => ({
+    build.onResolve({ filter: /^node:(fs|http|https|os|url|vm)$/ }, (args) => ({
       path: args.path.slice("node:".length),
       namespace: "empty-module",
     }));
