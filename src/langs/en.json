@@ -234,6 +234,7 @@
   "settings_disable_s3_metadata_sync_desc": "Disable uploading sync metadata to the S3 remote. Reload the plugin after changing this.",
   "settings_remoterun": "Sync Delay After Remote Change Detected",
   "settings_remoterun_10sec": "after 10 seconds",
+  "settings_remoterun_30sec": "after 30 seconds",
   "settings_remoterun_1min": "after 1 minute",
   "settings_remoterun_1sec": "after 1 second",
   "settings_remoterun_5sec": "after 5 seconds",

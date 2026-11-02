@@ -1036,11 +1036,12 @@ export default class ThirdPartySyncPlugin extends Plugin {
             v2PeriodMin !== undefined ? v2PeriodMin * 60_000 : -1;
         }
 
-        // 保存后同步：v1 存在 → 但 0 档已删除，0 映射到 5000；否则 v2 syncOnSaveMode 映射
+        // 保存后同步：v1 存在 → 0 档已删除 → 5000；60000 档已收窄 → 30000；否则原样保留
         const v1Save = this.settings.syncOnSaveAfterMilliseconds;
         if (v1Save !== undefined) {
           if (v1Save === 0) this.settings.syncOnSaveAfterMilliseconds = 5_000;
-          // 其他 v1 值（-1 / 5000 / 10000 / 30000 / 60000）原样保留
+          else if (v1Save === 60_000) this.settings.syncOnSaveAfterMilliseconds = 30_000;
+          // 其他合法值（-1 / 5000 / 10000 / 30000）原样保留
         } else {
           const v2Mode = raw.syncOnSaveMode as string | undefined;
           if (v2Mode === "off") this.settings.syncOnSaveAfterMilliseconds = -1;
@@ -1049,9 +1050,11 @@ export default class ThirdPartySyncPlugin extends Plugin {
           else this.settings.syncOnSaveAfterMilliseconds = -1;
         }
 
-        // 远端变更：v1 存在 → 原样保留；v2 没有这个概念 → -1（关闭）
+        // 远端变更：v1 存在 → 60000 档已收窄 → 30000；否则原样保留；v2 没有这个概念 → -1（关闭）
         if (this.settings.syncOnRemoteChangesAfterMilliseconds === undefined) {
           this.settings.syncOnRemoteChangesAfterMilliseconds = -1;
+        } else if (this.settings.syncOnRemoteChangesAfterMilliseconds === 60_000) {
+          this.settings.syncOnRemoteChangesAfterMilliseconds = 30_000;
         }
 
         this.settings.autoSyncConsolidatedMigrated = true;
@@ -1078,6 +1081,21 @@ export default class ThirdPartySyncPlugin extends Plugin {
     ) {
       // 不合法值（5s / 15s / 30s / 1min 等）就近向上归到 5 分钟
       this.settings.autoRunEveryMilliseconds = 300_000;
+      void this.saveSettings();
+    }
+
+    // ── save / remote 档位归一化：覆盖已过迁移标记但 data.json 里仍残留 60000 的老用户 ──
+    const LEGAL_SAVE_MS = new Set([-1, 5_000, 10_000, 30_000]);
+    const curSave = this.settings.syncOnSaveAfterMilliseconds;
+    if (curSave !== undefined && curSave > 0 && !LEGAL_SAVE_MS.has(curSave)) {
+      this.settings.syncOnSaveAfterMilliseconds = 30_000;
+      void this.saveSettings();
+    }
+
+    const LEGAL_REMOTE_MS = new Set([-1, 5_000, 10_000, 30_000]);
+    const curRemote = this.settings.syncOnRemoteChangesAfterMilliseconds;
+    if (curRemote !== undefined && curRemote > 0 && !LEGAL_REMOTE_MS.has(curRemote)) {
+      this.settings.syncOnRemoteChangesAfterMilliseconds = 30_000;
       void this.saveSettings();
     }
   }

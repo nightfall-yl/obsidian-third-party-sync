@@ -1261,7 +1261,6 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
         dropdown.addOption(`${1000 * 5}`, t("settings_saverun_5sec"));
         dropdown.addOption(`${1000 * 10}`, t("settings_saverun_10sec"));
         dropdown.addOption(`${1000 * 30}`, t("settings_saverun_30sec"));
-        dropdown.addOption(`${1000 * 60}`, t("settings_saverun_1min"));
         dropdown
           .setValue(`${this.plugin.settings.syncOnSaveAfterMilliseconds ?? -1}`)
           .onChange((val: string) => {
@@ -1280,7 +1279,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       dropdown.addOption("-1", t("settings_remoterun_notset"));
       dropdown.addOption(`${1000 * 5}`, t("settings_remoterun_5sec"));
       dropdown.addOption(`${1000 * 10}`, t("settings_remoterun_10sec"));
-      dropdown.addOption(`${1000 * 60}`, t("settings_remoterun_1min"));
+      dropdown.addOption(`${1000 * 30}`, t("settings_remoterun_30sec"));
       dropdown
         .setValue(`${this.plugin.settings.syncOnRemoteChangesAfterMilliseconds ?? -1}`)
         .onChange((val: string) => {

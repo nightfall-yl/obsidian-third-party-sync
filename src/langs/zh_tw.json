@@ -234,6 +234,7 @@
   "settings_disable_s3_metadata_sync_desc": "停用將同步元數據上傳到 S3 遠端的功能。修改後需重新載入插件。",
   "settings_remoterun": "偵測到遠端變更後同步延遲",
   "settings_remoterun_10sec": "10 秒後",
+  "settings_remoterun_30sec": "30 秒後",
   "settings_remoterun_1min": "1 分鐘後",
   "settings_remoterun_1sec": "1 秒後",
   "settings_remoterun_5sec": "5 秒後",

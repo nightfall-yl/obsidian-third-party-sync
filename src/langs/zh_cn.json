@@ -234,6 +234,7 @@
   "settings_remoterun_1sec": "1 秒后",
   "settings_remoterun_5sec": "5 秒后",
   "settings_remoterun_10sec": "10 秒后",
+  "settings_remoterun_30sec": "30 秒后",
   "settings_remoterun_1min": "1 分钟后",
   "settings_sync_trash": "同步 .trash 文件夹",
   "settings_sync_trash_desc": "是否同步 Obsidian 的 .trash 文件夹。",
