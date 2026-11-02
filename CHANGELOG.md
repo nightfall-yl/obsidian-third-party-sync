@@ -4,6 +4,26 @@
 
 > 说明：本更新日志自 `26.1.2` 起维护。
 
+## [26.2.7] - 2026-11-03
+
+### 设置
+
+- **通用Group 设置项精简**：
+  - 「自动同步」下拉收窄为 **4 档**：-1(关) / 5min / 10min / 30min。删除 5s / 15s / 30s / 1min 四档。**存量用户若原设了 5s / 15s / 30s / 1min，自动归到 5 分钟**；-1 / 5min / 10min / 30min 原值保留。归一化在 loadSettings 内一次完成，只写一次 data.json
+  - 「保存后同步延迟」下拉删除"立即"档（0ms），保留 5 档：-1(关) / 5s / 10s / 30s / 1min。旧值 0 档迁移时映射到 5s
+  - 「检测远端变更后同步延迟」下拉原样保留 4 档：-1(关) / 5s / 10s / 1min
+  - 「启动后运行一次」**删除**：启动后首次同步不再单独可配，跟随「自动同步」档位——自动同步 > 0 时，调度器启动后固定 5 秒触发首次（周期关闭 → 首次也不跑）。字段 initRunAfterMilliseconds 保留在数据模型里供旧数据兼容与回滚，运行时零消费
+
+### 架构
+
+- **SyncAutoScheduler 统一调度器**（移植自 obsidian-astra）：
+  - 自动同步来源从多个独立定时器合并为一个调度器管理
+  - AUTO_MIN_INTERVAL_MS = 30s **仅用于跨来源抢占仲裁**：当 pending 中有 ≥ 2 个不同来源时，后到的被推至前次自动同步后 30 秒；**同一来源连续触发（trailing debounce）不受约束**（例如保存后设 5s 延迟，连续保存按 5s 节奏正常执行）
+  - syncRun 执行中自动请求挂起，完成后重算
+  - 手动同步完全不受此下限约束
+- **保存后同步反馈环防护**：modify handler 主动排除插件自身 `data.json` / `static-data.json`，避免 `syncRun → saveSettings → modify → syncRun` 循环
+- **幂等迁移逻辑**：自动同步相关字段（autoRunEveryMilliseconds / syncOnSaveAfterMilliseconds / syncOnRemoteChangesAfterMilliseconds）迁移时，若 data.json 里还存在上一轮的 v2 字段残留（autoSyncEnabled / autoSyncPeriodMinutes / syncOnSaveMode），按 **v1 原值优先 > v2 映射值** 的规则归位；幂等标记 autoSyncConsolidatedMigrated 只跑一次
+
 ## [26.2.6] - 2026-11-01
 
 ### 性能

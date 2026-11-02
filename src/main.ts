@@ -5,7 +5,7 @@ import {
   Setting,
   setIcon,
   FileSystemAdapter,
-  Platform, Vault, EventRef,
+  Platform, Vault, EventRef, TFile, normalizePath,
 } from "obsidian";
 
 import type {
@@ -46,6 +46,7 @@ import { I18n } from "./i18n";
 import type { LangTypeAndAuto, TransItemType } from "./i18n";
 import { SyncAlgoV2Modal } from "./syncAlgoV2Notice";
 import { applyPresetRulesInplace } from "./presetRules";
+import { SyncAutoScheduler, type AutoSyncSource } from "./syncScheduler";
 
 import { log } from "./moreOnLog";
 import AggregateError from "aggregate-error";
@@ -60,11 +61,11 @@ const DEFAULT_SETTINGS: ThirdPartySyncPluginSettings = {
   password: "",
   serviceType: "s3",
   debugEnabled: false,
-  // vaultRandomID: "", // deprecated
+  // 自动同步最终形态：三个独立下拉，全部默认 -1（关闭）
   autoRunEveryMilliseconds: -1,
-  initRunAfterMilliseconds: -1,
   syncOnSaveAfterMilliseconds: -1,
   syncOnRemoteChangesAfterMilliseconds: -1,
+  autoSyncConsolidatedMigrated: false,
   agreeToUploadExtraMetadata: false,
   concurrency: 5,
   syncConfigDir: false,
@@ -108,14 +109,14 @@ export default class ThirdPartySyncPlugin extends Plugin {
   oauth2Info: OAuth2Info;
   currSyncMsg?: string;
   syncRibbon?: HTMLElement;
-  autoRunIntervalID?: number;
   i18n: I18n;
   vaultRandomID: string;
   isManual: boolean;
   isAlreadyRunning: boolean;
-  syncOnSaveEvent?: EventRef;
-  vaultScannerIntervalId?: number;
-  syncOnRemoteIntervalID?: number;
+  private autoScheduler: SyncAutoScheduler;
+  private vaultEventRefs: EventRef[] = [];
+  private remoteCheckIntervalID?: number;
+  private vaultScannerIntervalId?: number;
   statusBarIntervalID: number;
   currentTriggerSource?: SyncTriggerSourceType;
 
@@ -297,6 +298,8 @@ export default class ThirdPartySyncPlugin extends Plugin {
       return;
     }
 
+    // 通知统一调度器：同步执行中（minInterval 起点在 finally 里落盘）
+    this.autoScheduler?.markRunStarted();
     try {
       this.setSyncIcon(true, triggerSource);
 
@@ -410,6 +413,10 @@ export default class ThirdPartySyncPlugin extends Plugin {
       }
       this.updateSyncStatus("idle");
       this.setSyncIcon(false);
+    } finally {
+      // 通知统一调度器：本次结束。markRunFinished 会把 minInterval 起点推到当前时刻，
+      // 且 reschedule() 可能发现还有挂起的自动请求等待执行。
+      this.autoScheduler?.markRunFinished();
     }
   }
 
@@ -920,14 +927,24 @@ export default class ThirdPartySyncPlugin extends Plugin {
   }
 
   private enableFeaturesAfterAgreement() {
-    this.enableAutoSyncIfSet();
-    this.enableInitSyncIfSet();
+    // 初始化统一调度器（如果还没创建）
+    if (!this.autoScheduler) {
+      this.autoScheduler = new SyncAutoScheduler(
+        (source: AutoSyncSource) => {
+          const triggerSource: SyncTriggerSourceType =
+            source === "autoOnceInit" ? "autoOnceInit" : "auto";
+          return this.syncRun(triggerSource);
+        }
+      );
+    }
 
-    void this.toggleSyncOnRemote(true);
-    void this.toggleSyncOnSave(true);
+    // 配置调度器：启动首次延迟 + 定时周期
+    this.applyAutoSchedulerSetup();
+    this.registerVaultEvents();
+    this.setupRemoteChangeCheck();
+
     this.toggleStatusBar(true);
     this.toggleStatusText(true);
-
     this.updateSyncStatus("idle");
   }
 
@@ -938,9 +955,14 @@ export default class ThirdPartySyncPlugin extends Plugin {
       this.oauth2Info = undefined;
     }
 
-    // Disable Features
-    void this.toggleSyncOnSave(false);
-    void this.toggleSyncOnRemote(false);
+    // 停止所有自动同步调度
+    this.autoScheduler?.stop();
+    this.teardownRemoteChangeCheck();
+    this.unregisterVaultEvents();
+    if (this.vaultScannerIntervalId !== undefined) {
+      window.clearInterval(this.vaultScannerIntervalId);
+      this.vaultScannerIntervalId = undefined;
+    }
     this.toggleStatusText(false);
     this.toggleStatusBar(false);
   }
@@ -993,6 +1015,70 @@ export default class ThirdPartySyncPlugin extends Plugin {
     }
     if (this.settings.deleteToWhere === undefined) {
       this.settings.deleteToWhere = "system_trash";
+    }
+
+    // ── 自动同步：处理上一轮 v2 字段残留 → 最终形态（幂等，只跑一次） ──
+    // 判断：有 v2 字段（autoSyncEnabled / autoSyncPeriodMinutes / syncOnSaveMode）残留才需要迁移
+    if (!this.settings.autoSyncConsolidatedMigrated) {
+      const raw = this.settings as unknown as Record<string, unknown>;
+      const hasV2Residue =
+        "autoSyncEnabled" in raw ||
+        "autoSyncPeriodMinutes" in raw ||
+        "syncOnSaveMode" in raw;
+
+      if (hasV2Residue) {
+        // 优先级：v1 原值 > v2 映射值（用户可能来回升级过）
+        // 自动同步：v1 存在 → 原样保留；否则 v2 周期分钟数 * 60000
+        const v1AutoRun = this.settings.autoRunEveryMilliseconds;
+        if (v1AutoRun === undefined) {
+          const v2PeriodMin = raw.autoSyncPeriodMinutes as number | undefined;
+          this.settings.autoRunEveryMilliseconds =
+            v2PeriodMin !== undefined ? v2PeriodMin * 60_000 : -1;
+        }
+
+        // 保存后同步：v1 存在 → 但 0 档已删除，0 映射到 5000；否则 v2 syncOnSaveMode 映射
+        const v1Save = this.settings.syncOnSaveAfterMilliseconds;
+        if (v1Save !== undefined) {
+          if (v1Save === 0) this.settings.syncOnSaveAfterMilliseconds = 5_000;
+          // 其他 v1 值（-1 / 5000 / 10000 / 30000 / 60000）原样保留
+        } else {
+          const v2Mode = raw.syncOnSaveMode as string | undefined;
+          if (v2Mode === "off") this.settings.syncOnSaveAfterMilliseconds = -1;
+          else if (v2Mode === "immediate") this.settings.syncOnSaveAfterMilliseconds = 5_000;
+          else if (v2Mode === "delay5s") this.settings.syncOnSaveAfterMilliseconds = 5_000;
+          else this.settings.syncOnSaveAfterMilliseconds = -1;
+        }
+
+        // 远端变更：v1 存在 → 原样保留；v2 没有这个概念 → -1（关闭）
+        if (this.settings.syncOnRemoteChangesAfterMilliseconds === undefined) {
+          this.settings.syncOnRemoteChangesAfterMilliseconds = -1;
+        }
+
+        this.settings.autoSyncConsolidatedMigrated = true;
+        // 立即落盘，把 v2 残留清干净
+        void this.saveSettings();
+      } else {
+        // 没有 v2 残留：可能是 v1 直接升级，也可能是新安装
+        // 但仍需要把 initRunAfterMilliseconds 的 0 值处理（合并入 autoRun 的启动首次后，
+        // initRun 字段本身不活跃，但如果有人把 autoRun 关了只开了 initRun，syncScheduler
+        // 的 start(periodMs=0) 不会触发任何首次——这是正确行为，因为 autoRun=-1 时不启动）
+        // 这里不需要额外处理，幂等标记仍需落盘避免重复进 block
+        this.settings.autoSyncConsolidatedMigrated = true;
+        void this.saveSettings();
+      }
+    }
+
+    // ── autoRunEveryMilliseconds 档位归一化：收窄到 4 档（-1 / 5min / 10min / 30min） ──
+    const LEGAL_AUTORUN_MS = new Set([-1, 300_000, 600_000, 1_800_000]);
+    const curAutoRun = this.settings.autoRunEveryMilliseconds;
+    if (
+      curAutoRun !== undefined &&
+      curAutoRun > 0 &&
+      !LEGAL_AUTORUN_MS.has(curAutoRun)
+    ) {
+      // 不合法值（5s / 15s / 30s / 1min 等）就近向上归到 5 分钟
+      this.settings.autoRunEveryMilliseconds = 300_000;
+      void this.saveSettings();
     }
   }
 
@@ -1154,23 +1240,132 @@ export default class ThirdPartySyncPlugin extends Plugin {
     }
   }
 
-  async toggleSyncOnRemote(enabled: boolean) {
-    // Clears the current interval
-    if (this.syncOnRemoteIntervalID !== undefined) {
-      window.clearInterval(this.syncOnRemoteIntervalID);
-      this.syncOnRemoteIntervalID = undefined;
-    }
+  /**
+   * 配置统一调度器：读 autoRunEveryMilliseconds。
+   * 周期关闭 → 不启动调度器（启动首次也不跑）。
+   * 周期开启 → 固定 5s 启动首次 + 周期运行（每次跑完整 syncRun，不设门禁）。
+   * onChange 时重新调这个函数即可。
+   */
+  applyAutoSchedulerSetup() {
+    if (!this.autoScheduler) return;
 
-    if (enabled === false || this.settings.syncOnRemoteChangesAfterMilliseconds === -1) {
+    const periodMs = this.settings.autoRunEveryMilliseconds ?? -1;
+    if (periodMs <= 0) {
+      // 关闭 → 全停
+      this.autoScheduler.stop();
       return;
     }
+
+    const initDelayMs = 5_000; // 固定首次延迟 5 秒，仅在 periodMs > 0 时由 apply 内部注册
+    this.autoScheduler.apply(initDelayMs, periodMs);
+  }
+
+  /** 注册 vault 事件：delete/rename 历史记录 + modify 保存后同步 + 30s configDir 扫描 */
+  registerVaultEvents() {
+    // 幂等：已注册就跳过
+    if (this.vaultEventRefs.length > 0) return;
+
+    // 删除/重命名历史是三向合并的核心输入，必须始终记录
+    const deleteRef = this.app.vault.on("delete", async (file) => {
+      await insertDeleteRecordByVault(this.db, file, this.vaultRandomID);
+    });
+    this.vaultEventRefs.push(deleteRef);
+
+    const renameRef = this.app.vault.on("rename", async (file, oldPath) => {
+      await insertRenameRecordByVault(
+        this.db,
+        file,
+        oldPath,
+        this.vaultRandomID
+      );
+    });
+    this.vaultEventRefs.push(renameRef);
+
+    // ── 保存后同步：trailing debounce（debounceMs 读 settings.syncOnSaveAfterMilliseconds） ──
+    // 排除插件自身数据文件：syncRun → saveSettings 写 data.json → modify 会形成反馈环
+    const pluginDir =
+      this.manifest.dir ??
+      normalizePath(
+        [this.app.vault.configDir, "plugins", this.manifest.id].join("/")
+      );
+    const pluginOwnDataFiles = new Set<string>([
+      normalizePath([pluginDir, "data.json"].join("/")),
+    ]);
+
+    const modifyRef = this.app.vault.on("modify", (file) => {
+      if (!(file instanceof TFile)) return;
+      const normalized = normalizePath(file.path);
+      if (pluginOwnDataFiles.has(normalized)) return;
+
+      const debounceMs = this.settings.syncOnSaveAfterMilliseconds ?? -1;
+      if (debounceMs <= 0) return; // -1 关闭；0 立即档已删除（迁移时映射到 5000）
+
+      if (this.syncStatus !== "idle") return; // 正在同步中
+      this.autoScheduler?.onSaveModified(debounceMs);
+    });
+    this.vaultEventRefs.push(modifyRef);
+
+    // ── 30s config 目录扫描（独立于保存后同步，覆盖 .obsidian 配置变更不触发 modify 的场景） ──
+    const scanVault = async () => {
+      const debounceMs = this.settings.syncOnSaveAfterMilliseconds ?? -1;
+      if (
+        this.syncStatus !== "idle" ||
+        debounceMs <= 0 ||
+        !this.settings.syncConfigDir
+      ) {
+        return;
+      }
+
+      log.debug("Scanning config directory for changes");
+      let localConfigContents = await listFilesInObsFolder(
+        this.app.vault,
+        this.manifest.id,
+        this.settings.syncTrash
+      );
+
+      for (const file of localConfigContents) {
+        if (
+          file.key.includes(
+            `${this.app.vault.configDir}/plugins/third-party-sync/`
+          )
+        ) {
+          continue;
+        }
+        if (file.mtime > this.settings.lastSynced) {
+          log.debug("Unsynced config file found: ", file.key);
+          this.autoScheduler?.onSaveModified(debounceMs);
+          break;
+        }
+      }
+    };
+    this.vaultScannerIntervalId = window.setInterval(() => { void scanVault(); }, 30_000);
+  }
+
+  unregisterVaultEvents() {
+    for (const ref of this.vaultEventRefs) {
+      this.app.vault.offref(ref);
+    }
+    this.vaultEventRefs = [];
+  }
+
+  /**
+   * 远端变更后同步：独立 setInterval 轮询 listFromRemote + 对比 prevSync。
+   * 这是第三个独立开关，和 applyAutoSchedulerSetup 完全解耦。
+   */
+  setupRemoteChangeCheck() {
+    // 先清旧的
+    if (this.remoteCheckIntervalID !== undefined) {
+      window.clearInterval(this.remoteCheckIntervalID);
+      this.remoteCheckIntervalID = undefined;
+    }
+
+    const intervalMs = this.settings.syncOnRemoteChangesAfterMilliseconds ?? -1;
+    if (intervalMs <= 0) return;
 
     let checkingRemote = false;
 
     const syncOnRemote = async () => {
-      if (this.syncStatus !== "idle" || checkingRemote) {
-        return;
-      }
+      if (this.syncStatus !== "idle" || checkingRemote) return;
 
       checkingRemote = true;
       try {
@@ -1183,11 +1378,12 @@ export default class ThirdPartySyncPlugin extends Plugin {
           client.serviceType,
           this.settings.password
         );
-        const prevSyncRecords = await loadPrevSyncRecordsByVault(this.db, this.vaultRandomID);
-        const prevSyncMap = new Map(prevSyncRecords.map(r => [r.key, r]));
+        const prevSyncRecords = await loadPrevSyncRecordsByVault(
+          this.db,
+          this.vaultRandomID
+        );
+        const prevSyncMap = new Map(prevSyncRecords.map((r) => [r.key, r]));
 
-        // Check if remote has files that are not in prevSync (new remote files)
-        // or if remote is missing files that were in prevSync (remote deletions)
         let hasRemoteChanges = false;
         for (const remote of remoteStates) {
           if (!remote.key) continue;
@@ -1199,7 +1395,7 @@ export default class ThirdPartySyncPlugin extends Plugin {
         }
         if (!hasRemoteChanges) {
           for (const prev of prevSyncRecords) {
-            const remoteExists = remoteStates.some(r => r.key === prev.key);
+            const remoteExists = remoteStates.some((r) => r.key === prev.key);
             if (!remoteExists) {
               hasRemoteChanges = true;
               break;
@@ -1210,7 +1406,6 @@ export default class ThirdPartySyncPlugin extends Plugin {
         if (hasRemoteChanges) {
           log.debug("Sync on Remote ran | Remote changes detected");
           void this.syncRun("auto");
-          return true;
         }
       } catch (error) {
         log.debug("Sync on Remote check failed:", error);
@@ -1219,117 +1414,27 @@ export default class ThirdPartySyncPlugin extends Plugin {
       }
     };
 
+    // 移动端：启动时立即检查一次
     if (Platform.isMobileApp) {
-      const onLoadResult = await syncOnRemote();
-      new Notice(onLoadResult === true ? this.i18n.t("remote_changes_found") : this.i18n.t("remote_changes_synced"));
+      void syncOnRemote();
     }
 
-    this.syncOnRemoteIntervalID = window.setInterval(() => { void syncOnRemote(); }, this.settings.syncOnRemoteChangesAfterMilliseconds);
+    this.remoteCheckIntervalID = window.setInterval(
+      () => { void syncOnRemote(); },
+      intervalMs
+    );
   }
 
-  async toggleSyncOnSave(enabled: boolean) {
-    let alreadyScheduled = false;
-
-    // Unregister vault change event
-    if (this.syncOnSaveEvent !== undefined) {
-      this.app.vault.offref(this.syncOnSaveEvent);
-      this.syncOnSaveEvent = undefined;
+  teardownRemoteChangeCheck() {
+    if (this.remoteCheckIntervalID !== undefined) {
+      window.clearInterval(this.remoteCheckIntervalID);
+      this.remoteCheckIntervalID = undefined;
     }
-
-    // Unregister scanning for .obsidian changes
-    if (this.vaultScannerIntervalId !== undefined) {
-      window.clearInterval(this.vaultScannerIntervalId);
-      this.vaultScannerIntervalId = undefined;
-    }
-
-    if (enabled === false || this.settings.syncOnSaveAfterMilliseconds === -1) {
-      return;
-    }
-    
-    // Register vault change event
-    this.syncOnSaveEvent = this.app.vault.on("modify", () => {
-      if (this.syncStatus !== "idle" || alreadyScheduled) {
-        return;
-      }
-
-      alreadyScheduled = true;
-      log.debug(`Scheduled a sync run for ${this.settings.syncOnSaveAfterMilliseconds} milliseconds later`);
-
-      window.setTimeout(() => {
-        log.debug("Sync on save ran");
-        void this.syncRun("auto").finally(() => { alreadyScheduled = false; });
-      }, this.settings.syncOnSaveAfterMilliseconds);
-    });
-
-    // Scan vault for config directory changes
-    const scanVault = async () => {
-      if (this.syncStatus !== "idle" || alreadyScheduled || !this.settings.syncConfigDir) {
-        return;
-      }
-
-      log.debug("Scanning config directory for changes");
-
-      let localConfigContents: ObsConfigDirFileType[] = await listFilesInObsFolder(this.app.vault, this.manifest.id, this.settings.syncTrash);
-
-      for (let i = 0; i < localConfigContents.length; i++) {
-        const file = localConfigContents[i];
-
-        if (file.key.includes(`${this.app.vault.configDir}/plugins/third-party-sync/`)) {
-          continue;
-        }
-
-        if (file.mtime > this.settings.lastSynced) {
-          log.debug("Unsynced config file found: ", file.key)
-          alreadyScheduled = true;
-          log.debug(`Scheduled a sync run for ${this.settings.syncOnSaveAfterMilliseconds} milliseconds later`);
-
-          window.setTimeout(() => {
-            log.debug("Sync on save ran");
-            void this.syncRun("auto").finally(() => { alreadyScheduled = false; });
-          }, this.settings.syncOnSaveAfterMilliseconds);
-
-          break;
-        }
-      }
-    }
-
-    // Scans every 60 seconds
-    this.vaultScannerIntervalId = window.setInterval(() => { void scanVault(); }, 30_000);
   }
-  
+
   async getMetadataMtime() {
     // V3: No remote metadata file, use lastSynced from settings
     return this.settings.lastSynced;
-  }
-
-  enableAutoSyncIfSet() {
-    if (
-      this.settings.autoRunEveryMilliseconds !== undefined &&
-      this.settings.autoRunEveryMilliseconds !== null &&
-      this.settings.autoRunEveryMilliseconds > 0
-    ) {
-      this.app.workspace.onLayoutReady(() => {
-        const intervalID = window.setInterval(() => {
-          void this.syncRun("auto");
-        }, this.settings.autoRunEveryMilliseconds);
-        this.autoRunIntervalID = intervalID;
-        this.registerInterval(intervalID);
-      });
-    }
-  }
-
-  enableInitSyncIfSet() {
-    if (
-      this.settings.initRunAfterMilliseconds !== undefined &&
-      this.settings.initRunAfterMilliseconds !== null &&
-      this.settings.initRunAfterMilliseconds > 0
-    ) {
-      this.app.workspace.onLayoutReady(() => {
-        window.setTimeout(() => {
-          void this.syncRun("autoOnceInit");
-        }, this.settings.initRunAfterMilliseconds);
-      });
-    }
   }
 
   /**

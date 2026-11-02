@@ -1235,72 +1235,39 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
 
     // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
     sgBasic.addSetting((setting) => setting
+      .setName(t("settings_autorun"))
+      .setDesc(t("settings_autorun_desc"))
+      .addDropdown((dropdown) => {
+        dropdown.addOption("-1", t("settings_autorun_notset"));
+        dropdown.addOption(`${1000 * 60 * 5}`, t("settings_autorun_5min"));
+        dropdown.addOption(`${1000 * 60 * 10}`, t("settings_autorun_10min"));
+        dropdown.addOption(`${1000 * 60 * 30}`, t("settings_autorun_30min"));
+        dropdown
+          .setValue(`${this.plugin.settings.autoRunEveryMilliseconds ?? -1}`)
+          .onChange((val: string) => {
+            this.plugin.settings.autoRunEveryMilliseconds = parseInt(val);
+            void this.plugin.saveSettings();
+            this.plugin.applyAutoSchedulerSetup();
+          });
+      })
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
+    sgBasic.addSetting((setting) => setting
       .setName(t("settings_saverun"))
       .setDesc(t("settings_saverun_desc"))
       .addDropdown((dropdown) => {
         dropdown.addOption("-1", t("settings_saverun_notset"));
-        dropdown.addOption("0", t("settings_saverun_instant"));
         dropdown.addOption(`${1000 * 5}`, t("settings_saverun_5sec"));
         dropdown.addOption(`${1000 * 10}`, t("settings_saverun_10sec"));
         dropdown.addOption(`${1000 * 30}`, t("settings_saverun_30sec"));
         dropdown.addOption(`${1000 * 60}`, t("settings_saverun_1min"));
         dropdown
-          .setValue(`${this.plugin.settings.syncOnSaveAfterMilliseconds}`)
+          .setValue(`${this.plugin.settings.syncOnSaveAfterMilliseconds ?? -1}`)
           .onChange((val: string) => {
-            const realVal = parseInt(val);
-            this.plugin.settings.syncOnSaveAfterMilliseconds = realVal;
-
+            this.plugin.settings.syncOnSaveAfterMilliseconds = parseInt(val);
             void this.plugin.saveSettings();
-
-            if (realVal < 0) {
-              void this.plugin.toggleSyncOnSave(false);
-            } else {
-              void this.plugin.toggleSyncOnSave(true);
-            }
-          })
-      }));
-
-
-
-
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
-    sgBasic.addSetting((setting) => setting
-      .setName(t("settings_autorun"))
-      .setDesc(t("settings_autorun_desc"))
-      .addDropdown((dropdown) => {
-        dropdown.addOption("-1", t("settings_autorun_notset"));
-        dropdown.addOption(`${1000 * 5}`, t("settings_autorun_second", { "time": 5 }));
-        dropdown.addOption(`${1000 * 15}`, t("settings_autorun_second", { "time": 15 }));
-        dropdown.addOption(`${1000 * 30}`, t("settings_autorun_second", { "time": 30 }));
-        dropdown.addOption(`${1000 * 60}`, t("settings_autorun_1min"));
-        dropdown.addOption(`${1000 * 60 * 5}`, t("settings_autorun_5min"));
-        dropdown.addOption(`${1000 * 60 * 10}`, t("settings_autorun_10min"));
-        dropdown.addOption(`${1000 * 60 * 30}`, t("settings_autorun_30min"));
-
-        dropdown
-          .setValue(`${this.plugin.settings.autoRunEveryMilliseconds}`)
-          .onChange((val: string) => {
-            const realVal = parseInt(val);
-            this.plugin.settings.autoRunEveryMilliseconds = realVal;
-            void this.plugin.saveSettings();
-            if (
-              (realVal === undefined || realVal === null || realVal <= 0) &&
-              this.plugin.autoRunIntervalID !== undefined
-            ) {
-              // clear
-              window.clearInterval(this.plugin.autoRunIntervalID);
-              this.plugin.autoRunIntervalID = undefined;
-            } else if (
-              realVal !== undefined &&
-              realVal !== null &&
-              realVal > 0
-            ) {
-              const intervalID = window.setInterval(() => {
-                void this.plugin.syncRun("auto");
-              }, realVal);
-              this.plugin.autoRunIntervalID = intervalID;
-              this.plugin.registerInterval(intervalID);
-            }
+            // modify handler 每次从 settings.syncOnSaveAfterMilliseconds 读，无需额外 apply
           });
       })
     );
@@ -1311,54 +1278,20 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
     .setDesc(t("settings_remoterun_desc"))
     .addDropdown((dropdown) => {
       dropdown.addOption("-1", t("settings_remoterun_notset"));
-      dropdown.addOption(`${1000 * 1}`, t("settings_remoterun_1sec"));
       dropdown.addOption(`${1000 * 5}`, t("settings_remoterun_5sec"));
       dropdown.addOption(`${1000 * 10}`, t("settings_remoterun_10sec"));
       dropdown.addOption(`${1000 * 60}`, t("settings_remoterun_1min"));
-
       dropdown
-        .setValue(`${this.plugin.settings.syncOnRemoteChangesAfterMilliseconds}`)
+        .setValue(`${this.plugin.settings.syncOnRemoteChangesAfterMilliseconds ?? -1}`)
         .onChange((val: string) => {
-          const realVal = parseInt(val);
-          this.plugin.settings.syncOnRemoteChangesAfterMilliseconds = realVal;
-
+          this.plugin.settings.syncOnRemoteChangesAfterMilliseconds = parseInt(val);
           void this.plugin.saveSettings();
-
-          if (realVal <= 0) {
-            void this.plugin.toggleSyncOnRemote(false);
-          } else {
-            void this.plugin.toggleSyncOnRemote(true);
-          }
+          this.plugin.setupRemoteChangeCheck();
         });
     }));
 
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Setting is thenable but callback expects void return
-    sgBasic.addSetting((setting) => setting
-      .setName(t("settings_runoncestartup"))
-      .setDesc(t("settings_runoncestartup_desc"))
-      .addDropdown((dropdown) => {
-        dropdown.addOption("-1", t("settings_runoncestartup_notset"));
-        dropdown.addOption(
-          `${1000 * 1 * 1}`,
-          t("settings_runoncestartup_1sec")
-        );
-        dropdown.addOption(
-          `${1000 * 10 * 1}`,
-          t("settings_runoncestartup_10sec")
-        );
-        dropdown.addOption(
-          `${1000 * 30 * 1}`,
-          t("settings_runoncestartup_30sec")
-        );
-        dropdown
-          .setValue(`${this.plugin.settings.initRunAfterMilliseconds}`)
-          .onChange((val: string) => {
-            const realVal = parseInt(val);
-            this.plugin.settings.initRunAfterMilliseconds = realVal;
-            void this.plugin.saveSettings();
-          });
-      })
-    );
+    // initRunAfterMilliseconds 已废弃（合并入 autoRun 的启动首次，autoRun > 0 时固定 5s），
+    // 不再渲染独立下拉，字段继续留在 baseTypes 里供旧数据兼容与回滚。
 
     //////////////////////////////////////////////////
     // subsection: what to sync

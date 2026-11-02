@@ -72,10 +72,20 @@ export interface ThirdPartySyncPluginSettings {
   password: string;
   serviceType: SUPPORTED_SERVICES_TYPE;
   debugEnabled?: boolean;
+
+  // ── 自动同步（最终形态，26.2.7-preview） ──
+  /** 自动同步周期毫秒数，含启动首次固定 5s 延迟；-1 = 关闭。选项见 settings.ts。 */
   autoRunEveryMilliseconds?: number;
-  initRunAfterMilliseconds?: number;
+  /** 保存后同步延迟毫秒数；-1 = 关闭（已删除 0/立即 档）。 */
   syncOnSaveAfterMilliseconds?: number;
+  /** 远端变更后同步延迟毫秒数；-1 = 关闭。 */
   syncOnRemoteChangesAfterMilliseconds?: number;
+  /** 迁移幂等标记：true 表示已处理过上一轮 autoSyncEnabled / autoSyncPeriodMinutes / syncOnSaveMode 残留，不再重复 */
+  autoSyncConsolidatedMigrated?: boolean;
+
+  /** @deprecated 26.2.7-preview 起合并入 autoRunEveryMilliseconds 的启动首次触发（autoRun > 0 时固定 5s），运行时不再消费 */
+  initRunAfterMilliseconds?: number;
+
   agreeToUploadExtraMetadata?: boolean;
   concurrency?: number;
   syncConfigDir?: boolean;
