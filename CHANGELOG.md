@@ -4,9 +4,7 @@
 
 > 说明：本更新日志自 `26.1.2` 起维护。
 
-## [26.2.8-preview] - 2026-11-04
-
-> 发布于 26.2.7 tag 之后的补充改动。
+## [26.2.8] - 2026-11-04
 
 ### 修复
 - **OneDrive 远端删除后快照幽灵条目吞掉 delta 删除**：delta 返回的 `deleted` 条目若缺 `name` 或 `parentReference.path` 就无条件跳过，快照里那条永远不会被移除；现在按 `name + parentPath` 优先算 key，字段不全时退化为按 `name` 后缀反查，两者都失败时按回退分支同款写法**同时清空** `deltaLink` 与 `remoteSnapshot`（下一次同步强制全量重建基线），幽灵自然消失
