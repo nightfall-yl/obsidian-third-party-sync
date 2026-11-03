@@ -203,6 +203,18 @@ export class RemoteClient {
     }
   };
 
+  /**
+   * Forget one remote key in the service-side snapshot (OneDrive only).
+   * Used when a download proves the remote item no longer exists, so the stale
+   * key is not planned as "new remote content" on every following sync.
+   */
+  removeFromRemoteSnapshot = async (key: string) => {
+    if (this.serviceType !== "onedrive" || this.onedriveClient === undefined) {
+      return;
+    }
+    await onedrive.removeFromRemoteSnapshot(this.onedriveClient, key);
+  };
+
   checkConnectivity = async (callbackFunc?: (err?: string) => void) => {
     if (this.serviceType === "s3") {
       return await s3.checkConnectivity(
@@ -235,3 +247,19 @@ export class RemoteClient {
     return;
   };
 }
+
+/**
+ * True when a remote request failed because the item no longer exists.
+ * Relies on the structured `status` / `code` attached by the OneDrive API
+ * layer — never on message text.
+ */
+export const isRemoteItemNotFoundError = (err: unknown): boolean => {
+  if (typeof err !== "object" || err === null) {
+    return false;
+  }
+  const withStatus = err as { status?: unknown; code?: unknown };
+  if (withStatus.status === 404 || withStatus.status === 410) {
+    return true;
+  }
+  return withStatus.code === "itemNotFound";
+};

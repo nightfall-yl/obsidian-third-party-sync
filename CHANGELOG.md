@@ -4,6 +4,15 @@
 
 > 说明：本更新日志自 `26.1.2` 起维护。
 
+## [26.2.8-preview] - 2026-11-04
+
+> 发布于 26.2.7 tag 之后的补充改动。
+
+### 修复
+- **OneDrive 远端删除后快照幽灵条目吞掉 delta 删除**：delta 返回的 `deleted` 条目若缺 `name` 或 `parentReference.path` 就无条件跳过，快照里那条永远不会被移除；现在按 `name + parentPath` 优先算 key，字段不全时退化为按 `name` 后缀反查，两者都失败时按回退分支同款写法**同时清空** `deltaLink` 与 `remoteSnapshot`（下一次同步强制全量重建基线），幽灵自然消失
+- **远端文件已删但快照仍说存在 → 下载 404 累计 3 条错误后整轮中止**：`sync.ts` 判定为"远端新增"去下载，404 被当普通失败累计；现在 API 层抛错时挂结构化 `status` 与 Graph `code`，`downloadRemoteToLocal` 分支 catch 后用 `isRemoteItemNotFoundError` 判定——不计入错误数、从 remoteSnapshot 摘掉该 key（加密模式明文键与加密键都摘）、跳过该项、不删本地文件；非 404/410 错误原样抛出，熔断灵敏度不变
+- **RemoteClient 新增 `removeFromRemoteSnapshot` 跨服务统一入口**：OneDrive 下直接落盘清空快照里的单条键，S3/WebDAV 下为 no-op；避免"下载失败 → 下一轮又被当成远端新增 → 再失败"的循环
+
 ## [26.2.7] - 2026-11-03
 
 ### 设置

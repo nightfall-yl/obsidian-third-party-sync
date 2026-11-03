@@ -483,9 +483,27 @@ const oneDriveApiRequest = async (
     // Always append the RAW response body so any detail we failed to parse
     // (e.g. innerError under a different key, or non-JSON payload) is visible.
     const raw = typeof resp.text === "string" ? resp.text : JSON.stringify(json);
-    throw Error(
+    const apiError = Error(
       `OneDrive API ${method} ${theUrl} 失败 (HTTP ${resp.status}): ${detail || "无解析详情"}\nRAW BODY: ${raw}`
-    );
+    ) as Error & { status?: number; code?: string };
+    // Attach machine-readable metadata so callers can tell "the item is gone"
+    // (404/410/itemNotFound) from auth / throttling / server / network failures
+    // without parsing the human-readable message.
+    apiError.status = resp.status;
+    const graphErr = json.error as Record<string, unknown> | undefined;
+    if (graphErr !== undefined && typeof graphErr.code === "string") {
+      apiError.code = graphErr.code;
+    }
+    throw apiError;
+  }
+  // A non-2xx response without a Graph error body (e.g. a bare 404) must still
+  // fail here, with the status attached, instead of yielding `{}` downstream.
+  if (resp.status >= 400) {
+    const apiError = Error(
+      `OneDrive API ${method} ${theUrl} 失败 (HTTP ${resp.status})`
+    ) as Error & { status?: number; code?: string };
+    apiError.status = resp.status;
+    throw apiError;
   }
   return json;
 };
@@ -725,6 +743,43 @@ export const getOnedriveClient = (
 };
 
 /**
+ * Remove the snapshot entry referenced by a delta deletion item.
+ * Returns false when the item carries too little metadata to locate the key —
+ * the caller must then treat the merged snapshot as untrusted instead of
+ * silently keeping a ghost entry.
+ */
+const removeDeletedEntryFromSnapshot = (
+  snapshot: Record<string, RemoteItem>,
+  item: DriveItem,
+  remoteBaseDir: string
+): boolean => {
+  const name = item.name;
+  const parentPath = item.parentReference?.path;
+  if (name !== undefined && parentPath !== undefined) {
+    try {
+      const deletedItem = fromDriveItemToRemoteItem(item, remoteBaseDir);
+      // "/" is the vault root sentinel: nothing to remove, but it is resolved.
+      if (deletedItem.key !== "/") {
+        delete snapshot[deletedItem.key];
+      }
+      return true;
+    } catch {
+      // incomplete metadata: fall back to looking the key up by name suffix
+    }
+  }
+  if (name !== undefined) {
+    const suffix = `/${name}`;
+    for (const key of Object.keys(snapshot)) {
+      if (key.endsWith(suffix) || key === suffix) {
+        delete snapshot[key];
+        return true;
+      }
+    }
+  }
+  return false;
+};
+
+/**
  * Use OneDrive delta API to list all files and folders.
  * https://learn.microsoft.com/en-us/onedrive/developer/rest-api/api/driveitem_delta
  *
@@ -807,31 +862,25 @@ export const listFromRemote = async (
   // merge into the snapshot
   let snapshot: Record<string, RemoteItem> =
     client.onedriveConfig.remoteSnapshot ?? {};
+  // A deletion we cannot map to a key leaves a ghost entry behind; the merge
+  // must then be treated as untrusted instead of silently keeping it.
+  let unresolvedDeletion = false;
 
   for (const entry of entries) {
     // deleted items: remove from the snapshot (deletion detection does not
     // depend on fromDriveItemToRemoteItem succeeding)
     if (entry.deleted) {
-      const name = entry.item.name;
-      const parentPath = entry.item.parentReference?.path;
-      if (name !== undefined && parentPath !== undefined) {
-        try {
-          const deletedItem = fromDriveItemToRemoteItem(
-            entry.item,
-            client.remoteBaseDir
-          );
-          if (deletedItem.key !== "/") {
-            delete snapshot[deletedItem.key];
-          }
-        } catch {
-          // incomplete metadata: fall back to looking the key up by name suffix
-          for (const key of Object.keys(snapshot)) {
-            if (key.endsWith(`/${name}`) || key === `/${name}`) {
-              delete snapshot[key];
-              break;
+      if (!removeDeletedEntryFromSnapshot(snapshot, entry.item, client.remoteBaseDir)) {
+        unresolvedDeletion = true;
+        log.warn(
+          `onedrive delta deletion without usable metadata, snapshot will be rebuilt by a full enumeration: ${JSON.stringify(
+            {
+              id: entry.item?.id,
+              name: entry.item?.name,
+              parentPath: entry.item?.parentReference?.path,
             }
-          }
-        }
+          )}`
+        );
       }
       continue;
     }
@@ -857,14 +906,24 @@ export const listFromRemote = async (
     }
   }
 
-  // persist deltaLink + snapshot
-  if (newDeltaLink) {
-    client.onedriveConfig.deltaLink = newDeltaLink;
+  if (unresolvedDeletion) {
+    // The merge is not trustworthy: an unresolved deletion may have left a
+    // ghost key. Invalidate the resume state exactly like the fallback branch
+    // above (deltaLink and snapshot are cleared together), so the next listing
+    // rebuilds the baseline from a full enumeration instead of carrying it on.
+    client.onedriveConfig.deltaLink = "";
+    client.onedriveConfig.remoteSnapshot = undefined;
+    await client.saveUpdatedConfigFunc();
+  } else {
+    // persist deltaLink + snapshot
+    if (newDeltaLink) {
+      client.onedriveConfig.deltaLink = newDeltaLink;
+    }
+    // only a full enumeration resets the snapshot; delta resume merges
+    // incrementally into the existing snapshot
+    client.onedriveConfig.remoteSnapshot = snapshot;
+    await client.saveUpdatedConfigFunc();
   }
-  // only a full enumeration resets the snapshot; delta resume merges
-  // incrementally into the existing snapshot
-  client.onedriveConfig.remoteSnapshot = snapshot;
-  await client.saveUpdatedConfigFunc();
 
   // return the full Contents
   return {
@@ -1103,6 +1162,24 @@ export const deleteFromRemote = async (
 
   await client.init();
   await client.deleteJson(remoteFileName);
+};
+
+/**
+ * Drop one key from the persisted OneDrive remote snapshot.
+ * Used for self-healing when the remote item is confirmed gone (404/410):
+ * without this the stale key keeps coming back as "new remote content" and
+ * every later sync retries a download that can only fail.
+ */
+export const removeFromRemoteSnapshot = async (
+  client: WrappedOnedriveClient,
+  key: string
+): Promise<void> => {
+  const snapshot = client.onedriveConfig.remoteSnapshot;
+  if (snapshot === undefined || snapshot[key] === undefined) {
+    return;
+  }
+  delete snapshot[key];
+  await client.saveUpdatedConfigFunc();
 };
 
 export const checkConnectivity = async (

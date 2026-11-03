@@ -34,7 +34,7 @@ import {
   atWhichLevel,
   unixTimeToStr,
 } from "./misc";
-import { RemoteClient } from "./remote";
+import { isRemoteItemNotFoundError, RemoteClient } from "./remote";
 import {
   DeletionOnRemote,
   MetadataOnRemote,
@@ -1388,13 +1388,33 @@ const dispatchOperationToActual = async (
     }
     await clearDeleteRenameHistoryOfKeyAndVault(db, r.key, vaultRandomID);
   } else if (r.decision === "downloadRemoteToLocal") {
-    await client.downloadFromRemote(
-      r.key,
-      vault,
-      r.mtimeRemote,
-      password,
-      remoteEncryptedKey
-    );
+    try {
+      await client.downloadFromRemote(
+        r.key,
+        vault,
+        r.mtimeRemote,
+        password,
+        remoteEncryptedKey
+      );
+    } catch (err) {
+      if (!isRemoteItemNotFoundError(err)) {
+        throw err;
+      }
+      // The remote item is confirmed gone (404/410), even though the remote
+      // listing/snapshot still said it exists. Drop the stale snapshot entry so
+      // it stops being planned as "new remote content", skip this item instead
+      // of counting it as a failure (3 such items would abort the whole run),
+      // and leave the local file untouched: the next sync re-evaluates it with
+      // the corrected remote state and the normal V3 deletion rules apply.
+      log.warn(
+        `remote item is gone (404/410), drop the stale snapshot entry and skip: ${r.key}`
+      );
+      await client.removeFromRemoteSnapshot(remoteEncryptedKey);
+      if (remoteEncryptedKey !== r.key) {
+        await client.removeFromRemoteSnapshot(r.key);
+      }
+      return;
+    }
     await clearDeleteRenameHistoryOfKeyAndVault(db, r.key, vaultRandomID);
   } else if (r.decision === "createFolder") {
     if (!r.existLocal) {
