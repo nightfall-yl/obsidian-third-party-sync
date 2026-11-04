@@ -417,6 +417,69 @@ const fromDriveItemToRemoteItem = (
   };
 };
 
+/** 2xx is a usable response. */
+export const isHttpSuccessStatus = (status: number): boolean => {
+  return status >= 200 && status < 300;
+};
+
+/** 404 means the addressed remote item no longer exists. */
+export const isHttpNotFoundStatus = (status: number): boolean => {
+  return status === 404;
+};
+
+/**
+ * A DELETE that answers 2xx or 404 has reached its goal: 404 means the item is
+ * already gone, which is exactly the state the caller wanted.
+ */
+export const isDeleteResponseDone = (status: number): boolean => {
+  return isHttpSuccessStatus(status) || isHttpNotFoundStatus(status);
+};
+
+/**
+ * Build the shared Onedrive error shape: human-readable message plus the
+ * machine-readable `status` / `code` fields that `isRemoteItemNotFoundError`
+ * relies on. Used by every request path that reads the response itself
+ * (`throw: false`) instead of letting `requestUrl` throw an opaque
+ * `Request failed, status <code>` error.
+ */
+export const buildRemoteApiError = (
+  method: string,
+  theUrl: string,
+  status: number,
+  rawJson: unknown,
+  rawText: unknown,
+  detail: string = ""
+): Error & { status?: number; code?: string } => {
+  // `resp.json` is null when the body is not JSON; fall back to parsing text so
+  // the Graph error code survives on every platform.
+  let parsed: Record<string, unknown> | undefined;
+  if (rawJson !== null && typeof rawJson === "object") {
+    parsed = rawJson as Record<string, unknown>;
+  } else if (typeof rawText === "string") {
+    try {
+      const fromText: unknown = JSON.parse(rawText);
+      if (fromText !== null && typeof fromText === "object") {
+        parsed = fromText as Record<string, unknown>;
+      }
+    } catch {
+      // not JSON; the raw text is still reported below
+    }
+  }
+  const raw =
+    typeof rawText === "string" ? rawText : JSON.stringify(rawJson ?? {});
+  const apiError = Error(
+    `OneDrive API ${method} ${theUrl} 失败 (HTTP ${status}): ${
+      detail || "无解析详情"
+    }\nRAW BODY: ${raw}`
+  ) as Error & { status?: number; code?: string };
+  apiError.status = status;
+  const graphErr = parsed?.error as Record<string, unknown> | undefined;
+  if (graphErr !== undefined && typeof graphErr.code === "string") {
+    apiError.code = graphErr.code;
+  }
+  return apiError;
+};
+
 // Shared helper for OneDrive Graph API JSON calls.
 // Uses `throw: false` so a non-2xx response (e.g. HTTP 400) is returned instead
 // of being swallowed by an opaque RequestUrlError, then surfaces the real Graph
@@ -654,13 +717,34 @@ export class WrappedOnedriveClient {
   deleteJson = async (pathFragOrig: string) => {
     const theUrl = this.buildUrl(pathFragOrig);
     log.debug(`deleteJson, theUrl=${theUrl}`);
-    await requestUrl({
+    // `throw: false`: a 404 (item already gone) must be reported as success,
+    // not as an opaque `Request failed, status 404`.
+    const resp = await requestUrl({
       url: theUrl,
       method: "DELETE",
+      throw: false,
       headers: {
         Authorization: `Bearer ${await this.authGetter.getAccessToken()}`,
       },
     });
+    if (isDeleteResponseDone(resp.status)) {
+      if (isHttpNotFoundStatus(resp.status)) {
+        log.debug(
+          `deleteJson: remote item already absent (HTTP 404), nothing to do: ${theUrl}`
+        );
+      }
+      return;
+    }
+    // Pass only `resp.text`: `resp.json` is a lazy getter in Obsidian that
+    // throws on a non-JSON error page, which would replace this error with one
+    // lacking `status`. buildRemoteApiError re-parses the text instead.
+    throw buildRemoteApiError(
+      "DELETE",
+      theUrl,
+      resp.status,
+      null,
+      resp.text
+    );
   };
 
   putArrayBuffer = async (pathFragOrig: string, payload: ArrayBuffer) => {
@@ -1094,14 +1178,25 @@ const downloadFromRemoteRaw = async (
   const rsp = await client.getJson(
     `${key}?$select=@microsoft.graph.downloadUrl`
   );
-  const downloadUrl: string = rsp["@microsoft.graph.downloadUrl"];
-  const content = (
-    await requestUrl({
-      url: downloadUrl,
-      headers: { "Cache-Control": "no-cache" },
-    })
-  ).arrayBuffer;
-  return content;
+  const downloadUrl = rsp["@microsoft.graph.downloadUrl"] as string;
+  // `throw: false`: requestUrl would otherwise throw `Request failed, status
+  // 404`, an error without `status`/`code`, which the sync engine cannot tell
+  // apart from auth/throttling failures. Report it in the same shape as
+  // oneDriveApiRequest so a gone item (404/itemNotFound) is recognised.
+  const resp = await requestUrl({
+    url: downloadUrl,
+    headers: { "Cache-Control": "no-cache" },
+    throw: false,
+  });
+  if (!isHttpSuccessStatus(resp.status)) {
+    // Use the approot path (not the signed download URL) in the message so the
+    // notice/log stays readable and no temporary token leaks into it.
+    // Pass only `resp.text`: `resp.json` is a lazy getter in Obsidian that
+    // throws on a non-JSON error page, which would replace this error with one
+    // lacking `status`. buildRemoteApiError re-parses the text instead.
+    throw buildRemoteApiError("GET", key, resp.status, null, resp.text);
+  }
+  return resp.arrayBuffer;
 };
 
 export const downloadFromRemote = async (

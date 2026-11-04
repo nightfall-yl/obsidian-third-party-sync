@@ -7,18 +7,17 @@
 ## [26.2.8] - 2026-11-04
 
 ### 修复
-- **OneDrive 远端删除后快照幽灵条目吞掉 delta 删除**：delta 返回的 `deleted` 条目若缺 `name` 或 `parentReference.path` 就无条件跳过，快照里那条永远不会被移除；现在按 `name + parentPath` 优先算 key，字段不全时退化为按 `name` 后缀反查，两者都失败时按回退分支同款写法**同时清空** `deltaLink` 与 `remoteSnapshot`（下一次同步强制全量重建基线），幽灵自然消失
-- **远端文件已删但快照仍说存在 → 下载 404 累计 3 条错误后整轮中止**：`sync.ts` 判定为"远端新增"去下载，404 被当普通失败累计；现在 API 层抛错时挂结构化 `status` 与 Graph `code`，`downloadRemoteToLocal` 分支 catch 后用 `isRemoteItemNotFoundError` 判定——不计入错误数、从 remoteSnapshot 摘掉该 key（加密模式明文键与加密键都摘）、跳过该项、不删本地文件；非 404/410 错误原样抛出，熔断灵敏度不变
-- **RemoteClient 新增 `removeFromRemoteSnapshot` 跨服务统一入口**：OneDrive 下直接落盘清空快照里的单条键，S3/WebDAV 下为 no-op；避免"下载失败 → 下一轮又被当成远端新增 → 再失败"的循环
+- **OneDrive 删除文件后同步反复中止（远端快照幽灵条目）**：删除笔记后远端快照未移除对应键，下一轮被判为"远端新增"去下载，元数据查询、二进制下载或本地 DELETE 任一处遇 HTTP 404 即累计错误、凑够 3 条整轮中止且每轮重复；现 404/410 统一视为"远端已不存在"——摘除快照键、跳过该条目、不计入错误累计（401/403/429/5xx 与网络错误仍正常报错）
+- **delta 删除项缺可用路径时快照幽灵键残留**：OneDrive delta 返回的 deleted 条目若缺 `name` 或路径原被整条跳过，快照永久残留幽灵键；现优先算 key，字段不全时退化为文件名后缀反查，两者都失败时下一次同步自动清空并全量枚举重建基线
 
 ## [26.2.7] - 2026-11-03
 
 ### 设置
 
-- **通用Group 设置项精简**：
-  - 「自动同步」下拉收窄为 **4 档**：-1(关) / 5min / 10min / 30min。删除 5s / 15s / 30s / 1min 四档。**存量用户若原设了 5s / 15s / 30s / 1min，自动归到 5 分钟**；-1 / 5min / 10min / 30min 原值保留。归一化在 loadSettings 内一次完成，只写一次 data.json
-  - 「保存后同步延迟」下拉删除"立即"档（0ms），收窄为 **4 档**：-1(关) / 5s / 10s / 30s。旧值 0 档迁移时映射到 5s，旧值 1min 档迁移时归到 30s
-  - 「检测远端变更后同步延迟」下拉收窄为 **4 档**：-1(关) / 5s / 10s / 30s。旧值 1min 档迁移时归到 30s
+- **通用设置项精简**：
+  - 「自动同步」下拉收窄为 **4 档**：-1(关) / 5min / 10min / 30min。删除 5s / 15s / 30s / 1min 四档。**存量用户若原设了 5s / 15s / 30s / 1min，自动归到 5 分钟**；-1 / 5min / 10min / 30min 原值保留。归一化在 loadSettings 内完成
+  - 「保存后同步延迟」下拉删除"立即"档（0ms），收窄为 **4 档**：-1(关) / 5s / 10s / 30s。旧值 1min 档归到 30s；旧值 0 档仅 v2 残留迁移分支内映射到 5s，其余老用户保留 0 并在运行时按关闭处理（原"立即"变为关闭）
+  - 「检测远端变更后同步延迟」下拉收窄为 **4 档**：-1(关) / 5s / 10s / 30s。删除 1s 档，原 1s 归一化为 30s；旧值 1min 档归到 30s
   - 「启动后运行一次」**删除**：启动后首次同步不再单独可配，跟随「自动同步」档位——自动同步 > 0 时，调度器启动后固定 5 秒触发首次（周期关闭 → 首次也不跑）。字段 initRunAfterMilliseconds 保留在数据模型里供旧数据兼容与回滚，运行时零消费
 
 ### 架构
@@ -28,8 +27,8 @@
   - AUTO_MIN_INTERVAL_MS = 30s **仅用于跨来源抢占仲裁**：当 pending 中有 ≥ 2 个不同来源时，后到的被推至前次自动同步后 30 秒；**同一来源连续触发（trailing debounce）不受约束**（例如保存后设 5s 延迟，连续保存按 5s 节奏正常执行）
   - syncRun 执行中自动请求挂起，完成后重算
   - 手动同步完全不受此下限约束
-- **保存后同步反馈环防护**：modify handler 主动排除插件自身 `data.json` / `static-data.json`，避免 `syncRun → saveSettings → modify → syncRun` 循环
-- **幂等迁移逻辑**：自动同步相关字段（autoRunEveryMilliseconds / syncOnSaveAfterMilliseconds / syncOnRemoteChangesAfterMilliseconds）迁移时，若 data.json 里还存在上一轮的 v2 字段残留（autoSyncEnabled / autoSyncPeriodMinutes / syncOnSaveMode），按 **v1 原值优先 > v2 映射值** 的规则归位；幂等标记 autoSyncConsolidatedMigrated 只跑一次
+- **保存后同步反馈环防护**：modify handler 主动排除插件自身 `data.json`，避免 `syncRun → saveSettings → modify → syncRun` 循环
+- **幂等迁移逻辑**：自动同步相关字段（autoRunEveryMilliseconds / syncOnSaveAfterMilliseconds / syncOnRemoteChangesAfterMilliseconds）迁移时，若 data.json 里还存在上一轮的 v2 字段残留（autoSyncEnabled / autoSyncPeriodMinutes / syncOnSaveMode），v1 原值（含默认 -1）直接保留，v2 字段不再映射——只有 v2 字段的用户最终落到 -1（三项全关）；幂等标记 autoSyncConsolidatedMigrated 只跑一次
 
 ## [26.2.6] - 2026-11-01
 
