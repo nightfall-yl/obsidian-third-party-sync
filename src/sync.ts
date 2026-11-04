@@ -804,7 +804,6 @@ const assignOperationToFileInplaceV3Inner = (
     if (
       !isPushOnlyMode &&
       !isPullOnlyMode &&
-      r.prevSync === undefined &&
       conflictAction !== "disabled" &&
       r.sizeLocal !== undefined &&
       r.sizeRemote !== undefined &&
