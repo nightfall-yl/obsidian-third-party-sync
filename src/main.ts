@@ -1224,43 +1224,42 @@ export default class ThirdPartySyncPlugin extends Plugin {
     }
   }
 
-  toggleStatusBar(enabled: boolean) {  
+  toggleStatusBar(enabled: boolean) {
     this.statusBarElement?.remove();
 
+    // Container-level styling：best-effort，仅当 DOM 容器已就绪时操作；
+    // addStatusBarItem() 是 Obsidian 插件级 API，不依赖 DOM 就绪，可无条件调用
     const statusBar = activeDocument.getElementsByClassName("status-bar")[0] as HTMLElement | undefined;
+    if (statusBar) {
+      // Remove any third-party sync classes
+      statusBar.removeClass("third-party-sync-show-status-bar");
+      statusBar.addClass("tp-statusbar-reset-margin");
 
-    // Guard: if status bar doesn't exist (e.g., iOS), skip DOM manipulation
-    if (!statusBar) {
-      return;
+      Array.from(statusBar.children).forEach((element) => {
+        element.removeClass("third-party-sync-hidden");
+      });
     }
 
-    // Remove any third-party sync classes
-    statusBar.removeClass("third-party-sync-show-status-bar");
-    statusBar.addClass("tp-statusbar-reset-margin");
-
-    Array.from(statusBar.children).forEach((element) => {
-      element.removeClass("third-party-sync-hidden");
-    });
-
     if (enabled && this.settings.enableStatusBarInfo) {
-      // Enable status bar on mobile
-      if (Platform.isMobile) {
+      // Enable status bar on mobile (容器类名，DOM 不存在时跳过)
+      if (Platform.isMobile && statusBar) {
         statusBar.addClass("third-party-sync-show-status-bar");
-        
+
         // Shifts up the status bar on phone to not cover the navmenu
         if (Platform.isPhone) {
           const navBar = activeDocument.getElementsByClassName("mobile-navbar")[0] as HTMLElement | undefined;
-          if (!navBar) return;
-          const height = window.getComputedStyle(navBar).getPropertyValue('height');
-          statusBar.style.marginBottom = height;
+          if (navBar) {
+            const height = window.getComputedStyle(navBar).getPropertyValue("height");
+            statusBar.style.marginBottom = height;
+          }
         }
       }
 
       // Create third-party sync element
       this.statusBarElement = this.addStatusBarItem();
       this.statusBarElement.createSpan();
-      this.statusBarElement.setAttribute("data-tooltip-position", "top");    
-      this.updateStatusBar(); 
+      this.statusBarElement.setAttribute("data-tooltip-position", "top");
+      this.updateStatusBar();
     }
   }
 
