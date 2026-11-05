@@ -21,7 +21,7 @@
   "remote_changes_synced": "No remote changes found.",
   "syncrun_shortstep0": "0/2 {{serviceType}} is running in dry mode, not actual file changes would happen",
   "syncrun_shortstep1": "1/2 {{serviceType}} is exchanging data",
-  "syncrun_progressing": "{{serviceType}} is exchanging data {{index}}/{{total}} ({{percent}}%)",
+  "syncrun_progressing": "{{serviceType}} is exchanging data {{index}}/{{total}} · {{percent}}%",
   "syncrun_shortstep2skip": "2/2 {{serviceType}} real sync is skipped in dry run mode",
   "syncrun_shortstep2": "2/2 {{serviceType}} finished",
   "syncrun_shortstep3drydone": "{{serviceType}} Dry run finished (no files were changed)",

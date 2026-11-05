@@ -2,6 +2,7 @@ import {
   App,
   Modal,
   Notice,
+  Platform,
   PluginSettingTab,
   Setting,
   SettingGroup,
@@ -274,11 +275,21 @@ export class OnedriveAuthModal extends Modal {
       href: authUrl,
       text: authUrl,
     });
+
+    // 桌面端直接唤起系统浏览器；移动端 WebView 不支持自动跳转，
+    // 保留上方链接与复制按钮作为唯一入口
+    if (!Platform.isMobileApp) {
+      window.open(authUrl);
+    }
   }
 
   onClose() {
     let { contentEl } = this;
     contentEl.empty();
+    // 关窗即放弃本轮授权：清空 verifier，避免之后到达的 callback 复用旧状态
+    if (this.plugin.oauth2Info !== undefined) {
+      this.plugin.oauth2Info.verifier = "";
+    }
   }
 }
 

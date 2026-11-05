@@ -638,6 +638,12 @@ export default class ThirdPartySyncPlugin extends Plugin {
   }
 
   private updateStatusBar(syncQueue?: {i: number, total: number}) {
+    // 兜底：onload 时 status bar DOM 可能尚未就绪导致 toggleStatusBar 提前 return，
+    // 这里在首次需要显示时重新尝试创建
+    if (this.statusBarElement === undefined && this.settings.enableStatusBarInfo === true) {
+      this.toggleStatusBar(true);
+    }
+
     const enabled = this.statusBarElement !== undefined && 
       this.settings.enableStatusBarInfo === true;
 
