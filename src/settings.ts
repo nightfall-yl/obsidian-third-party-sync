@@ -1366,12 +1366,16 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
         toggle
           .setValue(this.plugin.settings.syncConfigDir)
           .onChange((val) => {
-            if (val && !bridge.secondConfirm) {
-              toggle.setValue(false);
-              new SyncConfigDirModal(this.app, this.plugin, () => {
-                bridge.secondConfirm = true;
-                toggle.setValue(true);
-              }).open();
+            if (val) {
+              if (!bridge.secondConfirm) {
+                toggle.setValue(false);
+                new SyncConfigDirModal(this.app, this.plugin, () => {
+                  bridge.secondConfirm = true;
+                  toggle.setValue(true);
+                }).open();
+              }
+              // val=true && secondConfirm=true: modal confirmed, setValue(true)
+              // re-entrant callback — do nothing here, modal already saved true.
             } else {
               bridge.secondConfirm = false;
               this.plugin.settings.syncConfigDir = false;

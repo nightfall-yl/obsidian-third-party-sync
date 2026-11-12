@@ -182,7 +182,7 @@
   "settings_concurrency_desc": "最多要同時下載或上傳幾個檔案？預設為 5。若遇到速率限制等問題，可將平行數調低。",
   "settings_syncunderscore": "同步 _ 開頭的檔案或資料夾",
   "settings_syncunderscore_desc": "是否同步以 _（底線）開頭的檔案或資料夾",
-  "settings_configdir": "同步設定目錄（實驗性）",
+  "settings_configdir": "同步設定目錄",
   "settings_configdir_desc": "是否同步設定目錄 {{configDir}}（內部的 .git 和 node_modules 會被忽略）。請注意這可能影響所有外掛或 Obsidian 的設定，且同步後可能需要重新啟動 Obsidian。請自行承擔風險啟用。",
   "settings_deletetowhere": "刪除目的地",
   "settings_deletetowhere_desc": "外掛刪除檔案時要放入哪個垃圾桶？",
