@@ -8,6 +8,7 @@ import type {
 import * as onedrive from "./remoteForOnedrive";
 import * as s3 from "./remoteForS3";
 import * as webdav from "./remoteForWebdav";
+import type { TokenStorage } from "./tokenStorage";
 
 export class RemoteClient {
   readonly serviceType: SUPPORTED_SERVICES_TYPE;
@@ -23,7 +24,9 @@ export class RemoteClient {
     webdavConfig?: WebdavConfig,
     onedriveConfig?: OnedriveConfig,
     vaultName?: string,
-    saveUpdatedConfigFunc?: () => Promise<void>
+    saveUpdatedConfigFunc?: () => Promise<void>,
+    tokenStorage?: TokenStorage,
+    flowClient?: onedrive.DeviceCodeFlowClient
   ) {
     this.serviceType = serviceType;
     // the client may modify the config inplace,
@@ -49,11 +52,19 @@ export class RemoteClient {
           "remember to provide vault name and callback while init onedrive client"
         );
       }
+      if (!tokenStorage || !flowClient) {
+        throw Error(
+          "remember to provide TokenStorage and DeviceCodeFlowClient while init onedrive client"
+        );
+      }
       const remoteBaseDir = onedriveConfig.remoteBaseDir || vaultName;
       this.onedriveConfig = onedriveConfig;
       this.onedriveClient = onedrive.getOnedriveClient(
         this.onedriveConfig,
         remoteBaseDir,
+        tokenStorage,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- throw guard above narrows type
+        flowClient,
         saveUpdatedConfigFunc
       );
     } else {

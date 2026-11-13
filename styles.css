@@ -217,3 +217,30 @@
   border-radius: 4px;
   margin: 12px 0;
 }
+
+/* OneDrive Device Code Flow 授权弹窗 —— 1:1 对齐 Astra DeviceCodeAuthModal 样式 */
+
+.device-code-wrap {
+  font-size: 1.8em;
+  font-weight: bold;
+  letter-spacing: 0.3em;
+  text-align: center;
+  margin: 16px 0;
+}
+
+.device-code-status {
+  color: var(--text-muted);
+}
+
+.device-code-retry {
+  text-align: center;
+  margin-top: 12px;
+}
+
+.device-code-status-success {
+  color: var(--color-green);
+}
+
+.device-code-status-failed {
+  color: var(--color-red);
+}

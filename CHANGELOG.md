@@ -4,6 +4,34 @@
 
 > 说明：本更新日志自 `26.1.2` 起维护。
 
+## [26.3.0] - 2026-11-13
+
+### 架构
+
+- **OneDrive 鉴权方式重构：PKCE → Device Code Flow（RFC 8628）**：
+  - 删除 PKCE 整套（`generateCodeVerifier` / `generateCodeChallenge` / `getAuthUrlAndVerifier` / `sendAuthReq` / `REDIRECT_URI` / `COMMAND_CALLBACK_ONEDRIVE` 协议处理器 / `plugin.oauth2Info` 成员），零残留
+  - 新增 `src/onedriveAuth.ts`（~300 行）：`DeviceCodeFlowClient` 封装 `requestDeviceCode()` / `pollForToken()` / `refreshToken()` / `cancelPolling()`，Entra AADSTS 错误码 → 用户友好文案映射（企业账号 `AADSTS50152/70002/50020/50026` 归为 `personal_only`、设备码过期 `AADSTS50166/50194` 归为 `code_expired` 等 6 档）
+  - 新增 `src/tokenStorage.ts`（~180 行）：Obsidian SecretStorage 持久化 token（桌面端进 macOS Keychain / Windows Credential Manager，移动端进平台安全存储），data.json 旧字段一次性迁移并清空；**minAppVersion 由 1.11.0 升至 1.11.4**（SecretStorage API 最低版本）
+  - `DeviceCodeAuthModal` 纯展示 + 状态标记（等待/成功/失败 + 重试按钮），轮询逻辑外置到 settings tab，授权成功后 `tokenStorage.setTokens()` 写入 + 拉用户名 + Notice + 自动关闭；授权弹窗桌面端自动唤起浏览器并打开设备码页面
+  - `OneDriveRevokeAuthModal` 撤回鉴权时追加 `lastSynced = -1`（换账号/重新授权后强制全量比对），同时清空 SecretStorage token + `deltaLink` + 远端快照
+- **MyAuthProvider 单飞锁**：并发 refresh 只触发一次网络请求，避免互相 invalidate refresh_token
+- **refresh_token grant 收拢**：删除独立 `sendRefreshTokenReq(clientID, authority, refreshToken)` 三参数函数，统一走 `DeviceCodeFlowClient.refreshToken()`，scope/endpoint/clientId 从 client 实例 options 取
+
+### OneDrive API 增强
+
+- **指数退避自动重试**：`oneDriveApiRequest` 对 429(限流) / 502 / 503 / 504(网关抖动) 瞬态错误自动重试 3 次（1s → 2s → 4s），401 / 403 / 404 / 410 等永久错误立即抛出不重试
+- **`buildRemoteApiError` RAW BODY 清理**：原始响应体不再拼进 `Error.message`，改存 `err.cause.rawBody` 供调试；message 只保留简洁的 `OneDrive API {method} {url} 失败 (HTTP {status})`
+- **`humanizeApiError()` 友好错误文案**：sync 失败 Notice 按 status/code 显示中文——401 "授权已失效"、429 "限流"、502/503/504 "服务暂时不可用"、`itemNotFound` "文件不存在" 等；同时修复下载错误路径把临时 signed URL 拼进 Notice 的问题，改用 key（approot 路径）
+
+### 调整
+
+- **OneDrive 声明文案更新**：disclaimer1 合并"只支持 OneDrive 个人版"限制声明；disclaimer2 与 folder 文案三语对齐简体语义；consent URL `account.live.com/consent/manage`；声明段落内的 URL 自动转为超链接（可点击新开标签页）
+- **三服务远端声明与路径文案对齐**：
+  - OneDrive 远端文件夹路径硬编码为 `/Apps/third-party-sync/Obsidian Vault`（不再根据插件 ID 与仓库名拼接）
+  - WebDAV 远端文件夹路径硬编码为 `/Obsidian Vault`
+  - S3 / WebDAV / OneDrive 声明第二段统一去除多余语气助词、三语对齐简体语义
+  - 同步清理 settings.ts 中对应 `t()` 调用的变量传参（占位符已移除）
+
 ## [26.2.9] - 2026-11-12
 
 ### 修复

@@ -30,8 +30,12 @@ import type ThirdPartySyncPlugin from "./main"; // unavoidable
 import { RemoteClient } from "./remote";
 import {
   DEFAULT_ONEDRIVE_CONFIG,
-  getAuthUrlAndVerifier as getAuthUrlAndVerifierOnedrive,
+  buildDeviceCodeFlowClient as buildDeviceCodeFlowClientOnedrive,
 } from "./remoteForOnedrive";
+import type {
+  DeviceCodeFlowClient,
+  DeviceCodeResponse,
+} from "./onedriveAuth";
 import type { TransItemType } from "./i18n";
 import { checkHasSpecialCharForDir, unixTimeToStr } from "./misc";
 import { applyWebdavPresetRulesInplace } from "./presetRules";
@@ -224,72 +228,121 @@ class ChangeRemoteBaseDirModal extends Modal {
   }
 }
 
+/** Device Code Flow 授权 Modal —— 1:1 对齐 Astra DeviceCodeAuthModal 设计 */
 export class OnedriveAuthModal extends Modal {
   readonly plugin: ThirdPartySyncPlugin;
-  readonly revokeAuthSetting: Setting;
+  private readonly deviceCodeResp: DeviceCodeResponse;
+  private readonly onDone: () => void;
+  private readonly onRetry: () => void;
+  private statusEl: HTMLElement | null = null;
+  private retryBtnEl: HTMLElement | null = null;
 
   constructor(
     app: App,
     plugin: ThirdPartySyncPlugin,
-    revokeAuthSetting: Setting
+    deviceCodeResp: DeviceCodeResponse,
+    onDone: () => void,
+    onRetry: () => void
   ) {
     super(app);
     this.plugin = plugin;
-    this.revokeAuthSetting = revokeAuthSetting;
+    this.deviceCodeResp = deviceCodeResp;
+    this.onDone = onDone;
+    this.onRetry = onRetry;
   }
 
-  async onOpen() {
-    let { contentEl } = this;
+  private t(x: TransItemType, vars?: Record<string, string>): string {
+    return this.plugin.i18n.t(x, vars);
+  }
 
-    const { authUrl, verifier } = await getAuthUrlAndVerifierOnedrive(
-      this.plugin.settings.onedrive.clientID,
-      this.plugin.settings.onedrive.authority
-    );
-    this.plugin.oauth2Info.verifier = verifier;
+  onOpen(): void {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl("h2", { text: this.t("modal_onedriveauth_title") });
+    contentEl.createEl("p", { text: this.t("modal_onedriveauth_hint") });
 
-    const t = (x: TransItemType, vars?: Record<string, string>) => {
-      return this.plugin.i18n.t(x, vars);
-    };
+    // 设备码：使用 styles.css 里的 .device-code-wrap 样式
+    const codeWrap = contentEl.createDiv({ cls: "device-code-wrap" });
+    codeWrap.textContent = this.deviceCodeResp.user_code;
 
-    t("modal_onedriveauth_shortdesc")
-      .split("\n")
-      .forEach((val) => {
-        contentEl.createEl("p", {
-          text: val,
-        });
-      });
-
-    const copyBtnDiv = createDiv();
-    contentEl.appendChild(copyBtnDiv);
-    const copyBtn = createEl("button");
-    copyBtn.textContent = t("modal_onedriveauth_copybutton");
-    copyBtn.className = "mod-cta";
-    copyBtn.onclick = () => {
-      void copyToClipboard(authUrl).then(() => {
-        new Notice(t("modal_onedriveauth_copynotice"));
-      });
-    };
-    copyBtnDiv.appendChild(copyBtn);
-
+    contentEl.createEl("p", { text: this.t("modal_onedriveauth_openurlhint") });
     contentEl.createEl("p").createEl("a", {
-      href: authUrl,
-      text: authUrl,
+      href: this.deviceCodeResp.verification_uri,
+      text: this.deviceCodeResp.verification_uri,
     });
 
-    // 桌面端直接唤起系统浏览器；移动端 WebView 不支持自动跳转，
-    // 保留上方链接与复制按钮作为唯一入口
+    new Setting(contentEl)
+      .addButton((btn) =>
+        btn
+          .setButtonText(this.t("modal_onedriveauth_copybutton"))
+          .onClick(() => {
+            void navigator.clipboard
+              .writeText(this.deviceCodeResp.verification_uri)
+              .then(() => new Notice(this.t("modal_onedriveauth_copynotice")))
+              .catch(() => {
+                /* no-op */
+              });
+          })
+      )
+      .addButton((btn) =>
+        btn
+          .setButtonText(this.t("modal_onedriveauth_copycodebutton"))
+          .onClick(() => {
+            void navigator.clipboard
+              .writeText(this.deviceCodeResp.user_code)
+              .then(() => new Notice(this.t("modal_onedriveauth_copycodenotice")))
+              .catch(() => {
+                /* no-op */
+              });
+          })
+      );
+
+    // 轮询状态（初始：等待中）
+    this.statusEl = contentEl.createEl("p", {
+      cls: "device-code-status",
+      text: this.t("modal_onedriveauth_waiting"),
+    });
+
+    // 重新授权按钮（初始隐藏，失败/过期时显示）
+    this.retryBtnEl = contentEl.createEl("p", { cls: "device-code-retry" });
+    const btn = this.retryBtnEl.createEl("button", {
+      type: "button",
+      cls: "mod-cta",
+      text: this.t("modal_onedriveauth_retrybutton"),
+    });
+    btn.addEventListener("click", () => this.onRetry());
+    this.retryBtnEl.hide();
+
+    // 桌面端自动打开浏览器
     if (!Platform.isMobileApp) {
-      window.open(authUrl);
+      window.open(this.deviceCodeResp.verification_uri);
     }
   }
 
-  onClose() {
-    let { contentEl } = this;
-    contentEl.empty();
-    // 关窗即放弃本轮授权：清空 verifier，避免之后到达的 callback 复用旧状态
-    if (this.plugin.oauth2Info !== undefined) {
-      this.plugin.oauth2Info.verifier = "";
-    }
+  /** 成功状态 —— 绿字 + 稍后自动关闭 */
+  markSuccess(): void {
+    if (!this.statusEl) return;
+    this.statusEl.setText(this.t("modal_onedriveauth_pollingsuccess"));
+    this.statusEl.addClass("device-code-status-success");
+    this.statusEl.removeClass("device-code-status-failed");
+    if (this.retryBtnEl) this.retryBtnEl.hide();
+    window.setTimeout(() => this.close(), 1500);
+  }
+
+  /** 失败状态 —— 红字展示错误 + 显示重试按钮，Modal 保持打开 */
+  markFailed(errorMsg: string): void {
+    if (!this.statusEl) return;
+    this.statusEl.setText(errorMsg);
+    this.statusEl.addClass("device-code-status-failed");
+    this.statusEl.removeClass("device-code-status-success");
+    if (this.retryBtnEl) this.retryBtnEl.show();
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+    this.statusEl = null;
+    this.retryBtnEl = null;
+    this.onDone();
   }
 }
 
@@ -318,7 +371,7 @@ export class OnedriveRevokeAuthModal extends Modal {
     contentEl.createEl("p", {
       text: t("modal_onedriverevokeauth_step1"),
     });
-    const consentUrl = "https://microsoft.com/consent";
+    const consentUrl = "https://account.live.com/consent/manage";
     contentEl.createEl("p").createEl("a", {
       href: consentUrl,
       text: consentUrl,
@@ -336,9 +389,14 @@ export class OnedriveRevokeAuthModal extends Modal {
         button.onClick(() => {
           void (async () => {
             try {
+              // SecretStorage 清空 token
+              this.plugin.tokenStorage.clearTokens();
+              // data.json 里的 onedrive config 也重置
               this.plugin.settings.onedrive = JSON.parse(
               JSON.stringify(DEFAULT_ONEDRIVE_CONFIG)
             ) as OnedriveConfig;
+            // 重置同步基线时间：换账号/重新授权后不应沿用旧游标
+            this.plugin.settings.lastSynced = -1;
             void this.plugin.saveSettings();
             const isAuthed = this.plugin.settings.onedrive.username !== "";
             this.authSetting.settingEl.toggleClass("tp-sync-auth-hidden", isAuthed);
@@ -762,30 +820,39 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
     // below for onedrive
     //////////////////////////////////////////////////
 
+    // 渲染 disclaimer：扫描 URL 并自动转为超链接
     for (const c of [
       t("settings_onedrive_disclaimer1"),
       t("settings_onedrive_disclaimer2"),
     ]) {
       const p = createEl("p");
-      p.textContent = c;
       p.className = "onedrive-disclaimer";
+      // 文本里可能包含 https://... URL，需要转成 <a>
+      // 用 \S+ 匹配连续非空白字符（URL 不会含空格），末尾若带句末标点再剥掉
+      const urlRegex = /(https?:\/\/\S+)/g;
+      let lastIndex = 0;
+      let match: RegExpExecArray | null;
+      while ((match = urlRegex.exec(c)) !== null) {
+        if (match.index > lastIndex) {
+          p.append(c.slice(lastIndex, match.index));
+        }
+        const a = p.createEl("a", {
+          text: match[0],
+          href: match[0],
+          cls: "tp-ext-link",
+        });
+        a.setAttr("target", "_blank");
+        lastIndex = match.index + match[0].length;
+      }
+      if (lastIndex < c.length) {
+        p.append(c.slice(lastIndex));
+      }
       onedriveDescEl.appendChild(p);
     }
 
     {
       const p = createEl("p");
-      p.textContent = t("settings_onedrive_folder", {
-        pluginID: this.plugin.manifest.id,
-        remoteBaseDir:
-          this.plugin.settings.onedrive.remoteBaseDir ||
-          this.app.vault.getName(),
-      });
-      onedriveDescEl.appendChild(p);
-    }
-
-    {
-      const p = createEl("p");
-      p.textContent = t("settings_onedrive_nobiz");
+      p.textContent = t("settings_onedrive_folder");
       onedriveDescEl.appendChild(p);
     }
 
@@ -797,8 +864,6 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       onedriveSettings.push(setting);
       onedriveRevokeAuthSetting = setting;
       if (!isOneDriveAuthenticated) setting.settingEl.addClass("tp-sync-revoke-hidden");
-      setting.settingEl.addClass("tp-no-border-top");
-      setting.settingEl.addClass("tp-no-box-shadow");
       setting.setName(t("settings_onedrive_revoke"))
         .setDesc(
           t("settings_onedrive_revoke_desc", {
@@ -822,22 +887,72 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
       onedriveSettings.push(setting);
       onedriveAuthSetting = setting;
       if (isOneDriveAuthenticated) setting.settingEl.addClass("tp-sync-auth-hidden");
-      setting.settingEl.addClass("tp-no-border-top");
-      setting.settingEl.addClass("tp-no-box-shadow");
       setting.setName(t("settings_onedrive_auth"))
         .setDesc(t("settings_onedrive_auth_desc"))
         .addButton((button) => {
           button.setButtonText(t("settings_onedrive_auth_button"));
-          button.onClick(() => {
+          button.onClick(async () => {
+            // 1) 请求设备码（在 Modal 外面，失败直接 Notice）
+            const cfg = this.plugin.settings.onedrive;
+            const flowClient = buildDeviceCodeFlowClientOnedrive(cfg);
+            let deviceCodeResp: DeviceCodeResponse;
+            try {
+              deviceCodeResp = await flowClient.requestDeviceCode();
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : String(err);
+              new Notice(msg);
+              log.debug("OnedriveAuth: requestDeviceCode failed", err);
+              return;
+            }
+
+            // 2) 开 Modal（纯展示）
             const modal = new OnedriveAuthModal(
               this.app,
               this.plugin,
-              onedriveRevokeAuthSetting
+              deviceCodeResp,
+              () => flowClient.cancelPolling(),
+              // eslint-disable-next-line @typescript-eslint/no-misused-promises -- onRetry 内部是 async IIFE
+              async () => {
+                // onRetry —— 关旧 Modal → 重新请求设备码 + 开新 Modal
+                modal.close();
+                try {
+                  const dc = await flowClient.requestDeviceCode();
+                  const m2 = new OnedriveAuthModal(
+                    this.app,
+                    this.plugin,
+                    dc,
+                    () => flowClient.cancelPolling(),
+                    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- 同上
+                    async () => {
+                      m2.close();
+                      try {
+                        const dc2 = await flowClient.requestDeviceCode();
+                        const m3 = new OnedriveAuthModal(
+                          this.app,
+                          this.plugin,
+                          dc2,
+                          () => flowClient.cancelPolling(),
+                          // eslint-disable-next-line @typescript-eslint/no-misused-promises -- 同上
+                          async () => { /* 不再嵌套 */ }
+                        );
+                        m3.open();
+                        void this.pollLoop(dc2, m3, flowClient);
+                      } catch {
+                        // 静默
+                      }
+                    }
+                  );
+                  m2.open();
+                  void this.pollLoop(dc, m2, flowClient);
+                } catch (e) {
+                  new Notice(e instanceof Error ? e.message : String(e));
+                }
+              }
             );
-            this.plugin.oauth2Info.helperModal = modal;
-            this.plugin.oauth2Info.authSetting = onedriveAuthSetting;
-            this.plugin.oauth2Info.revokeAuthSetting = onedriveRevokeAuthSetting;
             modal.open();
+
+            // 3) 外部轮询
+            void this.pollLoop(deviceCodeResp, modal, flowClient);
           });
         });
     });
@@ -884,7 +999,9 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
               undefined,
               this.plugin.settings.onedrive,
               this.app.vault.getName(),
-              () => this.plugin.saveSettings()
+              () => this.plugin.saveSettings(),
+              this.plugin.tokenStorage,
+              buildDeviceCodeFlowClientOnedrive(this.plugin.settings.onedrive)
             );
 
             const errors = { msg: "" };
@@ -925,10 +1042,7 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
 
     {
       const p = createEl("p");
-      p.textContent = t("settings_webdav_folder", {
-        remoteBaseDir:
-          this.plugin.settings.webdav.remoteBaseDir || this.app.vault.getName(),
-      });
+      p.textContent = t("settings_webdav_folder");
       webdavDescEl.appendChild(p);
     }
 
@@ -1782,14 +1896,96 @@ export class ThirdPartySyncSettingTab extends PluginSettingTab {
   }
 
   private getClient() {
+    const isOnedrive = this.plugin.settings.serviceType === "onedrive";
     return new RemoteClient(
       this.plugin.settings.serviceType,
       this.plugin.settings.s3,
       this.plugin.settings.webdav,
       this.plugin.settings.onedrive,
       this.app.vault.getName(),
-      () => this.plugin.saveSettings()
+      () => this.plugin.saveSettings(),
+      isOnedrive ? this.plugin.tokenStorage : undefined,
+      isOnedrive
+        ? buildDeviceCodeFlowClientOnedrive(this.plugin.settings.onedrive)
+        : undefined
     )
+  }
+
+  /** 把 AuthenticationError.code 映射成用户可读的 i18n 文案 */
+  private describeAuthError(err: unknown): string {
+    const e = err as { code?: string; message?: string };
+    const t = (x: TransItemType) => this.plugin.i18n.t(x);
+    switch (e.code) {
+      case "personal_only":
+        return t("onedrive_auth_err_personal_only");
+      case "code_expired":
+        return t("onedrive_auth_err_code_expired");
+      case "declined":
+        return t("onedrive_auth_err_declined");
+      case "cancelled":
+        return t("onedrive_auth_err_cancelled");
+      case "network":
+        return t("onedrive_auth_err_network");
+      default:
+        return e.message || t("onedrive_auth_err_unknown");
+    }
+  }
+
+  /** Astra startAuth 里的外部轮询 —— 轮询完成后调 modal.markSuccess/markFailed */
+  private async pollLoop(
+    deviceCodeResp: DeviceCodeResponse,
+    modal: OnedriveAuthModal,
+    flowClient: DeviceCodeFlowClient
+  ): Promise<void> {
+    let token;
+    try {
+      token = await flowClient.pollForToken(
+        deviceCodeResp.device_code,
+        deviceCodeResp.interval,
+        deviceCodeResp.expires_in
+      );
+      if (!token) return; // cancelled by user (onDone 里 cancelPolling 了)
+    } catch (err) {
+      modal.markFailed(`${this.plugin.i18n.t("modal_onedriveauth_failed")}: ${this.describeAuthError(err)}`);
+      return;
+    }
+
+    // 拿到 token → 写 SecretStorage
+    this.plugin.tokenStorage.setTokens(
+      token.access_token,
+      token.refresh_token ?? "",
+      token.expires_in
+    );
+
+    // 拉取用户名（失败不阻断授权）
+    try {
+      const client = new RemoteClient(
+        "onedrive",
+        undefined,
+        undefined,
+        this.plugin.settings.onedrive,
+        this.app.vault.getName(),
+        async () => await this.plugin.saveSettings(),
+        this.plugin.tokenStorage,
+        buildDeviceCodeFlowClientOnedrive(this.plugin.settings.onedrive)
+      );
+      const username = await client.getUser();
+      this.plugin.settings.onedrive.username = username;
+    } catch (err) {
+      log.debug("OneDrive getUser after auth failed:", err);
+    }
+    await this.plugin.saveSettings();
+
+    // 授权/撤回 按钮互斥显隐 + Notice
+    this.hide();
+    this.display();
+    new Notice(
+      this.plugin.i18n.t("protocol_onedrive_connect_succ_revoke", {
+        username: this.plugin.settings.onedrive.username,
+      })
+    );
+
+    modal.markSuccess();
   }
 
   hide() {

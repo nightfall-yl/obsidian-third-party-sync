@@ -4,11 +4,9 @@ import type {
   UploadSession,
   User,
 } from "@microsoft/microsoft-graph-types";
-import { requestUrl, RequestUrlParam, Vault } from "obsidian";
+import { requestUrl, Vault } from "obsidian";
 import {
-  COMMAND_CALLBACK_ONEDRIVE,
   DEFAULT_CONTENT_TYPE,
-  OAUTH2_FORCE_EXPIRE_MILLISECONDS,
   OnedriveConfig,
   RemoteItem,
 } from "./baseTypes";
@@ -18,14 +16,13 @@ import {
   getRandomArrayBuffer,
   getRandomIntInclusive,
   mkdirpInVault,
-  encodeBase64,
 } from "./misc";
+import { DeviceCodeFlowClient, OAuthEndpoints } from "./onedriveAuth";
+import type { TokenStorage } from "./tokenStorage";
 
 import { log } from "./moreOnLog";
 
 const SCOPES = ["User.Read", "Files.ReadWrite.AppFolder", "offline_access"];
-const REDIRECT_URI = `obsidian://${COMMAND_CALLBACK_ONEDRIVE}`;
-const ONEDRIVE_AUTH_TIMEOUT_MS = 30000;
 
 export const DEFAULT_ONEDRIVE_CONFIG: OnedriveConfig = {
   accessToken: "",
@@ -40,206 +37,93 @@ export const DEFAULT_ONEDRIVE_CONFIG: OnedriveConfig = {
 };
 
 ////////////////////////////////////////////////////////////////////////////////
-// Onedrive authorization using PKCE
+// Onedrive authorization using Device Code Flow (RFC 8628)
 ////////////////////////////////////////////////////////////////////////////////
 
-// Helper functions for PKCE
-async function generateCodeVerifier(): Promise<string> {
-  const arrayBuffer = new Uint8Array(32);
-  const crypto = (typeof window !== 'undefined' && window.crypto);
-  if (!crypto || !crypto.getRandomValues) {
-    throw new Error('Crypto API not available');
-  }
-  crypto.getRandomValues(arrayBuffer);
-  return encodeBase64(String.fromCharCode(...arrayBuffer))
-    .replace(/=/g, '')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_');
-}
-
-async function generateCodeChallenge(verifier: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(verifier);
-  const crypto = (typeof window !== 'undefined' && window.crypto);
-  if (!crypto || !crypto.subtle || !crypto.subtle.digest) {
-    throw new Error('Crypto subtle API not available');
-  }
-  const digest = await crypto.subtle.digest('SHA-256', data);
-  return encodeBase64(String.fromCharCode(...new Uint8Array(digest)))
-    .replace(/=/g, '')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_');
-}
-
-export async function getAuthUrlAndVerifier(
-  clientID: string,
-  authority: string
-) {
-  const verifier = await generateCodeVerifier();
-  const challenge = await generateCodeChallenge(verifier);
-
-  // Build OAuth2 authorization URL manually (msal-browser v3 removed getAuthCodeUrl from PublicClientApplication)
-  const baseAuthority = authority.replace(/\/$/, ""); // strip trailing slash
-  const params = new URLSearchParams({
-    client_id: clientID,
-    response_type: "code",
-    redirect_uri: REDIRECT_URI,
-    scope: SCOPES.join(" "),
-    code_challenge: challenge,
-    code_challenge_method: "S256",
-    response_mode: "query",
-  });
-  const authCodeUrl = `${baseAuthority}/oauth2/v2.0/authorize?${params.toString()}`;
-
+function buildOAuthEndpoints(authority: string): OAuthEndpoints {
+  const base = authority.replace(/\/$/, "");
   return {
-    authUrl: authCodeUrl,
-    verifier: verifier,
+    deviceCode: `${base}/oauth2/v2.0/devicecode`,
+    token: `${base}/oauth2/v2.0/token`,
   };
 }
+
+/** 构造设备码授权客户端（供设置页授权弹窗使用） */
+export function buildDeviceCodeFlowClient(
+  cfg: OnedriveConfig
+): DeviceCodeFlowClient {
+  return new DeviceCodeFlowClient({
+    clientId: cfg.clientID,
+    endpoints: buildOAuthEndpoints(cfg.authority),
+    scopes: SCOPES,
+  });
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// HTTP helpers — transient retry + humanized errors
+////////////////////////////////////////////////////////////////////////////////
+
+/** 瞬态 HTTP 状态：Graph 网关抖动/限流，重试一下就好 */
+const TRANSIENT_STATUSES = new Set([429, 502, 503, 504]);
+export const isTransientHttpStatus = (status: number): boolean =>
+  TRANSIENT_STATUSES.has(status);
+
+/** 指数退避 sleep（1s → 2s → 4s → …） */
+const sleepMs = (ms: number): Promise<void> =>
+  new Promise<void>((res) => window.setTimeout(res, ms));
 
 /**
- * Check doc from
- * https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-auth-code-flow
- * https://docs.microsoft.com/en-us/onedrive/developer/rest-api/getting-started/graph-oauth?view=odsp-graph-online#code-flow
+ * 把 raw API 错误映射成 Notice 层的中文文案。
+ * 原始错误保留在 err.cause?.rawBody / err.message 里供调试，
+ * 用户只看到友好的一句话。
  */
-export interface AccessCodeResponseSuccessfulType {
-  token_type: "Bearer" | "bearer";
-  expires_in: number;
-  ext_expires_in?: number;
-  scope: string;
-  access_token: string;
-  refresh_token?: string;
-  id_token?: string;
-}
-export interface AccessCodeResponseFailedType {
-  error: string;
-  error_description: string;
-  error_codes: number[];
-  timestamp: string;
-  trace_id: string;
-  correlation_id: string;
-}
+export const humanizeApiError = (err: unknown): string => {
+  if (err === null || err === undefined) {
+    return "";
+  }
+  if (typeof err === "string") {
+    return err;
+  }
+  if (!(err instanceof Error)) {
+    return "";
+  }
+  const e = err as Error & { status?: number; code?: string };
+  const status = e.status;
+  const code = e.code;
 
-export const sendAuthReq = async (
-  clientID: string,
-  authority: string,
-  authCode: string,
-  verifier: string
-): Promise<AccessCodeResponseSuccessfulType | AccessCodeResponseFailedType> => {
-  try {
-    // 从 authority URL 提取 tenant
-    const authorityUrl = new URL(authority);
-    const tenant = authorityUrl.pathname.replace(/^\//, "") || "common";
-
-    const requestPromise = requestUrl({
-      url: `${authority.replace(/\/$/, "")}/oauth2/v2.0/token`,
-      method: "POST",
-      contentType: "application/x-www-form-urlencoded",
-      // Do NOT throw on non-2xx: we must read the response body to surface the
-      // real Azure error_description (AADSTSxxxxx) instead of a bare "400".
-      throw: false,
-      body: new URLSearchParams({
-        tenant: tenant,
-        client_id: clientID,
-        scope: SCOPES.join(" "),
-        code: authCode,
-        redirect_uri: REDIRECT_URI,
-        grant_type: "authorization_code",
-        code_verifier: verifier,
-      }).toString(),
-    }).json;
-
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      window.setTimeout(() => {
-        reject(Error("请求超时（30秒）。请检查网络连接后重试。"));
-      }, ONEDRIVE_AUTH_TIMEOUT_MS);
-    });
-
-    const rsp = await Promise.race([requestPromise, timeoutPromise]) as AccessCodeResponseSuccessfulType | AccessCodeResponseFailedType;
-
-    if (rsp.error !== undefined) {
-      const rspFailed = rsp as AccessCodeResponseFailedType;
-      log.debug("OneDrive auth error:", rspFailed);
-      const errorMsg = rspFailed.error_description || rspFailed.error || "未知错误";
-      return {
-        ...rspFailed,
-        error_description: errorMsg,
-      };
-    } else {
-      return rsp;
+  if (status !== undefined) {
+    switch (status) {
+      case 401:
+        return "OneDrive 授权已失效，请重新授权";
+      case 403:
+        return "OneDrive 拒绝访问（权限不足或租户策略限制）";
+      case 404:
+      case 410:
+        return "OneDrive 上找不到这个文件";
+      case 429:
+        return "OneDrive 请求过于频繁（限流），请稍后再试";
+      case 502:
+      case 503:
+      case 504:
+        return "OneDrive 服务暂时不可用，请稍后重试";
     }
-  } catch (err: unknown) {
-    log.debug("OneDrive auth request failed:", err);
-    const error = err as { response?: { data?: string | Record<string, unknown> }; message?: string };
-    // 尝试解析响应体获取更详细的错误信息
-    if (error.response && error.response.data) {
-      const errorData: Record<string, unknown> = typeof error.response.data === 'string'
-        ? JSON.parse(error.response.data) as Record<string, unknown>
-        : error.response.data;
-      const desc = typeof errorData.error_description === "string" ? errorData.error_description : "";
-      const errCode = typeof errorData.error === "string" ? errorData.error : "";
-      throw Error(`Azure API 错误: ${desc || errCode || JSON.stringify(errorData)}`);
+  }
+
+  if (code !== undefined) {
+    switch (code) {
+      case "UnknownError":
+      case "generalException":
+        return "OneDrive 服务暂时异常，请稍后重试";
+      case "itemNotFound":
+        return "OneDrive 上找不到这个文件";
+      case "accessDenied":
+        return "OneDrive 拒绝访问（权限不足）";
+      case "invalidInput":
+        return "请求参数有误";
     }
-    
-    throw Error(`网络请求失败: ${err.message || err}`);
   }
-};
 
-export const sendRefreshTokenReq = async (
-  clientID: string,
-  authority: string,
-  refreshToken: string
-): Promise<AccessCodeResponseSuccessfulType | AccessCodeResponseFailedType> => {
-  // also use Obsidian request to bypass CORS issue.
-  const body = new URLSearchParams({
-    tenant: "consumers",
-    client_id: clientID,
-    scope: SCOPES.join(" "),
-    refresh_token: refreshToken,
-    grant_type: "refresh_token",
-  }).toString();
-  
-  const requestParams: RequestUrlParam = {
-    url: `${authority.replace(/\/$/, "")}/oauth2/v2.0/token`,
-    method: "POST",
-    contentType: "application/x-www-form-urlencoded",
-    throw: false, // surface real Azure error body on non-2xx
-    body: body,
-  };
-  
-  const requestPromise = requestUrl(requestParams).json;
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    window.setTimeout(() => {
-      reject(Error("请求超时（30秒）。请检查网络连接后重试。"));
-    }, ONEDRIVE_AUTH_TIMEOUT_MS);
-  });
-  const rsp = await Promise.race([requestPromise, timeoutPromise]) as Record<string, unknown>;
-
-  if (rsp.error !== undefined) {
-    return rsp as AccessCodeResponseFailedType;
-  } else {
-    return rsp as AccessCodeResponseSuccessfulType;
-  }
-};
-
-export const setConfigBySuccessfullAuthInplace = async (
-  config: OnedriveConfig,
-  authRes: AccessCodeResponseSuccessfulType,
-  saveUpdatedConfigFunc: () => Promise<void> | undefined
-) => {
-  config.accessToken = authRes.access_token;
-  config.accessTokenExpiresAtTime =
-    Date.now() + authRes.expires_in * 1000 - 5 * 60 * 1000;
-  config.accessTokenExpiresInSeconds = authRes.expires_in;
-  config.refreshToken = authRes.refresh_token;
-
-  // manually set it expired after 80 days;
-  config.credentialsShouldBeDeletedAtTime =
-    Date.now() + OAUTH2_FORCE_EXPIRE_MILLISECONDS;
-
-  if (saveUpdatedConfigFunc !== undefined) {
-    await saveUpdatedConfigFunc();
-  }
+  return e.message;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -441,6 +325,10 @@ export const isDeleteResponseDone = (status: number): boolean => {
  * relies on. Used by every request path that reads the response itself
  * (`throw: false`) instead of letting `requestUrl` throw an opaque
  * `Request failed, status <code>` error.
+ *
+ * The raw body is stored on `cause` (accessible via `err.cause.rawBody`)
+ * but intentionally NOT concatenated into the message — end-users see a short
+ * summary, while debugging still has the full payload available.
  */
 export const buildRemoteApiError = (
   method: string,
@@ -449,7 +337,7 @@ export const buildRemoteApiError = (
   rawJson: unknown,
   rawText: unknown,
   detail: string = ""
-): Error & { status?: number; code?: string } => {
+): Error & { status?: number; code?: string; cause?: unknown } => {
   // `resp.json` is null when the body is not JSON; fall back to parsing text so
   // the Graph error code survives on every platform.
   let parsed: Record<string, unknown> | undefined;
@@ -470,9 +358,10 @@ export const buildRemoteApiError = (
   const apiError = Error(
     `OneDrive API ${method} ${theUrl} 失败 (HTTP ${status}): ${
       detail || "无解析详情"
-    }\nRAW BODY: ${raw}`
-  ) as Error & { status?: number; code?: string };
+    }`
+  ) as Error & { status?: number; code?: string; cause?: unknown };
   apiError.status = status;
+  apiError.cause = { rawBody: raw };
   const graphErr = parsed?.error as Record<string, unknown> | undefined;
   if (graphErr !== undefined && typeof graphErr.code === "string") {
     apiError.code = graphErr.code;
@@ -484,137 +373,189 @@ export const buildRemoteApiError = (
 // Uses `throw: false` so a non-2xx response (e.g. HTTP 400) is returned instead
 // of being swallowed by an opaque RequestUrlError, then surfaces the real Graph
 // error code/message + HTTP status.
+//
+// Transient server failures (429/502/503/504) are retried up to 3 times with
+// exponential backoff (1s → 2s → 4s); permanent failures throw immediately.
+const MAX_RETRIES = 3;
+const RETRY_BASE_MS = 1000;
+
+/** resp.json 是惰性 getter，非 JSON 响应体（HTML 错误页/空 body）会在 getter 里抛 SyntaxError；
+ * 这里只读 text 手动解析，失败就返回 undefined。 */
+function parseJsonBodySafe(text: string): Record<string, unknown> | undefined {
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    if (parsed !== null && typeof parsed === "object") {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    // not JSON
+  }
+  return undefined;
+}
+
+/** Graph error innerError 递归走查，拿根因 code + message */
+function collectErrorDetail(node: unknown, depth: number): string {
+  if (node === undefined || node === null || typeof node !== "object") {
+    return "";
+  }
+  const obj = node as Record<string, unknown>;
+  const parts: string[] = [];
+  if (typeof obj.code === "string") {
+    parts.push(obj.code);
+  }
+  if (typeof obj.message === "string") {
+    parts.push(obj.message);
+  }
+  let inner = "";
+  if (depth < 5 && obj.innerError && typeof obj.innerError === "object") {
+    inner = collectErrorDetail(obj.innerError, depth + 1);
+  }
+  const joined = parts.filter(Boolean).join(" ");
+  return [joined, inner].filter(Boolean).join(" → ");
+}
+
+/** 把 finalizeApiError 抽出来：2xx 走 parseJsonBodySafe，非 2xx 走 buildRemoteApiError */
+function finalizeApiError(
+  method: string,
+  theUrl: string,
+  status: number,
+  rawText: unknown
+): Record<string, unknown> {
+  if (status < 400) {
+    return (
+      parseJsonBodySafe(
+        typeof rawText === "string" ? rawText : ""
+      ) ?? {}
+    );
+  }
+  const parsed =
+    typeof rawText === "string" ? parseJsonBodySafe(rawText) : undefined;
+
+  if (parsed !== undefined) {
+    const o = parsed as {
+      error?: unknown;
+      error_description?: string;
+    };
+    if (o.error !== undefined || o.error_description !== undefined) {
+      let detail = collectErrorDetail(o.error, 0);
+      if (!detail && typeof o.error === "string") {
+        detail = o.error;
+      }
+      if (o.error_description) {
+        detail = detail
+          ? `${detail} — ${o.error_description}`
+          : o.error_description;
+      }
+      throw buildRemoteApiError(
+        method,
+        theUrl,
+        status,
+        parsed,
+        rawText,
+        detail
+      );
+    }
+  }
+  // 非 2xx 且没解析到标准 Graph error body → bare error status
+  throw buildRemoteApiError(method, theUrl, status, null, rawText);
+}
+
 const oneDriveApiRequest = async (
   method: string,
   theUrl: string,
   headers: Record<string, string>,
   body?: string
 ): Promise<Record<string, unknown>> => {
-  const resp = await requestUrl({
-    url: theUrl,
-    method,
-    contentType: "application/json",
-    throw: false,
-    headers,
-    ...(body !== undefined ? { body } : {}),
-  });
-  const json = (resp.json ?? {}) as Record<string, unknown>;
-  const o = json as {
-    error?: unknown;
-    error_description?: string;
-    status?: number;
-  };
+  let resp: { status: number; text: string | null } | null = null;
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    if (attempt > 0) {
+      const backoff = RETRY_BASE_MS * 2 ** (attempt - 1);
+      log.warn(
+        `oneDriveApiRequest retry ${attempt}/${MAX_RETRIES} after HTTP ${resp?.status}, backoff=${backoff}ms: ${method} ${theUrl}`
+      );
+      await sleepMs(backoff);
+    }
 
-  // Graph errors nest the real cause inside error.innerError:
-  //   { "error": { "code":"invalidRequest", "message":"Invalid request",
-  //                "innerError": { "code":"...", "message":"..." } } }
-  // Recursively walk innerError to surface the actual reason instead of the
-  // generic outer message, so the root cause is visible to the user.
-  const collectErrorDetail = (node: unknown, depth: number): string => {
-    if (node === undefined || node === null || typeof node !== "object") {
-      return "";
-    }
-    const obj = node as Record<string, unknown>;
-    const parts: string[] = [];
-    if (typeof obj.code === "string") {
-      parts.push(obj.code);
-    }
-    if (typeof obj.message === "string") {
-      parts.push(obj.message);
-    }
-    let inner = "";
-    if (
-      depth < 5 &&
-      obj.innerError &&
-      typeof obj.innerError === "object"
-    ) {
-      inner = collectErrorDetail(obj.innerError, depth + 1);
-    }
-    const joined = parts.filter(Boolean).join(" ");
-    return [ joined, inner ].filter(Boolean).join(" → ");
-  };
+    const r = await requestUrl({
+      url: theUrl,
+      method,
+      contentType: "application/json",
+      throw: false,
+      headers,
+      ...(body !== undefined ? { body } : {}),
+    });
+    resp = { status: r.status, text: r.text };
 
-  if (o.error !== undefined || o.error_description !== undefined) {
-    let detail = collectErrorDetail(o.error, 0);
-    // Try parsing error as a plain string fallback
-    if (!detail && typeof o.error === "string") {
-      detail = o.error;
+    if (r.status < 400) {
+      break; // 成功退出循环，交给 finalizeApiError 返回
     }
-    if (o.error_description) {
-      detail = detail ? `${detail} — ${o.error_description}` : o.error_description;
+    // 永久错误（401/403/404/410/...）——立即抛出不重试
+    if (!isTransientHttpStatus(r.status)) {
+      return finalizeApiError(method, theUrl, r.status, r.text);
     }
-    // Always append the RAW response body so any detail we failed to parse
-    // (e.g. innerError under a different key, or non-JSON payload) is visible.
-    const raw = typeof resp.text === "string" ? resp.text : JSON.stringify(json);
-    const apiError = Error(
-      `OneDrive API ${method} ${theUrl} 失败 (HTTP ${resp.status}): ${detail || "无解析详情"}\nRAW BODY: ${raw}`
-    ) as Error & { status?: number; code?: string };
-    // Attach machine-readable metadata so callers can tell "the item is gone"
-    // (404/410/itemNotFound) from auth / throttling / server / network failures
-    // without parsing the human-readable message.
-    apiError.status = resp.status;
-    const graphErr = json.error as Record<string, unknown> | undefined;
-    if (graphErr !== undefined && typeof graphErr.code === "string") {
-      apiError.code = graphErr.code;
-    }
-    throw apiError;
+    // 瞬态错误 —— 继续循环（除非最后一次了）
   }
-  // A non-2xx response without a Graph error body (e.g. a bare 404) must still
-  // fail here, with the status attached, instead of yielding `{}` downstream.
-  if (resp.status >= 400) {
-    const apiError = Error(
-      `OneDrive API ${method} ${theUrl} 失败 (HTTP ${resp.status})`
-    ) as Error & { status?: number; code?: string };
-    apiError.status = resp.status;
-    throw apiError;
+
+  if (resp === null) {
+    throw new Error("oneDriveApiRequest: no response");
   }
-  return json;
+  return finalizeApiError(method, theUrl, resp.status, resp.text);
 };
 
+/**
+ * AuthProvider：每次 Graph API 调用前由 getAccessToken() 触发。
+ *
+ * - access token 过期前 2 分钟自动 refresh
+ * - refresh 串行化（单飞锁），避免并发请求互相 invalidate refresh token
+ * - Token 持久化完全走 TokenStorage（SecretStorage）
+ */
 class MyAuthProvider implements AuthenticationProvider {
-  onedriveConfig: OnedriveConfig;
-  saveUpdatedConfigFunc: () => Promise<void>;
+  private refreshPromise: Promise<void> | null = null;
+  readonly tokenStorage: TokenStorage;
+
   constructor(
-    onedriveConfig: OnedriveConfig,
-    saveUpdatedConfigFunc: () => Promise<void>
+    tokenStorage: TokenStorage,
+    private readonly flowClient: DeviceCodeFlowClient
   ) {
-    this.onedriveConfig = onedriveConfig;
-    this.saveUpdatedConfigFunc = saveUpdatedConfigFunc;
+    this.tokenStorage = tokenStorage;
   }
-  getAccessToken = async () => {
-    if (
-      this.onedriveConfig.accessToken === "" ||
-      this.onedriveConfig.refreshToken === ""
-    ) {
-      throw Error("The user has not manually auth yet.");
+
+  getAccessToken = async (): Promise<string> => {
+    if (!this.tokenStorage.hasTokens()) {
+      throw new Error("尚未完成 OneDrive 鉴权，请在设置页点击「授权 OneDrive」。");
     }
 
-    const currentTs = Date.now();
-    if (this.onedriveConfig.accessTokenExpiresAtTime > currentTs) {
-      return this.onedriveConfig.accessToken;
-    } else {
-      // use refreshToken to refresh
-      const r = await sendRefreshTokenReq(
-        this.onedriveConfig.clientID,
-        this.onedriveConfig.authority,
-        this.onedriveConfig.refreshToken
-      );
-      if ((r as Record<string, unknown>).error !== undefined) {
-        const r2 = r as AccessCodeResponseFailedType;
-        throw Error(
-          `Error while refreshing accessToken: ${r2.error}, ${String(r2.error_codes)}: ${r2.error_description}`
-        );
-      }
-      const r2 = r as AccessCodeResponseSuccessfulType;
-      this.onedriveConfig.accessToken = r2.access_token;
-      this.onedriveConfig.refreshToken = r2.refresh_token;
-      this.onedriveConfig.accessTokenExpiresInSeconds = r2.expires_in;
-      this.onedriveConfig.accessTokenExpiresAtTime =
-        currentTs + r2.expires_in * 1000 - 60 * 2 * 1000;
-      await this.saveUpdatedConfigFunc();
-      return this.onedriveConfig.accessToken;
+    if (!this.tokenStorage.isAccessTokenExpired(120_000)) {
+      const at = this.tokenStorage.getAccessToken();
+      if (!at) throw new Error("Token 存储异常，请重新授权。");
+      return at;
     }
+
+    // 过期了 → 单飞锁下 refresh
+    if (this.refreshPromise === null) {
+      this.refreshPromise = this.doRefresh().finally(() => {
+        this.refreshPromise = null;
+      });
+    }
+    await this.refreshPromise;
+
+    const at = this.tokenStorage.getAccessToken();
+    if (!at) throw new Error("Token 存储异常，请重新授权。");
+    return at;
   };
+
+  private async doRefresh(): Promise<void> {
+    const rt = this.tokenStorage.getRefreshToken();
+    if (!rt) {
+      throw new Error("没有 refresh token，请在设置页重新授权。");
+    }
+    const resp = await this.flowClient.refreshToken(rt);
+    this.tokenStorage.setTokens(
+      resp.access_token,
+      resp.refresh_token ?? rt,
+      resp.expires_in
+    );
+  }
 }
 
 export class WrappedOnedriveClient {
@@ -622,26 +563,26 @@ export class WrappedOnedriveClient {
   remoteBaseDir: string;
   vaultFolderExists: boolean;
   authGetter: MyAuthProvider;
-  saveUpdatedConfigFunc: () => Promise<void>;
+  /** 非敏感字段（deltaLink / remoteSnapshot）持久化回调；token 不再走这里 */
+  saveSettingsCb?: () => Promise<void>;
   constructor(
     onedriveConfig: OnedriveConfig,
     remoteBaseDir: string,
-    saveUpdatedConfigFunc: () => Promise<void>
+    tokenStorage: TokenStorage,
+    flowClient: DeviceCodeFlowClient,
+    saveSettingsCb?: () => Promise<void>
   ) {
     this.onedriveConfig = onedriveConfig;
     this.remoteBaseDir = remoteBaseDir;
     this.vaultFolderExists = false;
-    this.saveUpdatedConfigFunc = saveUpdatedConfigFunc;
-    this.authGetter = new MyAuthProvider(onedriveConfig, saveUpdatedConfigFunc);
+    this.saveSettingsCb = saveSettingsCb;
+    this.authGetter = new MyAuthProvider(tokenStorage, flowClient);
   }
 
   init = async () => {
-    // check token
-    if (
-      this.onedriveConfig.accessToken === "" ||
-      this.onedriveConfig.refreshToken === ""
-    ) {
-      throw Error("The user has not manually auth yet.");
+    // check token (SecretStorage via TokenStorage)
+    if (!this.authGetter.tokenStorage.hasTokens()) {
+      throw Error("尚未完成 OneDrive 鉴权，请在设置页点击「授权 OneDrive」。");
     }
 
     // Ensure the vault folder exists under approot.
@@ -817,12 +758,16 @@ export class WrappedOnedriveClient {
 export const getOnedriveClient = (
   onedriveConfig: OnedriveConfig,
   remoteBaseDir: string,
-  saveUpdatedConfigFunc: () => Promise<unknown>
+  tokenStorage: TokenStorage,
+  flowClient: DeviceCodeFlowClient,
+  saveSettingsCb?: () => Promise<void>
 ) => {
   return new WrappedOnedriveClient(
     onedriveConfig,
     remoteBaseDir,
-    saveUpdatedConfigFunc
+    tokenStorage,
+    flowClient,
+    saveSettingsCb
   );
 };
 
@@ -924,7 +869,7 @@ export const listFromRemote = async (
       );
       client.onedriveConfig.deltaLink = "";
       client.onedriveConfig.remoteSnapshot = undefined;
-      await client.saveUpdatedConfigFunc();
+      await client.saveSettingsCb?.();
       usedFullEnumeration = true;
     }
   } else {
@@ -997,7 +942,7 @@ export const listFromRemote = async (
     // rebuilds the baseline from a full enumeration instead of carrying it on.
     client.onedriveConfig.deltaLink = "";
     client.onedriveConfig.remoteSnapshot = undefined;
-    await client.saveUpdatedConfigFunc();
+    await client.saveSettingsCb?.();
   } else {
     // persist deltaLink + snapshot
     if (newDeltaLink) {
@@ -1006,7 +951,7 @@ export const listFromRemote = async (
     // only a full enumeration resets the snapshot; delta resume merges
     // incrementally into the existing snapshot
     client.onedriveConfig.remoteSnapshot = snapshot;
-    await client.saveUpdatedConfigFunc();
+    await client.saveSettingsCb?.();
   }
 
   // return the full Contents
@@ -1274,7 +1219,7 @@ export const removeFromRemoteSnapshot = async (
     return;
   }
   delete snapshot[key];
-  await client.saveUpdatedConfigFunc();
+  await client.saveSettingsCb?.();
 };
 
 export const checkConnectivity = async (
@@ -1312,5 +1257,5 @@ export const getUserDisplayName = async (client: WrappedOnedriveClient) => {
 // };
 
 export const getRevokeAddr = async () => {
-  return "https://account.live.com/consent/Manage";
+  return "https://account.live.com/consent/manage";
 };

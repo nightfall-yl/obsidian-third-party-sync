@@ -1,8 +1,6 @@
 import {
-  Modal,
   Notice,
   Plugin,
-  Setting,
   setIcon,
   FileSystemAdapter,
   Platform, Vault, EventRef, TFile, normalizePath,
@@ -16,7 +14,6 @@ import type {
 } from "./baseTypes";
 import {
   COMMAND_CALLBACK,
-  COMMAND_CALLBACK_ONEDRIVE,
   COMMAND_URI,
 } from "./baseTypes";
 import { importQrCodeUri } from "./importExport";
@@ -29,12 +26,7 @@ import {
   insertRenameRecordByVault,
 } from "./localdb";
 import { RemoteClient } from "./remote";
-import {
-  AccessCodeResponseSuccessfulType,
-  DEFAULT_ONEDRIVE_CONFIG,
-  sendAuthReq as sendAuthReqOnedrive,
-  setConfigBySuccessfullAuthInplace as setConfigBySuccessfullAuthInplaceOnedrive,
-} from "./remoteForOnedrive";
+import { DEFAULT_ONEDRIVE_CONFIG, buildDeviceCodeFlowClient, humanizeApiError } from "./remoteForOnedrive";
 import { DEFAULT_S3_CONFIG } from "./remoteForS3";
 import { DEFAULT_WEBDAV_CONFIG } from "./remoteForWebdav";
 import { ThirdPartySyncSettingTab } from "./settings";
@@ -47,6 +39,7 @@ import type { LangTypeAndAuto, TransItemType } from "./i18n";
 import { SyncAlgoV2Modal } from "./syncAlgoV2Notice";
 import { applyPresetRulesInplace } from "./presetRules";
 import { SyncAutoScheduler, type AutoSyncSource } from "./syncScheduler";
+import { TokenStorage } from "./tokenStorage";
 
 import { log } from "./moreOnLog";
 import AggregateError from "aggregate-error";
@@ -81,13 +74,6 @@ const DEFAULT_SETTINGS: ThirdPartySyncPluginSettings = {
   deleteToWhere: "system_trash",
 };
 
-interface OAuth2Info {
-  verifier?: string;
-  helperModal?: Modal;
-  authSetting?: Setting;
-  revokeAuthSetting?: Setting;
-}
-
 const iconNameSyncWait = "rotate-ccw";
 const iconNameSyncRunning = "refresh-ccw";
 
@@ -106,7 +92,6 @@ export default class ThirdPartySyncPlugin extends Plugin {
   db: InternalDBs;
   syncStatus: SyncStatusType;
   statusBarElement: HTMLSpanElement;
-  oauth2Info: OAuth2Info;
   currSyncMsg?: string;
   syncRibbon?: HTMLElement;
   i18n: I18n;
@@ -119,6 +104,8 @@ export default class ThirdPartySyncPlugin extends Plugin {
   private vaultScannerIntervalId?: number;
   statusBarIntervalID: number;
   currentTriggerSource?: SyncTriggerSourceType;
+  /** Device Code Flow token 存储（Obsidian SecretStorage） */
+  tokenStorage: TokenStorage = new TokenStorage();
 
   async syncRun(triggerSource: SyncTriggerSourceType = "manual") {
     this.isManual = triggerSource === "manual";
@@ -406,10 +393,12 @@ export default class ThirdPartySyncPlugin extends Plugin {
       getNotice(triggerSource, msg, 10 * 1000);
       if (error instanceof AggregateError) {
         for (const e of error.errors) {
-          getNotice(triggerSource, (e as Error).message, 10 * 1000);
+          const errMsg = humanizeApiError(e) || ((e as Error).message);
+          getNotice(triggerSource, errMsg, 10 * 1000);
         }
       } else {
-        getNotice(triggerSource, (error as Error).message, 10 * 1000);
+        const errMsg = humanizeApiError(error) || (error instanceof Error ? error.message : String(error));
+        getNotice(triggerSource, errMsg, 10 * 1000);
       }
       this.updateSyncStatus("idle");
       this.setSyncIcon(false);
@@ -536,7 +525,11 @@ export default class ThirdPartySyncPlugin extends Plugin {
       this.settings.webdav,
       this.settings.onedrive,
       this.app.vault.getName(),
-      () => self.saveSettings()
+      () => self.saveSettings(),
+      this.settings.serviceType === "onedrive" ? this.tokenStorage : undefined,
+      this.settings.serviceType === "onedrive"
+        ? buildDeviceCodeFlowClient(this.settings.onedrive)
+        : undefined
     );
     return client;
   }
@@ -659,13 +652,6 @@ export default class ThirdPartySyncPlugin extends Plugin {
   }
 
   async onload() {
-    this.oauth2Info = {
-      verifier: "",
-      helperModal: undefined,
-      authSetting: undefined,
-      revokeAuthSetting: undefined,
-    }; // init
-
     this.currSyncMsg = "";
 
     await this.loadSettings();
@@ -683,6 +669,20 @@ export default class ThirdPartySyncPlugin extends Plugin {
     if (this.settings.debugEnabled) {
       log.setLevel("debug");
     }
+
+    // ── Device Code Flow 时代：初始化 TokenStorage ──
+    // SecretStorage 优先；为空则从 data.json 的旧字段迁入并清空。
+    await this.tokenStorage.initialize(
+      this.app,
+      this.settings.onedrive,
+      async () => {
+        this.settings.onedrive.accessToken = "";
+        this.settings.onedrive.refreshToken = "";
+        this.settings.onedrive.accessTokenExpiresAtTime = 0;
+        this.settings.onedrive.accessTokenExpiresInSeconds = 0;
+        await this.saveSettings();
+      }
+    );
 
     await this.checkIfOauthExpires();
 
@@ -774,109 +774,6 @@ export default class ThirdPartySyncPlugin extends Plugin {
       }
     );
 
-    this.registerObsidianProtocolHandler(
-      COMMAND_CALLBACK_ONEDRIVE,
-      async (inputParams) => {
-        try {
-          if (inputParams.code !== undefined) {
-            if (!this.oauth2Info.verifier) {
-              throw Error("OneDrive auth verifier is missing. Please restart auth.");
-            }
-
-            if (this.oauth2Info.helperModal !== undefined) {
-              this.oauth2Info.helperModal.contentEl.empty();
-
-              t("protocol_onedrive_connecting")
-                .split("\n")
-                .forEach((val: string) => {
-                  this.oauth2Info.helperModal.contentEl.createEl("p", {
-                    text: val,
-                  });
-                });
-            }
-
-            let rsp = await sendAuthReqOnedrive(
-              this.settings.onedrive.clientID,
-              this.settings.onedrive.authority,
-              inputParams.code,
-              this.oauth2Info.verifier
-            );
-
-            const rsp2 = rsp as Record<string, unknown>;
-            if (rsp2.error !== undefined) {
-              const errorMsg = typeof rsp2.error_description === "string" ? rsp2.error_description : JSON.stringify(rsp);
-              throw Error(`Azure API 错误: ${errorMsg}`);
-            }
-
-            await setConfigBySuccessfullAuthInplaceOnedrive(
-              this.settings.onedrive,
-              rsp as AccessCodeResponseSuccessfulType,
-              async () => await this.saveSettings()
-            );
-
-            const client = new RemoteClient(
-              "onedrive",
-              undefined,
-              undefined,
-              this.settings.onedrive,
-              this.app.vault.getName(),
-              async () => await this.saveSettings()
-            );
-            this.settings.onedrive.username = await client.getUser();
-            await this.saveSettings();
-
-            this.oauth2Info.verifier = ""; // reset it
-            this.oauth2Info.helperModal?.close(); // close it
-            this.oauth2Info.helperModal = undefined;
-
-            const isAuthed = this.settings.onedrive.username !== "";
-            if (this.oauth2Info.authSetting !== undefined) {
-              this.oauth2Info.authSetting.settingEl.toggleClass("tp-sync-auth-hidden", isAuthed);
-            }
-            this.oauth2Info.authSetting = undefined;
-
-            this.oauth2Info.revokeAuthSetting?.setDesc(
-              t("protocol_onedrive_connect_succ_revoke", {
-                username: this.settings.onedrive.username,
-              })
-            );
-            if (this.oauth2Info.revokeAuthSetting !== undefined) {
-              this.oauth2Info.revokeAuthSetting.settingEl.toggleClass("tp-sync-revoke-hidden", !isAuthed);
-            }
-            this.oauth2Info.revokeAuthSetting = undefined;
-
-            new Notice(t("protocol_onedrive_connect_succ_revoke", {
-              username: this.settings.onedrive.username,
-            }));
-          } else {
-            new Notice(t("protocol_onedrive_connect_fail"));
-            throw Error(
-              t("protocol_onedrive_connect_unknown", {
-                params: JSON.stringify(inputParams),
-              })
-            );
-          }
-        } catch (err: unknown) {
-          log.debug("OneDrive auth protocol handler error:", err);
-          const error = err as { message?: string };
-          // 关闭 helper modal 并显示错误
-          if (this.oauth2Info.helperModal) {
-            this.oauth2Info.helperModal.contentEl.empty();
-            this.oauth2Info.helperModal.contentEl.createEl("p", { text: "鉴权失败" });
-            this.oauth2Info.helperModal.contentEl.createEl("p", { 
-              text: error.message || "未知错误",
-              cls: "onedrive-auth-error"
-            });
-          }
-          
-          // 重置状态
-          this.oauth2Info.verifier = "";
-          this.oauth2Info.authSetting = undefined;
-          this.oauth2Info.revokeAuthSetting = undefined;
-        }
-      }
-    );
-
     this.syncRibbon = this.addRibbonIcon(
       iconNameSyncWait,
       `${this.manifest.name}`,
@@ -956,10 +853,6 @@ export default class ThirdPartySyncPlugin extends Plugin {
 
   onunload() {
     this.syncRibbon = undefined;
-    if (this.oauth2Info !== undefined) {
-      this.oauth2Info.helperModal = undefined;
-      this.oauth2Info = undefined;
-    }
 
     // 停止所有自动同步调度
     this.autoScheduler?.stop();
